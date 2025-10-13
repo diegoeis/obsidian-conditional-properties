@@ -154,7 +154,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	display() {
 		const { containerEl } = this;
 		containerEl.empty();
-			containerEl.createEl("h2", { text: "Conditional Properties - Rules" });
+			containerEl.createEl("h1", { text: "Conditional Properties" });
+			containerEl.createEl("p", { text: "Create rules to change note properties values based in custom conditions." });
+			containerEl.createEl("h3", { text: "Configurations" });
 
 			new Setting(containerEl)
 			.setName("Scan interval (minutes)")
@@ -184,6 +186,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				});
 
 			this.plugin.settings.rules = this.plugin.settings.rules || [];
+			containerEl.createEl("h3", { text: "Add rules" });
 			// Add button ABOVE the list
 			const addWrap = containerEl.createEl("div", { cls: "conditional-add-wrap" });
 			const addBtn = addWrap.createEl("button", { text: "+ Add rule" });
