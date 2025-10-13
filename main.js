@@ -154,9 +154,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	display() {
 		const { containerEl } = this;
 		containerEl.empty();
-		containerEl.createEl("h2", { text: "Conditional Properties - Rules" });
+			containerEl.createEl("h2", { text: "Conditional Properties - Rules" });
 
-		new Setting(containerEl)
+			new Setting(containerEl)
 			.setName("Scan interval (minutes)")
 			.setDesc("Minimum 5 minutes")
 			.addText(text => text
@@ -168,64 +168,77 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					new Notice("Interval updated. Restart Obsidian to apply immediately.");
 				}));
 
-		new Setting(containerEl)
+			const runNow = new Setting(containerEl)
 			.setName("Run now on entire vault")
 			.setDesc("Execute all rules across all notes")
-			.addButton(btn => btn.setButtonText("Run now").onClick(async () => {
+				.addButton(btn => {
+					btn.setButtonText("Run now");
+					btn.buttonEl.classList.add("run-now-button");
+					btn.onClick(async () => {
 				btn.setDisabled(true);
 				try {
 					const result = await this.plugin.runScan();
 					new Notice(`Conditional Properties: ${result.modified} modified / ${result.scanned} scanned`);
-				} finally { btn.setDisabled(false); }
-			}));
+					} finally { btn.setDisabled(false); }
+					});
+				});
 
-		this.plugin.settings.rules = this.plugin.settings.rules || [];
-		this.plugin.settings.rules.forEach((rule, idx) => this._renderRule(containerEl, rule, idx));
-		const addBtn = containerEl.createEl("button", { text: "+ Add rule" });
-		addBtn.onclick = async () => {
-			this.plugin.settings.rules.push({ ifProp: "", ifValue: "", op: "equals", thenProp: "", thenValue: "" });
-			await this.plugin.saveData(this.plugin.settings);
-			this.display();
-		};
+			this.plugin.settings.rules = this.plugin.settings.rules || [];
+			// Add button ABOVE the list
+			const addWrap = containerEl.createEl("div", { cls: "conditional-add-wrap" });
+			const addBtn = addWrap.createEl("button", { text: "+ Add rule" });
+			addBtn.onclick = async () => {
+				this.plugin.settings.rules.push({ ifProp: "", ifValue: "", op: "equals", thenProp: "", thenValue: "" });
+				await this.plugin.saveData(this.plugin.settings);
+				this.display();
+			};
+
+			// Render rules with newest first
+			this.plugin.settings.rules.slice().reverse().forEach((rule, idxReversed) => {
+				// Map back to original index
+				const originalIndex = this.plugin.settings.rules.length - 1 - idxReversed;
+				this._renderRule(containerEl, rule, originalIndex);
+			});
 	}
 
 	_renderRule(containerEl, rule, idx) {
 		const wrap = containerEl.createEl("div", { cls: "conditional-rule" });
-		new Setting(wrap)
-			.setName("IF property")
-			.addText(t => t
-				.setPlaceholder("property")
-				.setValue(rule.ifProp || "")
-				.onChange(async (v) => { rule.ifProp = v; await this.plugin.saveData(this.plugin.settings); }));
-		new Setting(wrap)
-			.setName("Operator")
-			.addDropdown(d => {
-				const current = rule.op || "equals";
-				d.addOption("equals", "equals");
-				d.addOption("contains", "contains");
-				d.addOption("notEquals", "notEquals");
-				d.setValue(current);
-				d.onChange(async (v) => { rule.op = v; await this.plugin.saveData(this.plugin.settings); });
-			});
-		new Setting(wrap)
-			.setName("Value")
-			.addText(t => t
-				.setPlaceholder("value")
-				.setValue(rule.ifValue || "")
-				.onChange(async (v) => { rule.ifValue = v; await this.plugin.saveData(this.plugin.settings); }));
-		new Setting(wrap)
-			.setName("THEN set property")
-			.addText(t => t
-				.setPlaceholder("target property")
-				.setValue(rule.thenProp || "")
-				.onChange(async (v) => { rule.thenProp = v; await this.plugin.saveData(this.plugin.settings); }));
-		new Setting(wrap)
-			.setName("to value")
-			.addText(t => t
-				.setPlaceholder("new value")
-				.setValue(rule.thenValue || "")
-				.onChange(async (v) => { rule.thenValue = v; await this.plugin.saveData(this.plugin.settings); }));
-		const del = wrap.createEl("button", { text: "Remove" });
+		// Line 1: IF property [field] [operator] value [field]
+		const line1 = new Setting(wrap).setName("IF property");
+		line1.addText(t => t
+			.setPlaceholder("property")
+			.setValue(rule.ifProp || "")
+			.onChange(async (v) => { rule.ifProp = v; await this.plugin.saveData(this.plugin.settings); }));
+		line1.addDropdown(d => {
+			const current = rule.op || "equals";
+			d.addOption("equals", "equals");
+			d.addOption("contains", "contains");
+			d.addOption("notEquals", "notEquals");
+			d.setValue(current);
+			d.onChange(async (v) => { rule.op = v; await this.plugin.saveData(this.plugin.settings); });
+		});
+		line1.addText(t => t
+			.setPlaceholder("value")
+			.setValue(rule.ifValue || "")
+			.onChange(async (v) => { rule.ifValue = v; await this.plugin.saveData(this.plugin.settings); }));
+
+		// Line 2: THEN set property [field] to value [field]
+		const line2 = new Setting(wrap).setName("THEN set property");
+		line2.addText(t => t
+			.setPlaceholder("target property")
+			.setValue(rule.thenProp || "")
+			.onChange(async (v) => { rule.thenProp = v; await this.plugin.saveData(this.plugin.settings); }));
+		// Add a tiny label "to value" between inputs
+		const toLabel = document.createElement('span');
+		toLabel.textContent = ' to value ';
+		toLabel.classList.add('conditional-to-label');
+		line2.controlEl.appendChild(toLabel);
+		line2.addText(t => t
+			.setPlaceholder("new value")
+			.setValue(rule.thenValue || "")
+			.onChange(async (v) => { rule.thenValue = v; await this.plugin.saveData(this.plugin.settings); }));
+
+		const del = wrap.createEl("button", { text: "Remove", cls: "conditional-remove" });
 		del.onclick = async () => {
 			this.plugin.settings.rules.splice(idx, 1);
 			await this.plugin.saveData(this.plugin.settings);

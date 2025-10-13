@@ -10,4 +10,21 @@
 	margin-top: 12px;
 }
 
+.conditional-add-wrap {
+	margin: 8px 0 12px 0;
+}
+
+.conditional-remove {
+	background: #e93147 !important;
+	color: #fff !important;
+	border-color: #e93147 !important;
+}
+
+.run-now-button {
+	background: var(--color-accent) !important;
+	color: var(--text-on-accent) !important;
+}
+
+.conditional-to-label { margin: 0 6px; opacity: 0.8; }
+
 
