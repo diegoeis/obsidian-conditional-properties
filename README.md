@@ -2,6 +2,10 @@
 
 Automate frontmatter property updates in your Obsidian notes using simple conditional rules. Define rules like: IF property X equals Y THEN set property Z to W. Run on the whole vault or only on the current file, manually or on a schedule.
 
+What inspired me to do this plugin was:
+My Granola meeting notes imports weren’t bringing the same name values as my people notes. So, I created this plugin to correct the names of people in my notes.
+
+
 ## Features
 
 - Define multiple rules with a simple IF/THEN model
@@ -45,18 +49,18 @@ Each rule has:
 1) Rename a person mention in a multi-value property
 ```yaml
 ---
-related_people: ["[[isabella reis frota162]]", "[[John Doe]]"]
+related_people: ["[[steve_works]]", "[[John Doe]]"]
 ---
 ```
 Rule:
 ```
-IF property: related_people, op: equals, value: [[isabella reis frota162]]
-THEN set property: related_people to [[Isabella Reis]]
+IF property: related_people, op: equals, value: [[steve_works]]
+THEN set property: related_people to [[Steve Jobs]]
 ```
 Result:
 ```yaml
 ---
-related_people: ["[[Isabella Reis]]", "[[John Doe]]"]
+related_people: ["[[Steve Jobs]]", "[[John Doe]]"]
 ---
 ```
 
