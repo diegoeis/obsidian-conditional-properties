@@ -13,7 +13,7 @@ jobs:
 
       - name: Prepare package
         run: |
-          PLUGIN_ID="obsidian-conditional-properties"
+          PLUGIN_ID="conditional-properties"
           mkdir -p dist
           zip -j "dist/${PLUGIN_ID}.zip" manifest.json main.js styles.css || true
           cp manifest.json dist/manifest.json
@@ -31,7 +31,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/obsidian-conditional-properties.zip
+            dist/conditional-properties.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

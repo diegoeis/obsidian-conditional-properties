@@ -1,9 +1,9 @@
 {
-  "id": "obsidian-conditional-properties",
+  "id": "conditional-properties",
   "name": "Conditional Properties",
   "version": "0.1.0",
   "minAppVersion": "1.5.0",
-  "description": "Automate frontmatter updates using conditional rules (IF/THEN) for Obsidian.",
+  "description": "Automate frontmatter updates using conditional rules (IF/THEN).",
   "author": "Diego Eis",
   "authorUrl": "https://diegoeis.com",
   "isDesktopOnly": false
