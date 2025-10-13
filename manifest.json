@@ -3,7 +3,7 @@
   "name": "Conditional Properties",
   "version": "0.1.0",
   "minAppVersion": "1.5.0",
-  "description": "Automatiza modificação de propriedades via regras condicionais (SE/ENTÃO).",
+  "description": "Automate frontmatter updates using conditional rules (IF/THEN) for Obsidian.",
   "author": "Diego Eis",
   "authorUrl": "https://diegoeis.com",
   "isDesktopOnly": false
