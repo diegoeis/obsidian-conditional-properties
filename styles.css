@@ -1,0 +1,13 @@
+/* Conditional Properties plugin styles */
+.conditional-rule {
+	margin: 8px 0;
+	padding: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+}
+.conditional-rules-header {
+	font-weight: 600;
+	margin-top: 12px;
+}
+
+
