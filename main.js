@@ -54,17 +54,31 @@ class ConditionalPropertiesPlugin extends Plugin {
 		return { scanned: files.length, modified: modifiedCount };
 	}
 
+	async runScanForRules(rulesSubset) {
+		const { vault, metadataCache } = this.app;
+		const files = vault.getMarkdownFiles();
+		let modifiedCount = 0;
+		for (const file of files) {
+			const cache = metadataCache.getFileCache(file) || {};
+			const frontmatter = cache.frontmatter ?? {};
+			const applied = await this.applyRulesToFrontmatter(file, frontmatter, rulesSubset);
+			if (applied) modifiedCount++;
+		}
+		return { scanned: files.length, modified: modifiedCount };
+	}
+
 	async runScanOnFile(file) {
 		const cache = this.app.metadataCache.getFileCache(file) || {};
 		const frontmatter = cache.frontmatter ?? {};
 		return await this.applyRulesToFrontmatter(file, frontmatter);
 	}
 
-	async applyRulesToFrontmatter(file, currentFrontmatter) {
-		if (!Array.isArray(this.settings.rules) || this.settings.rules.length === 0) return false;
+	async applyRulesToFrontmatter(file, currentFrontmatter, rulesOverride) {
+		const rules = Array.isArray(rulesOverride) ? rulesOverride : this.settings.rules;
+		if (!Array.isArray(rules) || rules.length === 0) return false;
 		let changed = false;
 		const newFm = { ...currentFrontmatter };
-		for (const rule of this.settings.rules) {
+		for (const rule of rules) {
 			const { ifProp, ifValue, thenProp, thenValue } = rule || {};
 			const op = (rule?.op || "equals");
 			if (!ifProp || !thenProp) continue;
@@ -241,7 +255,19 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.setValue(rule.thenValue || "")
 			.onChange(async (v) => { rule.thenValue = v; await this.plugin.saveData(this.plugin.settings); }));
 
-		const del = wrap.createEl("button", { text: "Remove", cls: "conditional-remove" });
+		const actions = wrap.createEl("div", { cls: "conditional-actions" });
+		const runOne = actions.createEl("button", { text: "Run this rule", cls: "conditional-run-one" });
+		runOne.onclick = async () => {
+			runOne.setAttribute('disabled', 'true');
+			try {
+				const result = await this.plugin.runScanForRules([this.plugin.settings.rules[idx]]);
+				new Notice(`Conditional Properties: ${result.modified} modified / ${result.scanned} scanned (single rule)`);
+			} finally {
+				runOne.removeAttribute('disabled');
+			}
+		};
+
+		const del = actions.createEl("button", { text: "Remove", cls: "conditional-remove" });
 		del.onclick = async () => {
 			this.plugin.settings.rules.splice(idx, 1);
 			await this.plugin.saveData(this.plugin.settings);
