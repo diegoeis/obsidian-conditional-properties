@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare package
+        run: |
+          PLUGIN_ID="obsidian-conditional-properties"
+          mkdir -p dist
+          zip -j "dist/${PLUGIN_ID}.zip" manifest.json main.js styles.css || true
+          cp manifest.json dist/manifest.json
+          if [ -f versions.json ]; then cp versions.json dist/versions.json; fi
+
+      - name: Upload manifest.json
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/manifest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload plugin zip
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/obsidian-conditional-properties.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload versions.json (optional)
+        if: exists('dist/versions.json')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/versions.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
