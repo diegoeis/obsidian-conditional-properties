@@ -8,7 +8,10 @@
 .conditional-rules-header {
 	font-weight: 600;
 	margin-top: 12px;
+	display: flex;
+	align-items: center;
 }
+.conditional-rules-header * {flex: 1;}
 
 .conditional-add-wrap {
 	margin: 8px 0 12px 0;
@@ -98,3 +101,5 @@
 	justify-content: center;
 	margin-left: 8px;
 }
+
+.setting-item-info {min-width: 50px;}

@@ -599,9 +599,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const actions = wrap.createEl("div", { cls: "conditional-actions" });
 
 		// Add action button
-		const addActionBtn = actions.createEl("button", { text: "+ Add property", cls: "conditional-add-action" });
+		const addActionBtn = thenHeader.createEl("button", { text: "+ Add property", cls: "conditional-add-action" });
 		addActionBtn.onclick = async (e) => {
 			e.preventDefault(); // Prevent default behavior that might cause scroll
+			e.stopPropagation(); // Stop event propagation
 			rule.thenActions.push({ prop: "", value: "" });
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
@@ -618,7 +619,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			}
 		};
 
-		const del = actions.createEl("button", { text: "Remove", cls: "conditional-remove" });
+		const del = actions.createEl("button", { text: "Remove", cls: "conditional-remove eis-btn-red" });
 		del.onclick = async () => {
 			this.plugin.settings.rules.splice(idx, 1);
 			await this.plugin.saveData(this.plugin.settings);
@@ -631,13 +632,25 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		const actionSetting = new Setting(actionWrap).setName(`Property ${actionIdx + 1}`);
 
-		// Add remove button as first item in setting-item
-		const removeActionBtn = actionWrap.createEl("button", { text: "×", cls: "conditional-remove-action eis-btn-red" });
-		removeActionBtn.onclick = async () => {
+		// Add remove button as first element in the setting's control area
+		const settingItem = actionSetting.settingEl;
+		const removeActionBtn = document.createElement("button");
+		removeActionBtn.textContent = "×";
+		removeActionBtn.className = "conditional-remove-action eis-btn-red";
+		removeActionBtn.onclick = async (e) => {
+			e.preventDefault(); // Prevent default behavior that might cause scroll
+			e.stopPropagation(); // Stop event propagation
 			rule.thenActions.splice(actionIdx, 1);
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
 		};
+
+		// Insert button as first child of setting-item
+		if (settingItem.firstChild) {
+			settingItem.insertBefore(removeActionBtn, settingItem.firstChild);
+		} else {
+			settingItem.appendChild(removeActionBtn);
+		}
 
 		actionSetting.addText(t => t
 			.setPlaceholder("property name")
@@ -669,10 +682,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				await this.plugin.saveData(this.plugin.settings);
 			}));
 
-		// Only show remove button if more than one action (but it's always created now, just hidden via CSS)
-		if (rule.thenActions.length <= 1) {
-			removeActionBtn.style.display = 'none';
-		}
+		// Remove button is now always visible as part of the setting layout
 	}
 }
 
