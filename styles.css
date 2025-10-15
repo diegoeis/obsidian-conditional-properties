@@ -13,6 +13,10 @@
 }
 .conditional-rules-header * {flex: 1;}
 
+.setting-item-control {
+	flex-wrap: wrap !important;
+}
+
 .conditional-add-wrap {
 	margin: 8px 0 12px 0;
 }

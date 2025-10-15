@@ -12,14 +12,25 @@ My Granola meeting notes imports weren’t bringing the same name values as my p
 - Operators: `equals`, `contains`, `notEquals`
 - **Multiple THEN actions per rule**: Set multiple properties in a single rule
 - **Comma-separated values**: Set multiple values for a property (e.g., "work, frota162" → properly formatted YAML array)
-- **Smart property merging**: Add values to existing properties instead of overwriting (NEW!)
+- **ADD/REMOVE actions**: Choose to ADD values to a property or REMOVE specific values (NEW!)
+- **Smart property merging**: Add values to existing properties without duplicating
 - **Scan Scope Options**: Choose between entire vault, latest created notes, or latest modified notes
 - **Configurable scan count**: Set number of notes to scan (1-1000, default 15) for latest notes options
 - Run on the entire vault (settings button or command)
 - Run on the current file (command palette)
 - Scheduled scans with a minimum interval of 5 minutes
 - Safe updates: only frontmatter properties are modified, body content is preserved
-- Handles multi-value properties (arrays/strings): replaces only the matched value
+- Handles multi-value properties (arrays/strings): preserves existing values when adding
+
+## Settings
+- Scan interval (minutes): default 5, minimum 5
+- **Scan Scope**: Choose between "Latest Created notes", "Latest Modified notes", or "Entire vault"
+- **Number of notes**: When using latest notes options, set the number of notes to scan (1-1000, default 15)
+- Rules editor: add/remove rules, pick operator, edit values
+- Run now button (executes based on selected scope)
+- Add many values in the same THEN action separated by commas
+- Add multiple THEN actions
+
 
 ## Installation (Development)
 
@@ -49,6 +60,53 @@ Choose which notes the plugin will scan when running rules:
 - **Entire vault**: Scan all notes in the vault
 
 The scan scope can be configured in Settings → Conditional Properties → "Scan Scope".
+
+## ADD/REMOVE Actions
+
+When setting properties in THEN actions, you can now choose between two modes:
+
+### ADD (Default)
+- Adds the specified values to the property
+- Does NOT duplicate values if they already exist
+- Preserves existing values in the property
+- **Preserves the IF condition value** - will not remove it when adding new values
+
+### REMOVE
+- Removes the specified values from the property
+- Only removes values that exist
+- Preserves all other values in the property
+- Safe: does nothing if the value doesn't exist
+
+### How to use
+In the rules editor, each THEN action has a dropdown between the property name and value field:
+- Select **ADD** to add values (default behavior)
+- Select **REMOVE** to remove values
+
+### Examples
+
+**Add tags without duplicating:**
+```
+IF property: type, op: equals, value: meeting
+THEN set property: tags [ADD] work, important
+```
+Result: Adds "work" and "important" tags only if they don't already exist.
+
+**Remove old tags:**
+```
+IF property: status, op: equals, value: archived
+THEN set property: tags [REMOVE] draft, wip
+```
+Result: Removes "draft" and "wip" tags if they exist.
+
+**Combine ADD and REMOVE:**
+```
+IF property: tags, op: contains, value: old-project
+THEN set properties:
+  - tags [REMOVE] old-project, legacy
+  - tags [ADD] new-project, active
+  - status [ADD] migrated
+```
+Result: Removes old tags, adds new ones, and sets status.
 
 ## Rules
 
@@ -123,17 +181,6 @@ tags:
   - frota162
   - important
 ```
-
-## Settings
-- Scan interval (minutes): default 5, minimum 5
-- **Scan Scope**: Choose between "Latest Created notes", "Latest Modified notes", or "Entire vault"
-- **Number of notes**: When using latest notes options, set the number of notes to scan (1-1000, default 15)
-- Rules editor: add/remove rules, pick operator, edit values
-- Run now button (executes based on selected scope)
-- Add many values in the same THEN action separated by commas
-- Add multiple THEN actions
-
-
 
 ## Limitations (V1)
 - Only frontmatter is modified
