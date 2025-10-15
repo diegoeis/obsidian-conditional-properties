@@ -185,40 +185,52 @@ class ConditionalPropertiesPlugin extends Plugin {
 						const value = values[i];
 						console.log(`\n--- Processing THEN value ${i + 1}: "${value}" ---`);
 
-						// Check if ifValue exists in current array
-						const ifValueIndex = currentValue.findIndex(item => {
-							const equals = this._valueEquals(item, ifValue);
-							console.log(`Comparing "${item}" with ifValue "${ifValue}": ${equals}`);
-							return equals;
-						});
-						console.log(`Found ifValue "${ifValue}" at index:`, ifValueIndex);
+						// Process comma-separated values for this THEN action
+						const processedValue = this._processCommaSeparatedValue(value);
+						console.log(`Processed value: "${value}" -> ${processedValue}`);
 
-						// Check if the THEN value already exists
-						const valueExists = currentValue.some(item => {
-							const equals = this._valueEquals(item, value);
-							console.log(`Checking if THEN value "${value}" exists: comparing with "${item}": ${equals}`);
-							return equals;
-						});
-						console.log(`THEN value "${value}" already exists:`, valueExists);
+						// Handle both single values and arrays
+						const valuesToProcess = Array.isArray(processedValue) ? processedValue : [processedValue];
+						console.log(`Values to process: ${valuesToProcess}`);
 
-						if (ifValueIndex !== -1 && !valueExists) {
-							// ifValue exists AND new value doesn't exist, replace it
-							const oldValue = currentValue[ifValueIndex];
-							currentValue[ifValueIndex] = value;
-							hasChanges = true;
-							console.log(`✓ Replaced "${oldValue}" with "${value}" at index ${ifValueIndex}`);
-						} else if (ifValueIndex === -1 && !valueExists) {
-							// ifValue doesn't exist AND new value doesn't exist, add it
-							currentValue.push(value);
-							hasChanges = true;
-							console.log(`✓ Added new value "${value}" to array`);
-						} else {
-							console.log(`⚠ No action needed for "${value}" - conditions not met`);
-							console.log(`  - ifValue exists: ${ifValueIndex !== -1}`);
-							console.log(`  - value exists: ${valueExists}`);
+						for (const singleValue of valuesToProcess) {
+							console.log(`Processing single value: "${singleValue}"`);
+
+							// Check if ifValue exists in current array
+							const ifValueIndex = currentValue.findIndex(item => {
+								const equals = this._valueEquals(item, ifValue);
+								console.log(`Comparing "${item}" with ifValue "${ifValue}": ${equals}`);
+								return equals;
+							});
+							console.log(`Found ifValue "${ifValue}" at index:`, ifValueIndex);
+
+							// Check if the THEN value already exists
+							const valueExists = currentValue.some(item => {
+								const equals = this._valueEquals(item, singleValue);
+								console.log(`Checking if THEN value "${singleValue}" exists: comparing with "${item}": ${equals}`);
+								return equals;
+							});
+							console.log(`THEN value "${singleValue}" already exists:`, valueExists);
+
+							if (ifValueIndex !== -1 && !valueExists) {
+								// ifValue exists AND new value doesn't exist, replace it
+								const oldValue = currentValue[ifValueIndex];
+								currentValue[ifValueIndex] = singleValue;
+								hasChanges = true;
+								console.log(`✓ Replaced "${oldValue}" with "${singleValue}" at index ${ifValueIndex}`);
+							} else if (ifValueIndex === -1 && !valueExists) {
+								// ifValue doesn't exist AND new value doesn't exist, add it
+								currentValue.push(singleValue);
+								hasChanges = true;
+								console.log(`✓ Added new value "${singleValue}" to array`);
+							} else {
+								console.log(`⚠ No action needed for "${singleValue}" - conditions not met`);
+								console.log(`  - ifValue exists: ${ifValueIndex !== -1}`);
+								console.log(`  - value exists: ${valueExists}`);
+							}
+
+							console.log("Current array now:", currentValue);
 						}
-
-						console.log("Current array now:", currentValue);
 					}
 
 					console.log("\n=== FINAL RESULT ===");
@@ -236,9 +248,22 @@ class ConditionalPropertiesPlugin extends Plugin {
 					}
 				} else {
 					// Regular property setting - merge all values for this property
-					const allValues = values.join(', ');
-					console.log("Merging values for", prop, "- allValues:", allValues);
-					const mergedValue = this._mergePropertyValue(currentFrontmatter[prop], allValues);
+					// Process each value individually and combine them properly
+					let allProcessedValues = [];
+
+					for (const value of values) {
+						const processedValue = this._processCommaSeparatedValue(value);
+						console.log("Processing individual value:", value, "->", processedValue);
+
+						if (Array.isArray(processedValue)) {
+							allProcessedValues.push(...processedValue);
+						} else {
+							allProcessedValues.push(processedValue);
+						}
+					}
+
+					console.log("All processed values:", allProcessedValues);
+					const mergedValue = this._mergePropertyValue(currentFrontmatter[prop], allProcessedValues);
 					console.log("Merged value for", prop, ":", mergedValue, "current:", currentFrontmatter[prop]);
 
 					// Always apply if different from current value
@@ -294,24 +319,30 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	_processCommaSeparatedValue(value) {
+		console.log("_processCommaSeparatedValue input:", value, typeof value);
 		if (!value || typeof value !== 'string') {
+			console.log("Invalid input, returning as-is");
 			return value;
 		}
 
 		// Split by comma and filter out empty values
 		const parts = value.split(',').map(part => part.trim()).filter(part => part.length > 0);
+		console.log("Split parts:", parts);
 
 		// If only one value, return as simple string
 		if (parts.length === 1) {
+			console.log("Single value, returning:", parts[0]);
 			return parts[0];
 		}
 
 		// If multiple values, return as array
 		if (parts.length > 1) {
+			console.log("Multiple values, returning array:", parts);
 			return parts;
 		}
 
 		// If no valid parts, return original value
+		console.log("No valid parts, returning original");
 		return value;
 	}
 
@@ -367,7 +398,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 			return mergedArray[0];
 		} else {
 			// Multiple values, return as array
-			console.log("Multiple values, returning array");
+			console.log("Multiple values, returning array:", mergedArray);
 			return mergedArray;
 		}
 	}
@@ -393,7 +424,9 @@ class ConditionalPropertiesPlugin extends Plugin {
 		// Generate properly formatted YAML
 		let yamlStr = "";
 		try {
+			console.log("Calling _generateFormattedYaml with merged object:", merged);
 			yamlStr = this._generateFormattedYaml(merged);
+			console.log("Successfully generated formatted YAML");
 		} catch (error) {
 			console.error("Error generating formatted YAML:", error);
 			yamlStr = Object.entries(merged).map(([k, v]) => `${k}: ${v}`).join("\n");
@@ -406,14 +439,18 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	_generateFormattedYaml(obj, indent = 0) {
+		console.log("Generating YAML for:", obj, "with indent:", indent);
 		const spaces = '  '.repeat(indent);
 		const lines = [];
 
 		for (const [key, value] of Object.entries(obj)) {
+			console.log(`Processing key "${key}" with value:`, value, `type: ${typeof value}`);
 			if (Array.isArray(value) && value.length > 0) {
+				console.log(`Formatting array for key "${key}"`);
 				// Format arrays with proper YAML list syntax
 				lines.push(`${spaces}${key}:`);
 				for (const item of value) {
+					console.log(`Adding array item: "${item}"`);
 					lines.push(`${spaces}  - ${item}`);
 				}
 			} else if (typeof value === 'object' && value !== null) {
@@ -422,11 +459,15 @@ class ConditionalPropertiesPlugin extends Plugin {
 				lines.push(this._generateFormattedYaml(value, indent + 1));
 			} else {
 				// Handle simple values
+				console.log(`Adding simple value for key "${key}": ${value}`);
 				lines.push(`${spaces}${key}: ${value}`);
 			}
 		}
 
-		return lines.join('\n');
+		const result = lines.join('\n');
+		console.log("Generated YAML lines:", lines);
+		console.log("Final YAML result:", result);
+		return result;
 	}
 }
 

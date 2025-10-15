@@ -11,7 +11,7 @@ My Granola meeting notes imports weren’t bringing the same name values as my p
 - Define multiple rules with a simple IF/THEN model
 - Operators: `equals`, `contains`, `notEquals`
 - **Multiple THEN actions per rule**: Set multiple properties in a single rule
-- **Comma-separated values**: Set multiple values for a property (e.g., "work, frota162" → YAML array)
+- **Comma-separated values**: Set multiple values for a property (e.g., "work, frota162" → properly formatted YAML array)
 - **Smart property merging**: Add values to existing properties instead of overwriting (NEW!)
 - **Scan Scope Options**: Choose between entire vault, latest created notes, or latest modified notes
 - **Configurable scan count**: Set number of notes to scan (1-1000, default 15) for latest notes options
@@ -109,12 +109,19 @@ THEN set properties:
   - archived to true
 ```
 
-6) Add values to existing properties (NEW!)
+6) Set multiple tags at once (NEW!)
 ```
-IF property: status, op: equals, value: draft
+IF property: type, op: equals, value: note
 THEN set properties:
-  - tags to work, review  # Adds to existing tags
-  - priority to high      # Sets priority
+  - tags to work, frota162, important
+```
+
+**Result in YAML:**
+```yaml
+tags:
+  - work
+  - frota162
+  - important
 ```
 
 ## Settings
