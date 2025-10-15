@@ -424,35 +424,115 @@ class ConditionalPropertiesPlugin extends Plugin {
 		console.log("_writeFrontmatter called with:", newFrontmatter);
 		const content = await this.app.vault.read(file);
 		const hasYaml = content.startsWith("---\n");
-		let body = content;
+		
+		if (!hasYaml) {
+			// No existing frontmatter, create new one
+			const yamlStr = this._generateFormattedYaml(newFrontmatter);
+			const newContent = `---\n${yamlStr}\n---\n${content}`;
+			await this.app.vault.modify(file, newContent);
+			console.log("Created new frontmatter");
+			return;
+		}
+
+		// Extract existing YAML section
+		const end = content.indexOf("\n---\n", 4);
+		if (end === -1) return; // Invalid YAML structure
+		
+		const yamlRaw = content.substring(4, end);
+		const body = content.substring(end + 5);
+		
+		// Parse to get current values
 		let fm = {};
-		if (hasYaml) {
-			const end = content.indexOf("\n---\n", 4);
-			if (end !== -1) {
-				const yamlRaw = content.substring(4, end);
-				body = content.substring(end + 5);
-				try { fm = parseYaml(yamlRaw) || {}; } catch { fm = {}; }
-			}
-		}
+		try { fm = parseYaml(yamlRaw) || {}; } catch { fm = {}; }
 		console.log("Existing frontmatter:", fm);
-		const merged = { ...fm, ...newFrontmatter };
-		console.log("Merged frontmatter:", merged);
-
-		// Generate properly formatted YAML
-		let yamlStr = "";
-		try {
-			console.log("Calling _generateFormattedYaml with merged object:", merged);
-			yamlStr = this._generateFormattedYaml(merged);
-			console.log("Successfully generated formatted YAML");
-		} catch (error) {
-			console.error("Error generating formatted YAML:", error);
-			yamlStr = Object.entries(merged).map(([k, v]) => `${k}: ${v}`).join("\n");
+		
+		// Surgically update ONLY the changed properties in the raw YAML string
+		let updatedYaml = yamlRaw;
+		
+		for (const [key, newValue] of Object.entries(newFrontmatter)) {
+			console.log(`Updating property "${key}" to:`, newValue);
+			updatedYaml = this._updateYamlProperty(updatedYaml, key, newValue, fm[key]);
 		}
-
-		console.log("Generated YAML:", yamlStr);
-		const newContent = `---\n${yamlStr}\n---\n${body}`;
+		
+		console.log("Updated YAML:", updatedYaml);
+		const newContent = `---\n${updatedYaml}\n---\n${body}`;
 		await this.app.vault.modify(file, newContent);
 		console.log("File updated successfully");
+	}
+
+	_updateYamlProperty(yamlString, key, newValue, oldValue) {
+		// Create regex to find the property (handles both single line and multi-line arrays)
+		const keyPattern = new RegExp(`^(\\s*)${this._escapeRegex(key)}:(.*)$`, 'm');
+		const match = yamlString.match(keyPattern);
+		
+		if (!match) {
+			// Property doesn't exist, add it at the end
+			const formattedValue = this._formatPropertyValue(key, newValue);
+			return yamlString + (yamlString.endsWith('\n') ? '' : '\n') + formattedValue;
+		}
+		
+		const indent = match[1];
+		const matchIndex = match.index;
+		
+		// Check if it's a multi-line array (next line starts with - )
+		const afterMatch = yamlString.substring(matchIndex + match[0].length);
+		const isMultiLineArray = /^\s*\n\s*-\s/.test(afterMatch);
+		
+		if (isMultiLineArray) {
+			// Find all array items (lines starting with - at the same indent level)
+			let endIndex = matchIndex + match[0].length;
+			const arrayIndent = indent + '  ';
+			const lines = yamlString.substring(endIndex).split('\n');
+			let arrayLineCount = 0;
+			
+			for (const line of lines) {
+				if (line.trim() === '' || line.startsWith(arrayIndent + '-')) {
+					arrayLineCount++;
+				} else if (line.trim() !== '') {
+					break;
+				}
+			}
+			
+			// Calculate end position
+			for (let i = 0; i < arrayLineCount && endIndex < yamlString.length; i++) {
+				const nextNewline = yamlString.indexOf('\n', endIndex);
+				if (nextNewline === -1) {
+					endIndex = yamlString.length;
+					break;
+				}
+				endIndex = nextNewline + 1;
+			}
+			
+			// Replace the entire property including its array items
+			const formattedValue = this._formatPropertyValue(key, newValue, indent);
+			return yamlString.substring(0, matchIndex) + formattedValue + yamlString.substring(endIndex);
+		} else {
+			// Single line property, replace just this line
+			const lineEnd = yamlString.indexOf('\n', matchIndex);
+			const endIndex = lineEnd === -1 ? yamlString.length : lineEnd + 1;
+			const formattedValue = this._formatPropertyValue(key, newValue, indent);
+			return yamlString.substring(0, matchIndex) + formattedValue + (lineEnd === -1 ? '' : '\n') + yamlString.substring(endIndex);
+		}
+	}
+	
+	_formatPropertyValue(key, value, indent = '') {
+		if (Array.isArray(value) && value.length > 0) {
+			const lines = [`${indent}${key}:`];
+			for (const item of value) {
+				const formattedItem = this._formatYamlValue(item);
+				lines.push(`${indent}  - ${formattedItem}`);
+			}
+			return lines.join('\n');
+		} else if (Array.isArray(value) && value.length === 0) {
+			return `${indent}${key}: []`;
+		} else {
+			const formattedValue = this._formatYamlValue(value);
+			return `${indent}${key}: ${formattedValue}`;
+		}
+	}
+	
+	_escapeRegex(str) {
+		return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 	}
 
 	_generateFormattedYaml(obj, indent = 0) {
