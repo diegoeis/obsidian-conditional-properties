@@ -10,6 +10,8 @@ My Granola meeting notes imports weren’t bringing the same name values as my p
 
 - Define multiple rules with a simple IF/THEN model
 - Operators: `equals`, `contains`, `notEquals`
+- **Scan Scope Options**: Choose between entire vault, latest created notes, or latest modified notes
+- **Configurable scan count**: Set number of notes to scan (1-1000, default 15) for latest notes options
 - Run on the entire vault (settings button or command)
 - Run on the current file (command palette)
 - Scheduled scans with a minimum interval of 5 minutes
@@ -26,7 +28,7 @@ This repository ships the compiled `main.js`. No build step is required for test
 ## Usage
 
 ### Run now
-- Settings → Conditional Properties → "Run now on entire vault" button.
+- Settings → Conditional Properties → "Run now" button (executes based on selected scan scope).
 - Command palette: "Run conditional rules on vault".
 
 ### Run on current file
@@ -34,6 +36,16 @@ This repository ships the compiled `main.js`. No build step is required for test
 
 ### Scheduled execution
 - Settings → set "Scan interval (minutes)" (minimum 5). The plugin runs automatically using a timer.
+
+## Scan Scope Options
+
+Choose which notes the plugin will scan when running rules:
+
+- **Latest Created notes**: Scan the most recently created notes (configurable count, default 15)
+- **Latest Modified notes**: Scan the most recently modified notes (configurable count, default 15)
+- **Entire vault**: Scan all notes in the vault
+
+The scan scope can be configured in Settings → Conditional Properties → "Scan Scope".
 
 ## Rules
 
@@ -78,8 +90,10 @@ THEN set property: verified to true
 
 ## Settings
 - Scan interval (minutes): default 5, minimum 5
+- **Scan Scope**: Choose between "Latest Created notes", "Latest Modified notes", or "Entire vault"
+- **Number of notes**: When using latest notes options, set the number of notes to scan (1-1000, default 15)
 - Rules editor: add/remove rules, pick operator, edit values
-- Run now on entire vault
+- Run now button (executes based on selected scope)
 
 ## Limitations (V1)
 - Only frontmatter is modified
@@ -87,11 +101,12 @@ THEN set property: verified to true
 - No folder/tag scoping yet
 
 ## Roadmap
+- Change names of properties
+- Execute changes in the note content, not only properties
 - Advanced operators (regex, greater/less than)
 - Compound conditions (AND/OR/NOT)
 - Multiple actions per rule
 - Folder/tag scoping and new-note filters
-- Public API for other plugins
 
 ## Privacy
 All processing happens locally in your vault. No data leaves your device.

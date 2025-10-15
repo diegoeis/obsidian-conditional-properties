@@ -3,7 +3,13 @@ const { Plugin, Notice, Setting, PluginSettingTab, parseYaml, stringifyYaml } = 
 
 class ConditionalPropertiesPlugin extends Plugin {
 	async onload() {
-		this.settings = Object.assign({ rules: [], scanIntervalMinutes: 5, lastRun: null }, await this.loadData());
+		this.settings = Object.assign({
+			rules: [],
+			scanIntervalMinutes: 5,
+			lastRun: null,
+			scanScope: "latestCreated", // "latestCreated", "latestModified", "entireVault"
+			scanCount: 15
+		}, await this.loadData());
 		this.registerInterval(this._setupScheduler());
 		this.addCommand({
 			id: "conditional-properties-run-now",
@@ -41,7 +47,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 
 	async runScan() {
 		const { vault, metadataCache } = this.app;
-		const files = vault.getMarkdownFiles();
+		const files = this._getFilesToScan();
 		let modifiedCount = 0;
 		for (const file of files) {
 			const cache = metadataCache.getFileCache(file) || {};
@@ -54,9 +60,31 @@ class ConditionalPropertiesPlugin extends Plugin {
 		return { scanned: files.length, modified: modifiedCount };
 	}
 
+	_getFilesToScan() {
+		const { vault } = this.app;
+		const allFiles = vault.getMarkdownFiles();
+
+		if (this.settings.scanScope === 'entireVault') {
+			return allFiles;
+		}
+
+		const count = Math.max(1, Number(this.settings.scanCount || 15));
+
+		if (this.settings.scanScope === 'latestModified') {
+			return allFiles
+				.sort((a, b) => b.stat.mtime - a.stat.mtime)
+				.slice(0, count);
+		}
+
+		// Default to latestCreated
+		return allFiles
+			.sort((a, b) => b.stat.ctime - a.stat.ctime)
+			.slice(0, count);
+	}
+
 	async runScanForRules(rulesSubset) {
 		const { vault, metadataCache } = this.app;
-		const files = vault.getMarkdownFiles();
+		const files = this._getFilesToScan();
 		let modifiedCount = 0;
 		for (const file of files) {
 			const cache = metadataCache.getFileCache(file) || {};
@@ -184,9 +212,42 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					new Notice("Interval updated. Restart Obsidian to apply immediately.");
 				}));
 
+			containerEl.createEl("h3", { text: "Scan Scope" });
+
+			new Setting(containerEl)
+			.setName("Scan scope")
+			.setDesc("Choose which notes to scan")
+			.addDropdown(dropdown => {
+				dropdown.addOption("latestCreated", "Latest Created notes");
+				dropdown.addOption("latestModified", "Latest Modified notes");
+				dropdown.addOption("entireVault", "Entire vault");
+				dropdown.setValue(this.plugin.settings.scanScope || "latestCreated");
+				dropdown.onChange(async (value) => {
+					this.plugin.settings.scanScope = value;
+					await this.plugin.saveData(this.plugin.settings);
+					this.display(); // Refresh to show/hide count field
+				});
+			});
+
+			if (this.plugin.settings.scanScope !== 'entireVault') {
+				new Setting(containerEl)
+				.setName("Number of notes")
+				.setDesc("Number of notes to scan (1-1000)")
+				.addText(text => text
+					.setPlaceholder("15")
+					.setValue(String(this.plugin.settings.scanCount || 15))
+					.onChange(async (value) => {
+						const num = Math.max(1, Math.min(1000, Number(value) || 15));
+						this.plugin.settings.scanCount = num;
+						await this.plugin.saveData(this.plugin.settings);
+					}));
+			}
+
+			containerEl.createEl("h3", { text: "Run now" });
+
 			const runNow = new Setting(containerEl)
-			.setName("Run now on entire vault")
-			.setDesc("Execute all rules across all notes")
+			.setName("Run now")
+			.setDesc("Execute all rules across selected scope")
 				.addButton(btn => {
 					btn.setButtonText("Run now");
 					btn.buttonEl.classList.add("run-now-button");
@@ -277,5 +338,3 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 }
 
 module.exports = ConditionalPropertiesPlugin;
-
-
