@@ -600,16 +600,32 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		// Add action button
 		const addActionBtn = thenHeader.createEl("button", { text: "+ Add property", cls: "conditional-add-action" });
-		addActionBtn.onclick = async (e) => {
-			e.preventDefault(); // Prevent default behavior that might cause scroll
-			e.stopPropagation(); // Stop event propagation
+		addActionBtn.addEventListener("click", async (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			e.returnValue = false;
+			e.stopImmediatePropagation();
+			
+			// Save scroll position before display
+			const scrollContainer = this.containerEl.closest('.modal-content') || this.containerEl.parentElement;
+			const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+			
 			rule.thenActions.push({ prop: "", value: "" });
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
-		};
+			
+			// Restore scroll position after display
+			if (scrollContainer) {
+				scrollContainer.scrollTop = scrollTop;
+			}
+		}, true); // Use capture phase
 
 		const runOne = actions.createEl("button", { text: "Run this rule", cls: "conditional-run-one eis-btn-primary" });
-		runOne.onclick = async () => {
+		runOne.addEventListener("click", async (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			e.returnValue = false;
+			e.stopImmediatePropagation();
 			runOne.setAttribute('disabled', 'true');
 			try {
 				const result = await this.plugin.runScanForRules([this.plugin.settings.rules[idx]]);
@@ -617,14 +633,28 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			} finally {
 				runOne.removeAttribute('disabled');
 			}
-		};
+		}, true);
 
 		const del = actions.createEl("button", { text: "Remove", cls: "conditional-remove eis-btn-red" });
-		del.onclick = async () => {
+		del.addEventListener("click", async (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			e.returnValue = false;
+			e.stopImmediatePropagation();
+			
+			// Save scroll position before display
+			const scrollContainer = this.containerEl.closest('.modal-content') || this.containerEl.parentElement;
+			const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+			
 			this.plugin.settings.rules.splice(idx, 1);
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
-		};
+			
+			// Restore scroll position after display
+			if (scrollContainer) {
+				scrollContainer.scrollTop = scrollTop;
+			}
+		}, true);
 	}
 
 	_renderThenAction(containerEl, rule, action, actionIdx, ruleIdx) {
@@ -637,13 +667,25 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const removeActionBtn = document.createElement("button");
 		removeActionBtn.textContent = "×";
 		removeActionBtn.className = "conditional-remove-action eis-btn-red";
-		removeActionBtn.onclick = async (e) => {
-			e.preventDefault(); // Prevent default behavior that might cause scroll
-			e.stopPropagation(); // Stop event propagation
+		removeActionBtn.addEventListener("click", async (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			e.returnValue = false;
+			e.stopImmediatePropagation();
+			
+			// Save scroll position before display
+			const scrollContainer = this.containerEl.closest('.modal-content') || this.containerEl.parentElement;
+			const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+			
 			rule.thenActions.splice(actionIdx, 1);
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
-		};
+			
+			// Restore scroll position after display
+			if (scrollContainer) {
+				scrollContainer.scrollTop = scrollTop;
+			}
+		}, true);
 
 		// Insert button as first child of setting-item
 		if (settingItem.firstChild) {
