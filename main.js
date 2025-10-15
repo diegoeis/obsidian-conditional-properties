@@ -157,23 +157,97 @@ class ConditionalPropertiesPlugin extends Plugin {
 			const match = this._matchesCondition(sourceValue, ifValue, op);
 			if (!match) continue;
 
-			// Apply all THEN actions
+			// Group THEN actions by property for intelligent merging
+			const propertyActions = {};
+			console.log("Processing rule with thenActions:", thenActions);
 			for (const action of thenActions) {
 				const { prop, value } = action || {};
+				console.log("Processing action:", { prop, value });
 				if (!prop) continue;
 
+				if (!propertyActions[prop]) {
+					propertyActions[prop] = [];
+				}
+				propertyActions[prop].push(value);
+			}
+			console.log("Grouped property actions:", propertyActions);
+
+			// Apply merged actions
+			for (const [prop, values] of Object.entries(propertyActions)) {
+				console.log("Applying property:", prop, "with values:", values);
 				if (prop === ifProp) {
-					// Special case: replacing in multi-value property
-					const replaced = this._replaceInMultiValue(sourceValue, ifValue, value);
-					if (!this._deepEqual(replaced, sourceValue)) {
-						newFm[prop] = replaced;
+					// Special case: IF property - process each value individually
+					let currentValue = [...sourceValue];
+					let hasChanges = false;
+					console.log("Starting with sourceValue:", currentValue, "ifValue:", ifValue);
+
+					for (let i = 0; i < values.length; i++) {
+						const value = values[i];
+						console.log(`\n--- Processing THEN value ${i + 1}: "${value}" ---`);
+
+						// Check if ifValue exists in current array
+						const ifValueIndex = currentValue.findIndex(item => {
+							const equals = this._valueEquals(item, ifValue);
+							console.log(`Comparing "${item}" with ifValue "${ifValue}": ${equals}`);
+							return equals;
+						});
+						console.log(`Found ifValue "${ifValue}" at index:`, ifValueIndex);
+
+						// Check if the THEN value already exists
+						const valueExists = currentValue.some(item => {
+							const equals = this._valueEquals(item, value);
+							console.log(`Checking if THEN value "${value}" exists: comparing with "${item}": ${equals}`);
+							return equals;
+						});
+						console.log(`THEN value "${value}" already exists:`, valueExists);
+
+						if (ifValueIndex !== -1 && !valueExists) {
+							// ifValue exists AND new value doesn't exist, replace it
+							const oldValue = currentValue[ifValueIndex];
+							currentValue[ifValueIndex] = value;
+							hasChanges = true;
+							console.log(`✓ Replaced "${oldValue}" with "${value}" at index ${ifValueIndex}`);
+						} else if (ifValueIndex === -1 && !valueExists) {
+							// ifValue doesn't exist AND new value doesn't exist, add it
+							currentValue.push(value);
+							hasChanges = true;
+							console.log(`✓ Added new value "${value}" to array`);
+						} else {
+							console.log(`⚠ No action needed for "${value}" - conditions not met`);
+							console.log(`  - ifValue exists: ${ifValueIndex !== -1}`);
+							console.log(`  - value exists: ${valueExists}`);
+						}
+
+						console.log("Current array now:", currentValue);
+					}
+
+					console.log("\n=== FINAL RESULT ===");
+					console.log("Final result for IF property:", currentValue);
+					console.log("Original sourceValue:", sourceValue);
+					console.log("Has changes:", hasChanges);
+
+					// Only apply if there were actual changes
+					if (hasChanges) {
+						newFm[prop] = currentValue;
 						changed = true;
+						console.log("Applied IF property changes");
+					} else {
+						console.log("No changes needed for IF property");
 					}
 				} else {
-					// Regular property setting
-					if (!this._deepEqual(newFm[prop], value)) {
-						newFm[prop] = value;
+					// Regular property setting - merge all values for this property
+					const allValues = values.join(', ');
+					console.log("Merging values for", prop, "- allValues:", allValues);
+					const mergedValue = this._mergePropertyValue(currentFrontmatter[prop], allValues);
+					console.log("Merged value for", prop, ":", mergedValue, "current:", currentFrontmatter[prop]);
+
+					// Always apply if different from current value
+					if (!this._deepEqual(currentFrontmatter[prop], mergedValue)) {
+						newFm[prop] = mergedValue;
 						changed = true;
+						console.log("Applied merged value for property:", prop);
+					} else {
+						console.log("No change needed for property:", prop);
 					}
 				}
 			}
@@ -219,7 +293,87 @@ class ConditionalPropertiesPlugin extends Plugin {
 		try { return JSON.stringify(a) === JSON.stringify(b); } catch { return a === b; }
 	}
 
+	_processCommaSeparatedValue(value) {
+		if (!value || typeof value !== 'string') {
+			return value;
+		}
+
+		// Split by comma and filter out empty values
+		const parts = value.split(',').map(part => part.trim()).filter(part => part.length > 0);
+
+		// If only one value, return as simple string
+		if (parts.length === 1) {
+			return parts[0];
+		}
+
+		// If multiple values, return as array
+		if (parts.length > 1) {
+			return parts;
+		}
+
+		// If no valid parts, return original value
+		return value;
+	}
+
+	_mergePropertyValue(existingValue, newValue) {
+		console.log("_mergePropertyValue called with:", { existingValue, newValue });
+		// Process new value (handle comma-separated strings)
+		const newValues = this._processCommaSeparatedValue(newValue);
+		console.log("Processed new values:", newValues);
+
+		// If no existing value, return new values
+		if (existingValue == null || existingValue === '') {
+			console.log("No existing value, returning new values");
+			return newValues;
+		}
+
+		// Ensure existing value is an array for processing
+		let existingArray = [];
+		if (Array.isArray(existingValue)) {
+			existingArray = [...existingValue];
+		} else if (typeof existingValue === 'string') {
+			// Convert string to array for merging
+			existingArray = this._processCommaSeparatedValue(existingValue);
+		} else {
+			// For other types, convert to string array
+			existingArray = [String(existingValue)];
+		}
+		console.log("Existing array:", existingArray);
+
+		// If new values is a string, convert to array
+		let newArray = [];
+		if (Array.isArray(newValues)) {
+			newArray = [...newValues];
+		} else if (typeof newValues === 'string') {
+			newArray = this._processCommaSeparatedValue(newValues);
+		} else {
+			newArray = [String(newValues)];
+		}
+		console.log("New array:", newArray);
+
+		// Merge arrays with unique values
+		const mergedArray = [...existingArray];
+		for (const newVal of newArray) {
+			if (!existingArray.some(existingVal => this._valueEquals(existingVal, newVal))) {
+				mergedArray.push(newVal);
+			}
+		}
+		console.log("Merged array:", mergedArray);
+
+		// Return appropriate format based on original types and result
+		if (mergedArray.length === 1) {
+			// If only one value, return as string for consistency
+			console.log("Single value, returning:", mergedArray[0]);
+			return mergedArray[0];
+		} else {
+			// Multiple values, return as array
+			console.log("Multiple values, returning array");
+			return mergedArray;
+		}
+	}
+
 	async _writeFrontmatter(file, newFrontmatter) {
+		console.log("_writeFrontmatter called with:", newFrontmatter);
 		const content = await this.app.vault.read(file);
 		const hasYaml = content.startsWith("---\n");
 		let body = content;
@@ -232,13 +386,17 @@ class ConditionalPropertiesPlugin extends Plugin {
 				try { fm = parseYaml(yamlRaw) || {}; } catch { fm = {}; }
 			}
 		}
+		console.log("Existing frontmatter:", fm);
 		const merged = { ...fm, ...newFrontmatter };
+		console.log("Merged frontmatter:", merged);
 		let yamlStr = "";
 		try { yamlStr = stringifyYaml(merged); } catch {
 			yamlStr = Object.entries(merged).map(([k, v]) => `${k}: ${v}`).join("\n");
 		}
+		console.log("Generated YAML:", yamlStr);
 		const newContent = `---\n${yamlStr}\n---\n${body}`;
 		await this.app.vault.modify(file, newContent);
+		console.log("File updated successfully");
 	}
 }
 
@@ -359,7 +517,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		// THEN section header
 		const thenHeader = wrap.createEl("div", { cls: "conditional-rules-header" });
-		thenHeader.createEl("strong", { text: "THEN set properties:" });
+		thenHeader.createEl("strong", { text: "THEN:" });
 
 		// Render each THEN action
 		rule.thenActions.forEach((action, actionIdx) => {
