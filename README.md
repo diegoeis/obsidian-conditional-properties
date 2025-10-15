@@ -10,6 +10,7 @@ My Granola meeting notes imports weren’t bringing the same name values as my p
 
 - Define multiple rules with a simple IF/THEN model
 - Operators: `equals`, `contains`, `notEquals`
+- **Multiple THEN actions per rule**: Set multiple properties in a single rule
 - **Scan Scope Options**: Choose between entire vault, latest created notes, or latest modified notes
 - **Configurable scan count**: Set number of notes to scan (1-1000, default 15) for latest notes options
 - Run on the entire vault (settings button or command)
@@ -53,8 +54,7 @@ Each rule has:
 - `ifProp`: source property name
 - `op`: operator (`equals`, `contains`, `notEquals`)
 - `ifValue`: value to test
-- `thenProp`: target property name
-- `thenValue`: target value to set
+- `thenActions`: array of actions to execute, each with `prop` and `value`
 
 ### Examples
 
@@ -86,6 +86,25 @@ THEN set property: status to processed
 ```
 IF property: source, op: notEquals, value: transcript-auto
 THEN set property: verified to true
+```
+
+4) Set multiple properties when a condition is met (NEW!)
+```
+IF property: tags, op: contains, value: meeting
+THEN set properties:
+  - status to processed
+  - priority to high
+  - last_reviewed to [[{{date}}]]
+```
+
+5) Update multiple related properties
+```
+IF property: project_status, op: equals, value: completed
+THEN set properties:
+  - status to done
+  - completed_date to [[{{date}}]]
+  - priority to low
+  - archived to true
 ```
 
 ## Settings

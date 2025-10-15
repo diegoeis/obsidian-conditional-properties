@@ -3,13 +3,18 @@ const { Plugin, Notice, Setting, PluginSettingTab, parseYaml, stringifyYaml } = 
 
 class ConditionalPropertiesPlugin extends Plugin {
 	async onload() {
-		this.settings = Object.assign({
-			rules: [],
-			scanIntervalMinutes: 5,
-			lastRun: null,
-			scanScope: "latestCreated", // "latestCreated", "latestModified", "entireVault"
-			scanCount: 15
-		}, await this.loadData());
+		await this.loadData().then(settings => {
+			this.settings = Object.assign({
+				rules: [],
+				scanIntervalMinutes: 5,
+				lastRun: null,
+				scanScope: "latestCreated", // "latestCreated", "latestModified", "entireVault"
+				scanCount: 15
+			}, settings);
+
+			// Migrate old rules format to new format
+			this._migrateRules();
+		});
 		this.registerInterval(this._setupScheduler());
 		this.addCommand({
 			id: "conditional-properties-run-now",
@@ -43,6 +48,42 @@ class ConditionalPropertiesPlugin extends Plugin {
 				console.error("ConditionalProperties scheduler error", e);
 			}
 		}, minutes * 60 * 1000);
+	}
+
+	_migrateRules() {
+		let hasChanges = false;
+
+		this.settings.rules = this.settings.rules.map(rule => {
+			// Check if rule is in old format (has thenProp/thenValue)
+			if (rule.thenProp !== undefined || rule.thenValue !== undefined) {
+				// Convert old format to new format
+				const migratedRule = {
+					ifProp: rule.ifProp || "",
+					ifValue: rule.ifValue || "",
+					op: rule.op || "equals",
+					thenActions: []
+				};
+
+				// Add the old THEN action as first action
+				if (rule.thenProp) {
+					migratedRule.thenActions.push({
+						prop: rule.thenProp,
+						value: rule.thenValue || ""
+					});
+				}
+
+				hasChanges = true;
+				return migratedRule;
+			}
+
+			// Rule is already in new format or has no THEN actions
+			return rule;
+		});
+
+		// Save migrated settings if changes were made
+		if (hasChanges) {
+			this.saveData(this.settings);
+		}
 	}
 
 	async runScan() {
@@ -107,23 +148,33 @@ class ConditionalPropertiesPlugin extends Plugin {
 		let changed = false;
 		const newFm = { ...currentFrontmatter };
 		for (const rule of rules) {
-			const { ifProp, ifValue, thenProp, thenValue } = rule || {};
+			const { ifProp, ifValue, thenActions } = rule || {};
 			const op = (rule?.op || "equals");
-			if (!ifProp || !thenProp) continue;
+			if (!ifProp || !Array.isArray(thenActions) || thenActions.length === 0) continue;
+
+			// Check IF condition
 			const sourceValue = currentFrontmatter?.[ifProp];
 			const match = this._matchesCondition(sourceValue, ifValue, op);
 			if (!match) continue;
 
-			if (thenProp === ifProp) {
-				const replaced = this._replaceInMultiValue(sourceValue, ifValue, thenValue);
-				if (!this._deepEqual(replaced, sourceValue)) {
-					newFm[thenProp] = replaced;
-					changed = true;
-				}
-			} else {
-				if (!this._deepEqual(newFm[thenProp], thenValue)) {
-					newFm[thenProp] = thenValue;
-					changed = true;
+			// Apply all THEN actions
+			for (const action of thenActions) {
+				const { prop, value } = action || {};
+				if (!prop) continue;
+
+				if (prop === ifProp) {
+					// Special case: replacing in multi-value property
+					const replaced = this._replaceInMultiValue(sourceValue, ifValue, value);
+					if (!this._deepEqual(replaced, sourceValue)) {
+						newFm[prop] = replaced;
+						changed = true;
+					}
+				} else {
+					// Regular property setting
+					if (!this._deepEqual(newFm[prop], value)) {
+						newFm[prop] = value;
+						changed = true;
+					}
 				}
 			}
 		}
@@ -266,7 +317,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			const addWrap = containerEl.createEl("div", { cls: "conditional-add-wrap" });
 			const addBtn = addWrap.createEl("button", { text: "+ Add rule" });
 			addBtn.onclick = async () => {
-				this.plugin.settings.rules.push({ ifProp: "", ifValue: "", op: "equals", thenProp: "", thenValue: "" });
+				this.plugin.settings.rules.push({ ifProp: "", ifValue: "", op: "equals", thenActions: [{ prop: "", value: "" }] });
 				await this.plugin.saveData(this.plugin.settings);
 				this.display();
 			};
@@ -281,6 +332,12 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 	_renderRule(containerEl, rule, idx) {
 		const wrap = containerEl.createEl("div", { cls: "conditional-rule" });
+
+		// Ensure rule has thenActions array
+		if (!Array.isArray(rule.thenActions)) {
+			rule.thenActions = [{ prop: "", value: "" }];
+		}
+
 		// Line 1: IF property [field] [operator] value [field]
 		const line1 = new Setting(wrap).setName("IF property");
 		line1.addText(t => t
@@ -300,21 +357,22 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.setValue(rule.ifValue || "")
 			.onChange(async (v) => { rule.ifValue = v; await this.plugin.saveData(this.plugin.settings); }));
 
-		// Line 2: THEN set property [field] to value [field]
-		const line2 = new Setting(wrap).setName("THEN set property");
-		line2.addText(t => t
-			.setPlaceholder("target property")
-			.setValue(rule.thenProp || "")
-			.onChange(async (v) => { rule.thenProp = v; await this.plugin.saveData(this.plugin.settings); }));
-		// Add a tiny label "to value" between inputs
-		const toLabel = document.createElement('span');
-		toLabel.textContent = ' to value ';
-		toLabel.classList.add('conditional-to-label');
-		line2.controlEl.appendChild(toLabel);
-		line2.addText(t => t
-			.setPlaceholder("new value")
-			.setValue(rule.thenValue || "")
-			.onChange(async (v) => { rule.thenValue = v; await this.plugin.saveData(this.plugin.settings); }));
+		// THEN section header
+		const thenHeader = wrap.createEl("div", { cls: "conditional-rules-header" });
+		thenHeader.createEl("strong", { text: "THEN set properties:" });
+
+		// Render each THEN action
+		rule.thenActions.forEach((action, actionIdx) => {
+			this._renderThenAction(wrap, rule, action, actionIdx, idx);
+		});
+
+		// Add action button
+		const addActionBtn = wrap.createEl("button", { text: "+ Add property", cls: "conditional-add-action" });
+		addActionBtn.onclick = async () => {
+			rule.thenActions.push({ prop: "", value: "" });
+			await this.plugin.saveData(this.plugin.settings);
+			this.display();
+		};
 
 		const actions = wrap.createEl("div", { cls: "conditional-actions" });
 		const runOne = actions.createEl("button", { text: "Run this rule", cls: "conditional-run-one" });
@@ -334,6 +392,43 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
 		};
+	}
+
+	_renderThenAction(containerEl, rule, action, actionIdx, ruleIdx) {
+		const actionWrap = containerEl.createEl("div", { cls: "conditional-then-action" });
+
+		const actionSetting = new Setting(actionWrap).setName(`Property ${actionIdx + 1}`);
+		actionSetting.addText(t => t
+			.setPlaceholder("property name")
+			.setValue(action.prop || "")
+			.onChange(async (v) => {
+				action.prop = v;
+				await this.plugin.saveData(this.plugin.settings);
+			}));
+
+		// Label "to value"
+		const toLabel = document.createElement('span');
+		toLabel.textContent = ' to ';
+		toLabel.classList.add('conditional-to-label');
+		actionSetting.controlEl.appendChild(toLabel);
+
+		actionSetting.addText(t => t
+			.setPlaceholder("value")
+			.setValue(action.value || "")
+			.onChange(async (v) => {
+				action.value = v;
+				await this.plugin.saveData(this.plugin.settings);
+			}));
+
+		// Remove action button (only show if more than one action)
+		if (rule.thenActions.length > 1) {
+			const removeActionBtn = actionWrap.createEl("button", { text: "×", cls: "conditional-remove-action" });
+			removeActionBtn.onclick = async () => {
+				rule.thenActions.splice(actionIdx, 1);
+				await this.plugin.saveData(this.plugin.settings);
+				this.display();
+			};
+		}
 	}
 }
 

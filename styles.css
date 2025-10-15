@@ -40,3 +40,60 @@
 	border-color: #e93147 !important;
 	order: 1;
 }
+
+/* New styles for multiple THEN actions */
+.conditional-then-action {
+	margin: 8px 0;
+	padding: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+}
+
+.conditional-then-action .setting-item {
+	border: none;
+	padding: 0;
+	margin: 0;
+}
+
+.conditional-then-action .setting-item-name {
+	font-size: 0.85rem;
+	font-weight: 500;
+	color: var(--text-muted);
+	margin-bottom: 4px;
+}
+
+.conditional-add-action {
+	background: var(--interactive-accent) !important;
+	color: var(--text-on-accent) !important;
+	border: none;
+	border-radius: 4px;
+	padding: 4px 8px;
+	font-size: 0.8rem;
+	margin: 8px 0;
+	cursor: pointer;
+}
+
+.conditional-add-action:hover {
+	background: var(--interactive-accent-hover) !important;
+}
+
+.conditional-remove-action {
+	background: #e93147 !important;
+	color: #fff !important;
+	border: none;
+	border-radius: 50%;
+	width: 20px;
+	height: 20px;
+	font-size: 12px;
+	font-weight: bold;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-left: 8px;
+}
+
+.conditional-remove-action:hover {
+	background: #d42c3d !important;
+}
