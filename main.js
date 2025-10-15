@@ -389,14 +389,44 @@ class ConditionalPropertiesPlugin extends Plugin {
 		console.log("Existing frontmatter:", fm);
 		const merged = { ...fm, ...newFrontmatter };
 		console.log("Merged frontmatter:", merged);
+
+		// Generate properly formatted YAML
 		let yamlStr = "";
-		try { yamlStr = stringifyYaml(merged); } catch {
+		try {
+			yamlStr = this._generateFormattedYaml(merged);
+		} catch (error) {
+			console.error("Error generating formatted YAML:", error);
 			yamlStr = Object.entries(merged).map(([k, v]) => `${k}: ${v}`).join("\n");
 		}
+
 		console.log("Generated YAML:", yamlStr);
 		const newContent = `---\n${yamlStr}\n---\n${body}`;
 		await this.app.vault.modify(file, newContent);
 		console.log("File updated successfully");
+	}
+
+	_generateFormattedYaml(obj, indent = 0) {
+		const spaces = '  '.repeat(indent);
+		const lines = [];
+
+		for (const [key, value] of Object.entries(obj)) {
+			if (Array.isArray(value) && value.length > 0) {
+				// Format arrays with proper YAML list syntax
+				lines.push(`${spaces}${key}:`);
+				for (const item of value) {
+					lines.push(`${spaces}  - ${item}`);
+				}
+			} else if (typeof value === 'object' && value !== null) {
+				// Handle nested objects
+				lines.push(`${spaces}${key}:`);
+				lines.push(this._generateFormattedYaml(value, indent + 1));
+			} else {
+				// Handle simple values
+				lines.push(`${spaces}${key}: ${value}`);
+			}
+		}
+
+		return lines.join('\n');
 	}
 }
 

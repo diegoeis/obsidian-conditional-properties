@@ -123,6 +123,10 @@ THEN set properties:
 - **Number of notes**: When using latest notes options, set the number of notes to scan (1-1000, default 15)
 - Rules editor: add/remove rules, pick operator, edit values
 - Run now button (executes based on selected scope)
+- Add many values in the same THEN action separated by commas
+- Add multiple THEN actions
+
+
 
 ## Limitations (V1)
 - Only frontmatter is modified
