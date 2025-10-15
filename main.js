@@ -505,13 +505,17 @@ class ConditionalPropertiesPlugin extends Plugin {
 			
 			// Replace the entire property including its array items
 			const formattedValue = this._formatPropertyValue(key, newValue, indent);
-			return yamlString.substring(0, matchIndex) + formattedValue + yamlString.substring(endIndex);
+			const before = yamlString.substring(0, matchIndex);
+			const after = yamlString.substring(endIndex);
+			return before + formattedValue + (after.startsWith('\n') ? after : '\n' + after);
 		} else {
 			// Single line property, replace just this line
 			const lineEnd = yamlString.indexOf('\n', matchIndex);
-			const endIndex = lineEnd === -1 ? yamlString.length : lineEnd + 1;
+			const endIndex = lineEnd === -1 ? yamlString.length : lineEnd;
 			const formattedValue = this._formatPropertyValue(key, newValue, indent);
-			return yamlString.substring(0, matchIndex) + formattedValue + (lineEnd === -1 ? '' : '\n') + yamlString.substring(endIndex);
+			const before = yamlString.substring(0, matchIndex);
+			const after = yamlString.substring(endIndex);
+			return before + formattedValue + after;
 		}
 	}
 	
