@@ -320,16 +320,45 @@ class ConditionalPropertiesPlugin extends Plugin {
 	_matchesCondition(source, expected, op) {
 		// Normalize
 		if (Array.isArray(source)) {
-			const has = source.some(v => this._valueEquals(v, expected));
+			const has = source.some(v => this._valueMatches(v, expected));
 			if (op === "contains") return has;
 			if (op === "notContains") return !has;
 			return false;
 		}
 		const s = source == null ? "" : String(source);
 		const e = expected == null ? "" : String(expected);
-		if (op === "contains") return s.includes(e);
-		if (op === "notContains") return !s.includes(e);
+		if (op === "contains") return this._valueMatches(s, e);
+		if (op === "notContains") return !this._valueMatches(s, e);
 		return false;
+	}
+
+	_valueMatches(source, expected) {
+		// Convert both to strings for comparison
+		const sourceStr = String(source || '');
+		const expectedStr = String(expected || '');
+
+		// For arrays, check if any item matches
+		if (Array.isArray(source)) {
+			return source.some(item => this._valueMatches(item, expected));
+		}
+
+		// Normalize: remove wiki links [[ ]] and quotes " "
+		const normalize = (str) => {
+			// Remove wiki link brackets [[ ]]
+			let normalized = str.replace(/\[\[([^\]]+)\]\]/g, '$1');
+			// Remove surrounding quotes if they wrap the entire string
+			if (normalized.startsWith('"') && normalized.endsWith('"')) {
+				normalized = normalized.slice(1, -1);
+			}
+			return normalized.trim();
+		};
+
+		const normalizedSource = normalize(sourceStr);
+		const normalizedExpected = normalize(expectedStr);
+
+		console.log(`Comparing "${sourceStr}" (normalized: "${normalizedSource}") with "${expectedStr}" (normalized: "${normalizedExpected}")`);
+
+		return normalizedSource === normalizedExpected;
 	}
 
 	_replaceInMultiValue(source, needle, replacement) {
@@ -344,7 +373,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	_valueEquals(a, b) {
-		return String(a) === String(b);
+		return this._valueMatches(a, b);
 	}
 
 	_deepEqual(a, b) {
