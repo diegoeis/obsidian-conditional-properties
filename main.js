@@ -161,29 +161,29 @@ class ConditionalPropertiesPlugin extends Plugin {
 			const propertyActions = {};
 			console.log("Processing rule with thenActions:", thenActions);
 			for (const action of thenActions) {
-				const { prop, value } = action || {};
-				console.log("Processing action:", { prop, value });
+				const { prop, value, action: actionType } = action || {};
+				console.log("Processing action:", { prop, value, actionType });
 				if (!prop) continue;
 
 				if (!propertyActions[prop]) {
 					propertyActions[prop] = [];
 				}
-				propertyActions[prop].push(value);
+				propertyActions[prop].push({ value, actionType: actionType || "add" });
 			}
 			console.log("Grouped property actions:", propertyActions);
 
 			// Apply merged actions
-			for (const [prop, values] of Object.entries(propertyActions)) {
-				console.log("Applying property:", prop, "with values:", values);
+			for (const [prop, actions] of Object.entries(propertyActions)) {
+				console.log("Applying property:", prop, "with actions:", actions);
 				if (prop === ifProp) {
-					// Special case: IF property - process each value individually
-					let currentValue = [...sourceValue];
+					// Special case: IF property - process each action individually
+					let currentValue = Array.isArray(sourceValue) ? [...sourceValue] : (sourceValue ? [sourceValue] : []);
 					let hasChanges = false;
 					console.log("Starting with sourceValue:", currentValue, "ifValue:", ifValue);
 
-					for (let i = 0; i < values.length; i++) {
-						const value = values[i];
-						console.log(`\n--- Processing THEN value ${i + 1}: "${value}" ---`);
+					for (let i = 0; i < actions.length; i++) {
+						const { value, actionType } = actions[i];
+						console.log(`\n--- Processing THEN action ${i + 1}: type="${actionType}", value="${value}" ---`);
 
 						// Process comma-separated values for this THEN action
 						const processedValue = this._processCommaSeparatedValue(value);
@@ -193,43 +193,37 @@ class ConditionalPropertiesPlugin extends Plugin {
 						const valuesToProcess = Array.isArray(processedValue) ? processedValue : [processedValue];
 						console.log(`Values to process: ${valuesToProcess}`);
 
-						for (const singleValue of valuesToProcess) {
-							console.log(`Processing single value: "${singleValue}"`);
-
-							// Check if ifValue exists in current array
-							const ifValueIndex = currentValue.findIndex(item => {
-								const equals = this._valueEquals(item, ifValue);
-								console.log(`Comparing "${item}" with ifValue "${ifValue}": ${equals}`);
-								return equals;
-							});
-							console.log(`Found ifValue "${ifValue}" at index:`, ifValueIndex);
-
-							// Check if the THEN value already exists
-							const valueExists = currentValue.some(item => {
-								const equals = this._valueEquals(item, singleValue);
-								console.log(`Checking if THEN value "${singleValue}" exists: comparing with "${item}": ${equals}`);
-								return equals;
-							});
-							console.log(`THEN value "${singleValue}" already exists:`, valueExists);
-
-							if (ifValueIndex !== -1 && !valueExists) {
-								// ifValue exists AND new value doesn't exist, replace it
-								const oldValue = currentValue[ifValueIndex];
-								currentValue[ifValueIndex] = singleValue;
-								hasChanges = true;
-								console.log(`✓ Replaced "${oldValue}" with "${singleValue}" at index ${ifValueIndex}`);
-							} else if (ifValueIndex === -1 && !valueExists) {
-								// ifValue doesn't exist AND new value doesn't exist, add it
-								currentValue.push(singleValue);
-								hasChanges = true;
-								console.log(`✓ Added new value "${singleValue}" to array`);
-							} else {
-								console.log(`⚠ No action needed for "${singleValue}" - conditions not met`);
-								console.log(`  - ifValue exists: ${ifValueIndex !== -1}`);
-								console.log(`  - value exists: ${valueExists}`);
+						if (actionType === "remove") {
+							// REMOVE action: remove specified values
+							for (const singleValue of valuesToProcess) {
+								console.log(`Removing value: "${singleValue}"`);
+								const initialLength = currentValue.length;
+								currentValue = currentValue.filter(item => !this._valueEquals(item, singleValue));
+								if (currentValue.length < initialLength) {
+									hasChanges = true;
+									console.log(`✓ Removed "${singleValue}" from array`);
+								} else {
+									console.log(`⚠ Value "${singleValue}" not found to remove`);
+								}
+								console.log("Current array now:", currentValue);
 							}
+						} else {
+							// ADD action: add values (default behavior)
+							for (const singleValue of valuesToProcess) {
+								console.log(`Adding value: "${singleValue}"`);
 
-							console.log("Current array now:", currentValue);
+								// Don't remove ifValue when adding - preserve it
+								const valueExists = currentValue.some(item => this._valueEquals(item, singleValue));
+								
+								if (!valueExists) {
+									currentValue.push(singleValue);
+									hasChanges = true;
+									console.log(`✓ Added new value "${singleValue}" to array`);
+								} else {
+									console.log(`⚠ Value "${singleValue}" already exists`);
+								}
+								console.log("Current array now:", currentValue);
+							}
 						}
 					}
 
@@ -240,39 +234,64 @@ class ConditionalPropertiesPlugin extends Plugin {
 
 					// Only apply if there were actual changes
 					if (hasChanges) {
-						newFm[prop] = currentValue;
+						newFm[prop] = currentValue.length === 1 ? currentValue[0] : currentValue;
 						changed = true;
 						console.log("Applied IF property changes");
 					} else {
 						console.log("No changes needed for IF property");
 					}
 				} else {
-					// Regular property setting - merge all values for this property
-					// Process each value individually and combine them properly
-					let allProcessedValues = [];
+					// Regular property setting - process each action individually
+					let currentValue = Array.isArray(currentFrontmatter[prop]) 
+						? [...currentFrontmatter[prop]] 
+						: (currentFrontmatter[prop] ? [currentFrontmatter[prop]] : []);
+					let hasChanges = false;
 
-					for (const value of values) {
+					for (const actionData of actions) {
+						const { value, actionType } = actionData;
+						console.log("Processing action for", prop, ":", { value, actionType });
+
+						// Process comma-separated values
 						const processedValue = this._processCommaSeparatedValue(value);
-						console.log("Processing individual value:", value, "->", processedValue);
+						const valuesToProcess = Array.isArray(processedValue) ? processedValue : [processedValue];
+						console.log("Values to process:", valuesToProcess);
 
-						if (Array.isArray(processedValue)) {
-							allProcessedValues.push(...processedValue);
+						if (actionType === "remove") {
+							// REMOVE action: remove specified values
+							for (const singleValue of valuesToProcess) {
+								const initialLength = currentValue.length;
+								currentValue = currentValue.filter(item => !this._valueEquals(item, singleValue));
+								if (currentValue.length < initialLength) {
+									hasChanges = true;
+									console.log(`✓ Removed "${singleValue}" from ${prop}`);
+								} else {
+									console.log(`⚠ Value "${singleValue}" not found in ${prop}`);
+								}
+							}
 						} else {
-							allProcessedValues.push(processedValue);
+							// ADD action: add values if they don't exist
+							for (const singleValue of valuesToProcess) {
+								const valueExists = currentValue.some(item => this._valueEquals(item, singleValue));
+								if (!valueExists) {
+									currentValue.push(singleValue);
+									hasChanges = true;
+									console.log(`✓ Added "${singleValue}" to ${prop}`);
+								} else {
+									console.log(`⚠ Value "${singleValue}" already exists in ${prop}`);
+								}
+							}
 						}
 					}
 
-					console.log("All processed values:", allProcessedValues);
-					const mergedValue = this._mergePropertyValue(currentFrontmatter[prop], allProcessedValues);
-					console.log("Merged value for", prop, ":", mergedValue, "current:", currentFrontmatter[prop]);
+					console.log("Final value for", prop, ":", currentValue);
 
-					// Always apply if different from current value
-					if (!this._deepEqual(currentFrontmatter[prop], mergedValue)) {
-						newFm[prop] = mergedValue;
+					// Apply changes if any
+					if (hasChanges) {
+						newFm[prop] = currentValue.length === 1 ? currentValue[0] : currentValue;
 						changed = true;
-						console.log("Applied merged value for property:", prop);
+						console.log("Applied changes for property:", prop);
 					} else {
-						console.log("No change needed for property:", prop);
+						console.log("No changes needed for property:", prop);
 					}
 				}
 			}
@@ -546,7 +565,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			const addWrap = containerEl.createEl("div", { cls: "conditional-add-wrap" });
 			const addBtn = addWrap.createEl("button", { text: "+ Add rule", cls: "eis-btn-primary" });
 			addBtn.onclick = async () => {
-				this.plugin.settings.rules.push({ ifProp: "", ifValue: "", op: "equals", thenActions: [{ prop: "", value: "" }] });
+				this.plugin.settings.rules.push({ ifProp: "", ifValue: "", op: "equals", thenActions: [{ prop: "", value: "", action: "add" }] });
 				await this.plugin.saveData(this.plugin.settings);
 				this.display();
 			};
@@ -610,7 +629,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			const scrollContainer = this.containerEl.closest('.modal-content') || this.containerEl.parentElement;
 			const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
 			
-			rule.thenActions.push({ prop: "", value: "" });
+			rule.thenActions.push({ prop: "", value: "", action: "add" });
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
 			
@@ -662,6 +681,11 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		const actionSetting = new Setting(actionWrap).setName(`Property ${actionIdx + 1}`);
 
+		// Ensure action has action field (backward compatibility)
+		if (!action.action) {
+			action.action = "add";
+		}
+
 		// Add remove button as first element in the setting's control area
 		const settingItem = actionSetting.settingEl;
 		const removeActionBtn = document.createElement("button");
@@ -710,9 +734,20 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				await this.plugin.saveData(this.plugin.settings);
 			}));
 
+		// Add action dropdown (ADD/REMOVE)
+		actionSetting.addDropdown(d => {
+			d.addOption("add", "ADD");
+			d.addOption("remove", "REMOVE");
+			d.setValue(action.action || "add");
+			d.onChange(async (v) => {
+				action.action = v;
+				await this.plugin.saveData(this.plugin.settings);
+			});
+		});
+
 		// Label "to value"
 		const toLabel = document.createElement('span');
-		toLabel.textContent = ' to ';
+		toLabel.textContent = ' ';
 		toLabel.classList.add('conditional-to-label');
 		actionSetting.controlEl.appendChild(toLabel);
 
