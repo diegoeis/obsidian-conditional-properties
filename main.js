@@ -89,6 +89,9 @@ class ConditionalPropertiesPlugin extends Plugin {
 	async runScan() {
 		const { vault, metadataCache } = this.app;
 		const files = this._getFilesToScan();
+		console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+		console.log(`🔍 STARTING SCAN: ${files.length} notes to process`);
+		console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 		let modifiedCount = 0;
 		for (const file of files) {
 			const cache = metadataCache.getFileCache(file) || {};
@@ -98,6 +101,9 @@ class ConditionalPropertiesPlugin extends Plugin {
 		}
 		this.settings.lastRun = new Date().toISOString();
 		await this.saveData(this.settings);
+		console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+		console.log(`✅ SCAN COMPLETE: ${modifiedCount} modified / ${files.length} scanned`);
+		console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 		return { scanned: files.length, modified: modifiedCount };
 	}
 
@@ -126,6 +132,9 @@ class ConditionalPropertiesPlugin extends Plugin {
 	async runScanForRules(rulesSubset) {
 		const { vault, metadataCache } = this.app;
 		const files = this._getFilesToScan();
+		console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+		console.log(`🔍 STARTING SINGLE RULE SCAN: ${files.length} notes to process`);
+		console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 		let modifiedCount = 0;
 		for (const file of files) {
 			const cache = metadataCache.getFileCache(file) || {};
@@ -133,6 +142,9 @@ class ConditionalPropertiesPlugin extends Plugin {
 			const applied = await this.applyRulesToFrontmatter(file, frontmatter, rulesSubset);
 			if (applied) modifiedCount++;
 		}
+		console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+		console.log(`✅ SINGLE RULE SCAN COMPLETE: ${modifiedCount} modified / ${files.length} scanned`);
+		console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 		return { scanned: files.length, modified: modifiedCount };
 	}
 
@@ -297,6 +309,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		}
 		if (!changed) return false;
+		console.log(`✓ MODIFIED NOTE: "${file.basename}" (${file.path})`);
+		console.log("Changes to be applied:", newFm);
 		await this._writeFrontmatter(file, newFm);
 		return true;
 	}
