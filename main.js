@@ -94,6 +94,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 		console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 		let modifiedCount = 0;
 		for (const file of files) {
+			console.log(`📄 Scanning: "${file.basename}" (${file.path})`);
 			const cache = metadataCache.getFileCache(file) || {};
 			const frontmatter = cache.frontmatter ?? {};
 			const applied = await this.applyRulesToFrontmatter(file, frontmatter);
@@ -137,6 +138,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 		console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 		let modifiedCount = 0;
 		for (const file of files) {
+			console.log(`📄 Scanning: "${file.basename}" (${file.path})`);
 			const cache = metadataCache.getFileCache(file) || {};
 			const frontmatter = cache.frontmatter ?? {};
 			const applied = await this.applyRulesToFrontmatter(file, frontmatter, rulesSubset);
