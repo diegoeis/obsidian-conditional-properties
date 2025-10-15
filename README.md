@@ -9,10 +9,10 @@ My Granola meeting notes imports weren’t bringing the same name values as my p
 ## Features
 
 - Define multiple rules with a simple IF/THEN model
-- Operators: `equals`, `contains`, `notEquals`
+- Operators: `contains`, `notContains`
 - **Multiple THEN actions per rule**: Set multiple properties in a single rule
 - **Comma-separated values**: Set multiple values for a property (e.g., "work, frota162" → properly formatted YAML array)
-- **ADD/REMOVE actions**: Choose to ADD values to a property or REMOVE specific values (NEW!)
+- **ADD/REMOVE actions**: Choose to ADD values to a property or REMOVE specific values
 - **Smart property merging**: Add values to existing properties without duplicating
 - **Scan Scope Options**: Choose between entire vault, latest created notes, or latest modified notes
 - **Configurable scan count**: Set number of notes to scan (1-1000, default 15) for latest notes options
@@ -86,14 +86,14 @@ In the rules editor, each THEN action has a dropdown between the property name a
 
 **Add tags without duplicating:**
 ```
-IF property: type, op: equals, value: meeting
+IF property: type, op: contains, value: meeting
 THEN set property: tags [ADD] work, important
 ```
 Result: Adds "work" and "important" tags only if they don't already exist.
 
 **Remove old tags:**
 ```
-IF property: status, op: equals, value: archived
+IF property: status, op: contains, value: archived
 THEN set property: tags [REMOVE] draft, wip
 ```
 Result: Removes "draft" and "wip" tags if they exist.
@@ -112,9 +112,9 @@ Result: Removes old tags, adds new ones, and sets status.
 
 Each rule has:
 - `ifProp`: source property name
-- `op`: operator (`equals`, `contains`, `notEquals`)
+- `op`: operator (`contains`, `notContains`)
 - `ifValue`: value to test
-- `thenActions`: array of actions to execute, each with `prop` and `value`
+- `thenActions`: array of actions to execute, each with `prop`, `value`, and `action` (add/remove)
 
 ### Examples
 
@@ -126,7 +126,7 @@ related_people: ["[[steve_works]]", "[[John Doe]]"]
 ```
 Rule:
 ```
-IF property: related_people, op: equals, value: [[steve_works]]
+IF property: related_people, op: contains, value: [[steve_works]]
 THEN set property: related_people to [[Steve Jobs]]
 ```
 Result:
@@ -142,9 +142,9 @@ IF property: tags, op: contains, value: meeting
 THEN set property: status to processed
 ```
 
-3) Ensure a property differs from a given value
+3) Ensure a property does not contain a value
 ```
-IF property: source, op: notEquals, value: transcript-auto
+IF property: source, op: notContains, value: transcript-auto
 THEN set property: verified to true
 ```
 
@@ -159,7 +159,7 @@ THEN set properties:
 
 5) Update multiple related properties
 ```
-IF property: project_status, op: equals, value: completed
+IF property: project_status, op: contains, value: completed
 THEN set properties:
   - status to done
   - completed_date to [[{{date}}]]
@@ -167,9 +167,9 @@ THEN set properties:
   - archived to true
 ```
 
-6) Set multiple tags at once (NEW!)
+6) Set multiple tags at once
 ```
-IF property: type, op: equals, value: note
+IF property: type, op: contains, value: note
 THEN set properties:
   - tags to work, frota162, important
 ```
@@ -182,9 +182,9 @@ tags:
   - important
 ```
 
-## Limitations (V1)
+## Limitations
 - Only frontmatter is modified
-- Operators limited to equality, containment, and inequality
+- Operators limited to containment (`contains`, `notContains`)
 - No folder/tag scoping yet
 
 ## Roadmap

@@ -60,7 +60,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 				const migratedRule = {
 					ifProp: rule.ifProp || "",
 					ifValue: rule.ifValue || "",
-					op: rule.op || "equals",
+					op: rule.op || "contains",
 					thenActions: []
 				};
 
@@ -149,7 +149,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 		const newFm = { ...currentFrontmatter };
 		for (const rule of rules) {
 			const { ifProp, ifValue, thenActions } = rule || {};
-			const op = (rule?.op || "equals");
+			const op = (rule?.op || "contains");
 			if (!ifProp || !Array.isArray(thenActions) || thenActions.length === 0) continue;
 
 			// Check IF condition
@@ -305,16 +305,14 @@ class ConditionalPropertiesPlugin extends Plugin {
 		// Normalize
 		if (Array.isArray(source)) {
 			const has = source.some(v => this._valueEquals(v, expected));
-			if (op === "equals") return has; // equals means any array item equals expected
-			if (op === "contains") return has; // contains behaves same as equals for arrays
-			if (op === "notEquals") return !has;
+			if (op === "contains") return has;
+			if (op === "notContains") return !has;
 			return false;
 		}
 		const s = source == null ? "" : String(source);
 		const e = expected == null ? "" : String(expected);
-		if (op === "equals") return s === e;
 		if (op === "contains") return s.includes(e);
-		if (op === "notEquals") return s !== e;
+		if (op === "notContains") return !s.includes(e);
 		return false;
 	}
 
@@ -565,7 +563,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			const addWrap = containerEl.createEl("div", { cls: "conditional-add-wrap" });
 			const addBtn = addWrap.createEl("button", { text: "+ Add rule", cls: "eis-btn-primary" });
 			addBtn.onclick = async () => {
-				this.plugin.settings.rules.push({ ifProp: "", ifValue: "", op: "equals", thenActions: [{ prop: "", value: "", action: "add" }] });
+				this.plugin.settings.rules.push({ ifProp: "", ifValue: "", op: "contains", thenActions: [{ prop: "", value: "", action: "add" }] });
 				await this.plugin.saveData(this.plugin.settings);
 				this.display();
 			};
@@ -593,10 +591,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.setValue(rule.ifProp || "")
 			.onChange(async (v) => { rule.ifProp = v; await this.plugin.saveData(this.plugin.settings); }));
 		line1.addDropdown(d => {
-			const current = rule.op || "equals";
-			d.addOption("equals", "equals");
+			const current = rule.op || "contains";
 			d.addOption("contains", "contains");
-			d.addOption("notEquals", "notEquals");
+			d.addOption("notContains", "notContains");
 			d.setValue(current);
 			d.onChange(async (v) => { rule.op = v; await this.plugin.saveData(this.plugin.settings); });
 		});
