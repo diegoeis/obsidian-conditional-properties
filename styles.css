@@ -14,9 +14,13 @@
 	margin: 8px 0 12px 0;
 }
 
-.run-now-button {
+.eis-btn-primary {
 	background: var(--color-accent) !important;
 	color: var(--text-on-accent) !important;
+}
+.eis-btn-primary:hover {
+	background: var(--interactive-accent) !important;
+	color: #fff !important;
 }
 
 .conditional-to-label { margin: 0 6px; opacity: 0.8; }
@@ -26,19 +30,7 @@
 	gap: 8px;
 	margin-top: 6px;
 	align-items: center;
-}
-
-.conditional-run-one {
-	background: var(--interactive-accent) !important;
-	color: var(--text-on-accent) !important;
-	order: 2;
-}
-
-.conditional-remove {
-	background: #e93147 !important;
-	color: #fff !important;
-	border-color: #e93147 !important;
-	order: 1;
+	margin: 0;
 }
 
 /* New styles for multiple THEN actions */
@@ -64,25 +56,38 @@
 }
 
 .conditional-add-action {
-	background: var(--interactive-accent) !important;
-	color: var(--text-on-accent) !important;
-	border: none;
+	background: transparent !important;
+	color: var(--color-accent) !important;
+	border: 1px solid var(--interactive-accent) !important;
 	border-radius: 4px;
 	padding: 4px 8px;
 	font-size: 0.8rem;
 	margin: 8px 0;
+	margin-left: auto;
+	order: 3;
 	cursor: pointer;
+	box-shadow: none !important;
 }
 
 .conditional-add-action:hover {
-	background: var(--interactive-accent-hover) !important;
+	background: var(--interactive-accent) !important;
+	color: #fff !important;
 }
 
-.conditional-remove-action {
+.eis-btn-red {
 	background: #e93147 !important;
 	color: #fff !important;
+
+}
+
+.eis-btn-red:hover {
+	background: #fff;
+	color: #e93147;
+}
+
+
+.conditional-remove-action {
 	border: none;
-	border-radius: 50%;
 	width: 20px;
 	height: 20px;
 	font-size: 12px;
@@ -92,8 +97,4 @@
 	align-items: center;
 	justify-content: center;
 	margin-left: 8px;
-}
-
-.conditional-remove-action:hover {
-	background: #d42c3d !important;
 }

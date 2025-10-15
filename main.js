@@ -301,7 +301,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.setDesc("Execute all rules across selected scope")
 				.addButton(btn => {
 					btn.setButtonText("Run now");
-					btn.buttonEl.classList.add("run-now-button");
+					btn.buttonEl.classList.add("run-now-button", "eis-btn-primary");
 					btn.onClick(async () => {
 				btn.setDisabled(true);
 				try {
@@ -315,7 +315,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			containerEl.createEl("h3", { text: "Add rules" });
 			// Add button ABOVE the list
 			const addWrap = containerEl.createEl("div", { cls: "conditional-add-wrap" });
-			const addBtn = addWrap.createEl("button", { text: "+ Add rule" });
+			const addBtn = addWrap.createEl("button", { text: "+ Add rule", cls: "eis-btn-primary" });
 			addBtn.onclick = async () => {
 				this.plugin.settings.rules.push({ ifProp: "", ifValue: "", op: "equals", thenActions: [{ prop: "", value: "" }] });
 				await this.plugin.saveData(this.plugin.settings);
@@ -366,16 +366,19 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			this._renderThenAction(wrap, rule, action, actionIdx, idx);
 		});
 
+		// Create actions container
+		const actions = wrap.createEl("div", { cls: "conditional-actions" });
+
 		// Add action button
-		const addActionBtn = wrap.createEl("button", { text: "+ Add property", cls: "conditional-add-action" });
-		addActionBtn.onclick = async () => {
+		const addActionBtn = actions.createEl("button", { text: "+ Add property", cls: "conditional-add-action" });
+		addActionBtn.onclick = async (e) => {
+			e.preventDefault(); // Prevent default behavior that might cause scroll
 			rule.thenActions.push({ prop: "", value: "" });
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
 		};
 
-		const actions = wrap.createEl("div", { cls: "conditional-actions" });
-		const runOne = actions.createEl("button", { text: "Run this rule", cls: "conditional-run-one" });
+		const runOne = actions.createEl("button", { text: "Run this rule", cls: "conditional-run-one eis-btn-primary" });
 		runOne.onclick = async () => {
 			runOne.setAttribute('disabled', 'true');
 			try {
@@ -398,10 +401,27 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const actionWrap = containerEl.createEl("div", { cls: "conditional-then-action" });
 
 		const actionSetting = new Setting(actionWrap).setName(`Property ${actionIdx + 1}`);
+
+		// Add remove button as first item in setting-item
+		const removeActionBtn = actionWrap.createEl("button", { text: "×", cls: "conditional-remove-action eis-btn-red" });
+		removeActionBtn.onclick = async () => {
+			rule.thenActions.splice(actionIdx, 1);
+			await this.plugin.saveData(this.plugin.settings);
+			this.display();
+		};
+
 		actionSetting.addText(t => t
 			.setPlaceholder("property name")
 			.setValue(action.prop || "")
 			.onChange(async (v) => {
+				// Check for duplicate properties in the same rule
+				const duplicateCount = rule.thenActions.filter(a => a.prop === v).length;
+				if (duplicateCount > 1) {
+					new Notice(`Warning: Property "${v}" is defined multiple times in this rule. The last value will be used.`, 3000);
+					actionWrap.classList.add('duplicate-prop');
+				} else {
+					actionWrap.classList.remove('duplicate-prop');
+				}
 				action.prop = v;
 				await this.plugin.saveData(this.plugin.settings);
 			}));
@@ -413,21 +433,16 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		actionSetting.controlEl.appendChild(toLabel);
 
 		actionSetting.addText(t => t
-			.setPlaceholder("value")
+			.setPlaceholder("value (use commas to separate multiple values)")
 			.setValue(action.value || "")
 			.onChange(async (v) => {
 				action.value = v;
 				await this.plugin.saveData(this.plugin.settings);
 			}));
 
-		// Remove action button (only show if more than one action)
-		if (rule.thenActions.length > 1) {
-			const removeActionBtn = actionWrap.createEl("button", { text: "×", cls: "conditional-remove-action" });
-			removeActionBtn.onclick = async () => {
-				rule.thenActions.splice(actionIdx, 1);
-				await this.plugin.saveData(this.plugin.settings);
-				this.display();
-			};
+		// Only show remove button if more than one action (but it's always created now, just hidden via CSS)
+		if (rule.thenActions.length <= 1) {
+			removeActionBtn.style.display = 'none';
 		}
 	}
 }
