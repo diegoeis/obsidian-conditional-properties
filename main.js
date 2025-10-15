@@ -468,7 +468,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 				lines.push(`${spaces}${key}:`);
 				for (const item of value) {
 					console.log(`Adding array item: "${item}"`);
-					lines.push(`${spaces}  - ${item}`);
+					const formattedItem = this._formatYamlValue(item);
+					lines.push(`${spaces}  - ${formattedItem}`);
 				}
 			} else if (typeof value === 'object' && value !== null) {
 				// Handle nested objects
@@ -477,7 +478,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 			} else {
 				// Handle simple values
 				console.log(`Adding simple value for key "${key}": ${value}`);
-				lines.push(`${spaces}${key}: ${value}`);
+				const formattedValue = this._formatYamlValue(value);
+				lines.push(`${spaces}${key}: ${formattedValue}`);
 			}
 		}
 
@@ -485,6 +487,38 @@ class ConditionalPropertiesPlugin extends Plugin {
 		console.log("Generated YAML lines:", lines);
 		console.log("Final YAML result:", result);
 		return result;
+	}
+
+	_formatYamlValue(value) {
+		if (value === null || value === undefined) {
+			return '';
+		}
+
+		const str = String(value);
+		
+		// Check if value needs quotes
+		// Need quotes if:
+		// - Contains special YAML characters: : { } [ ] , & * # ? | - < > = ! % @ `
+		// - Starts or ends with whitespace
+		// - Is a number-like string that should stay as string
+		// - Contains newlines
+		// - Is empty
+		const needsQuotes = (
+			str === '' ||
+			str !== str.trim() ||
+			/[:\{\}\[\],&*#\?|\-<>=!%@`]/.test(str) ||
+			str.includes('\n') ||
+			str.includes('"') ||
+			str.includes("'")
+		);
+
+		if (needsQuotes) {
+			// Use double quotes and escape any existing double quotes
+			const escaped = str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+			return `"${escaped}"`;
+		}
+
+		return str;
 	}
 }
 
