@@ -5,6 +5,8 @@ Automate frontmatter property updates in your Obsidian notes using simple condit
 What inspired me to do this plugin was:
 My Granola meeting notes imports weren’t bringing the same name values as my people notes. So, I created this plugin to correct the names of people in my notes.
 
+![https://i.imgur.com/xfz21us.png](https://i.imgur.com/xfz21us.png)
+
 
 ## Features
 
