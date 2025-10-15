@@ -222,7 +222,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 								console.log("Current array now:", currentValue);
 							}
 						} else {
-							// ADD action: add values (default behavior)
+							// ADD action: add values (default behavior) - use original value for preservation
 							for (const singleValue of valuesToProcess) {
 								console.log(`Adding value: "${singleValue}"`);
 
@@ -342,7 +342,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 			return source.some(item => this._valueMatches(item, expected));
 		}
 
-		// Normalize: remove wiki links [[ ]] and quotes " "
+		// Normalize: remove wiki links [[ ]] and quotes " " for comparison purposes only
 		const normalize = (str) => {
 			// Remove wiki link brackets [[ ]]
 			let normalized = str.replace(/\[\[([^\]]+)\]\]/g, '$1');
@@ -380,32 +380,10 @@ class ConditionalPropertiesPlugin extends Plugin {
 		try { return JSON.stringify(a) === JSON.stringify(b); } catch { return a === b; }
 	}
 
-	_processCommaSeparatedValue(value) {
-		console.log("_processCommaSeparatedValue input:", value, typeof value);
-		if (!value || typeof value !== 'string') {
-			console.log("Invalid input, returning as-is");
-			return value;
-		}
-
-		// Split by comma and filter out empty values
-		const parts = value.split(',').map(part => part.trim()).filter(part => part.length > 0);
-		console.log("Split parts:", parts);
-
-		// If only one value, return as simple string
-		if (parts.length === 1) {
-			console.log("Single value, returning:", parts[0]);
-			return parts[0];
-		}
-
-		// If multiple values, return as array
-		if (parts.length > 1) {
-			console.log("Multiple values, returning array:", parts);
-			return parts;
-		}
-
-		// If no valid parts, return original value
-		console.log("No valid parts, returning original");
-		return value;
+	_processValuePreservingOriginal(value, originalValue) {
+		// Process comma-separated values but preserve original formatting
+		const processedValue = this._processCommaSeparatedValue(originalValue);
+		return processedValue;
 	}
 
 	_mergePropertyValue(existingValue, newValue) {
@@ -442,7 +420,6 @@ class ConditionalPropertiesPlugin extends Plugin {
 		} else {
 			newArray = [String(newValues)];
 		}
-		console.log("New array:", newArray);
 
 		// Merge arrays with unique values
 		const mergedArray = [...existingArray];
@@ -463,6 +440,34 @@ class ConditionalPropertiesPlugin extends Plugin {
 			console.log("Multiple values, returning array:", mergedArray);
 			return mergedArray;
 		}
+	}
+
+	_processCommaSeparatedValue(value) {
+		console.log("_processCommaSeparatedValue input:", value, typeof value);
+		if (!value || typeof value !== 'string') {
+			console.log("Invalid input, returning as-is");
+			return value;
+		}
+
+		// Split by comma and filter out empty values, preserving original formatting
+		const parts = value.split(',').map(part => part.trim()).filter(part => part.length > 0);
+		console.log("Split parts:", parts);
+
+		// If only one value, return as simple string
+		if (parts.length === 1) {
+			console.log("Single value, returning:", parts[0]);
+			return parts[0];
+		}
+
+		// If multiple values, return as array with original formatting preserved
+		if (parts.length > 1) {
+			console.log("Multiple values, returning array:", parts);
+			return parts;
+		}
+
+		// If no valid parts, return original value
+		console.log("No valid parts, returning original");
+		return value;
 	}
 
 	async _writeFrontmatter(file, newFrontmatter) {
