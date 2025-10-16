@@ -79,10 +79,24 @@ When setting properties in THEN actions, you can now choose between two modes:
 - Preserves all other values in the property
 - Safe: does nothing if the value doesn't exist
 
+### OVERWRITE
+- Completely replaces the property value with the specified new value
+- Removes all existing values and sets only the new ones
+- Useful for resetting or fully updating a property
+- Warning: This will erase any existing data in the property
+
+### DELETE PROPERTY
+- Completely removes the property from the frontmatter
+- The property and all its values are deleted permanently
+- Warning: This action is irreversible and will permanently delete the property
+- No value field is required, as nothing is being set
+
 ### How to use
 In the rules editor, each THEN action has a dropdown between the property name and value field:
 - Select **ADD** to add values (default behavior)
 - Select **REMOVE** to remove values
+- Select **OVERWRITE** to replace the entire property value
+- Select **DELETE PROPERTY** to remove the property entirely
 
 ### Examples
 
@@ -100,6 +114,20 @@ THEN set property: tags [REMOVE] draft, wip
 ```
 Result: Removes "draft" and "wip" tags if they exist.
 
+**Overwrite property value:**
+```
+IF property: status, op: contains, value: old
+THEN set property: status [OVERWRITE] new
+```
+Result: Replaces the entire "status" property with "new", removing any previous values.
+
+**Delete a property:**
+```
+IF property: tags, op: contains, value: deprecated
+THEN set property: old_tags [DELETE PROPERTY]
+```
+Result: Completely removes the "old_tags" property from the frontmatter.
+
 **Combine ADD and REMOVE:**
 ```
 IF property: tags, op: contains, value: old-project
@@ -116,7 +144,7 @@ Each rule has:
 - `ifProp`: source property name
 - `op`: operator (`contains`, `notContains`)
 - `ifValue`: value to test
-- `thenActions`: array of actions to execute, each with `prop`, `value`, and `action` (add/remove)
+- `thenActions`: array of actions to execute, each with `prop`, `value`, and `action` (add/remove/overwrite/delete)
 
 ### Examples
 

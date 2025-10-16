@@ -1,3 +1,25 @@
+:root {
+	--red-color: #e93147;
+}
+
+.eis-message {
+	font-size: .8rem;
+    padding: 7px 0 0;
+}
+
+.eis-message-error {color: var(--red-color);}
+
+.eis-btn-red {
+	background: var(--red-color) !important;
+	color: #fff !important;
+}
+
+.eis-btn-red:hover {
+	background: #fff;
+	color: var(--red-color);
+}
+
+
 /* Conditional Properties plugin styles */
 .conditional-rule {
 	margin: 8px 0;
@@ -55,6 +77,8 @@
 	margin: 0;
 }
 
+.conditional-then-action .eis-message {text-align: right;}
+
 .conditional-then-action .setting-item-name {
 	font-size: 0.85rem;
 	font-weight: 500;
@@ -80,18 +104,6 @@
 	background: var(--interactive-accent) !important;
 	color: #fff !important;
 }
-
-.eis-btn-red {
-	background: #e93147 !important;
-	color: #fff !important;
-
-}
-
-.eis-btn-red:hover {
-	background: #fff;
-	color: #e93147;
-}
-
 
 .conditional-remove-action {
 	border: none;

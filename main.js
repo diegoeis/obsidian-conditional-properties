@@ -226,6 +226,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 							currentValue = [...valuesToProcess];
 							hasChanges = true;
 							console.log(`✓ Overwritten IF property with: ${valuesToProcess}`);
+						} else if (actionType === "delete") {
+							// DELETE action: mark for removal
+							newFm[prop] = null;
+							changed = true;
+							console.log(`✓ Marked IF property ${prop} for deletion`);
 						} else {
 							// ADD action: add values (default behavior) - use original value for preservation
 							for (const singleValue of valuesToProcess) {
@@ -292,6 +297,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 							currentValue = [...valuesToProcess];
 							hasChanges = true;
 							console.log(`✓ Overwritten ${prop} with: ${valuesToProcess}`);
+						} else if (actionType === "delete") {
+							// DELETE action: mark for removal
+							newFm[prop] = null;
+							changed = true;
+							console.log(`✓ Marked property ${prop} for deletion`);
 						} else {
 							// ADD action: add values if they don't exist
 							for (const singleValue of valuesToProcess) {
@@ -511,13 +521,80 @@ class ConditionalPropertiesPlugin extends Plugin {
 		
 		for (const [key, newValue] of Object.entries(newFrontmatter)) {
 			console.log(`Updating property "${key}" to:`, newValue);
-			updatedYaml = this._updateYamlProperty(updatedYaml, key, newValue, fm[key]);
+			if (newValue === null) {
+				// Remove the property
+				updatedYaml = this._removeYamlProperty(updatedYaml, key);
+			} else {
+				updatedYaml = this._updateYamlProperty(updatedYaml, key, newValue, fm[key]);
+			}
 		}
 		
 		console.log("Updated YAML:", updatedYaml);
 		const newContent = `---\n${updatedYaml}\n---\n${body}`;
 		await this.app.vault.modify(file, newContent);
 		console.log("File updated successfully");
+	}
+
+	_removeYamlProperty(yamlString, key) {
+		// Create regex to find the property (handles both single line and multi-line arrays)
+		const keyPattern = new RegExp(`^(\\s*)${this._escapeRegex(key)}:(.*)$`, 'm');
+		const match = yamlString.match(keyPattern);
+		
+		if (!match) {
+			// Property doesn't exist, return as-is
+			return yamlString;
+		}
+		
+		const indent = match[1];
+		const matchIndex = match.index;
+		
+		// Check if it's a multi-line array (next line starts with - )
+		const afterMatch = yamlString.substring(matchIndex + match[0].length);
+		const isMultiLineArray = /^\s*\n\s*-\s/.test(afterMatch);
+		
+		if (isMultiLineArray) {
+			// Find all array items (lines starting with - at the same indent level)
+			let endIndex = matchIndex + match[0].length;
+			const arrayIndent = indent + '  ';
+			const lines = yamlString.substring(endIndex).split('\n');
+			let arrayLineCount = 0;
+			
+			for (const line of lines) {
+				if (line.trim() === '' || line.startsWith(arrayIndent + '-')) {
+					arrayLineCount++;
+				} else if (line.trim() !== '') {
+					break;
+				}
+			}
+			
+			// Calculate end position
+			for (let i = 0; i < arrayLineCount && endIndex < yamlString.length; i++) {
+				const nextNewline = yamlString.indexOf('\n', endIndex);
+				if (nextNewline === -1) {
+					endIndex = yamlString.length;
+					break;
+				}
+				endIndex = nextNewline + 1;
+			}
+			
+			// Remove the entire property including its array items
+			const before = yamlString.substring(0, matchIndex);
+			const after = yamlString.substring(endIndex);
+			let cleaned = before + after;
+			// Clean up extra blank lines and whitespace
+			cleaned = cleaned.replace(/\n\s*\n/g, '\n').trim();
+			return cleaned;
+		} else {
+			// Single line property, remove just this line
+			const lineEnd = yamlString.indexOf('\n', matchIndex);
+			const endIndex = lineEnd === -1 ? yamlString.length : lineEnd;
+			const before = yamlString.substring(0, matchIndex);
+			const after = yamlString.substring(endIndex);
+			let cleaned = before + after;
+			// Clean up extra blank lines and whitespace
+			cleaned = cleaned.replace(/\n\s*\n/g, '\n').trim();
+			return cleaned;
+		}
 	}
 
 	_updateYamlProperty(yamlString, key, newValue, oldValue) {
@@ -906,31 +983,42 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				await this.plugin.saveData(this.plugin.settings);
 			}));
 
-		// Add action dropdown (ADD/REMOVE)
+		// Add action dropdown (ADD/REMOVE/OVERWRITE/DELETE)
 		actionSetting.addDropdown(d => {
 			d.addOption("add", "ADD");
 			d.addOption("remove", "REMOVE");
 			d.addOption("overwrite", "OVERWRITE");
+			d.addOption("delete", "DELETE PROPERTY");
 			d.setValue(action.action || "add");
 			d.onChange(async (v) => {
 				action.action = v;
 				await this.plugin.saveData(this.plugin.settings);
+				// Refresh UI to show/hide elements based on new action
+				this.display();
 			});
 		});
 
-		// Label "to value"
-		const toLabel = document.createElement('span');
-		toLabel.textContent = ' ';
-		toLabel.classList.add('conditional-to-label');
-		actionSetting.controlEl.appendChild(toLabel);
+		// Add warning message for DELETE action
+		if (action.action === "delete") {
+			const warningDiv = document.createElement('div');
+			warningDiv.className = 'eis-message eis-message-error';
+			warningDiv.textContent = 'This action is irreversible and will permanently delete the property.';
+			actionWrap.appendChild(warningDiv);
+		} else {
+			// Label "to value" and value field only for non-delete actions
+			const toLabel = document.createElement('span');
+			toLabel.textContent = ' ';
+			toLabel.classList.add('conditional-to-label');
+			actionSetting.controlEl.appendChild(toLabel);
 
-		actionSetting.addText(t => t
-			.setPlaceholder("value (use commas to separate multiple values)")
-			.setValue(action.value || "")
-			.onChange(async (v) => {
-				action.value = v;
-				await this.plugin.saveData(this.plugin.settings);
-			}));
+			actionSetting.addText(t => t
+				.setPlaceholder("value (use commas to separate multiple values)")
+				.setValue(action.value || "")
+				.onChange(async (v) => {
+					action.value = v;
+					await this.plugin.saveData(this.plugin.settings);
+				}));
+		}
 
 		// Remove button is now always visible as part of the setting layout
 	}
