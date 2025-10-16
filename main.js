@@ -677,7 +677,6 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					new Notice("Interval updated. Restart Obsidian to apply immediately.");
 				}));
 
-			containerEl.createEl("h3", { text: "Scan Scope" });
 
 			new Setting(containerEl)
 			.setName("Scan scope")
@@ -707,8 +706,6 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 						await this.plugin.saveData(this.plugin.settings);
 					}));
 			}
-
-			containerEl.createEl("h3", { text: "Run now" });
 
 			const runNow = new Setting(containerEl)
 			.setName("Run now")
@@ -783,7 +780,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const actions = wrap.createEl("div", { cls: "conditional-actions" });
 
 		// Add action button
-		const addActionBtn = thenHeader.createEl("button", { text: "+ Add property", cls: "conditional-add-action" });
+		const addActionBtn = actions.createEl("button", { text: "+ Add property", cls: "conditional-add-action" });
 		addActionBtn.addEventListener("click", async (e) => {
 			e.preventDefault();
 			e.stopPropagation();

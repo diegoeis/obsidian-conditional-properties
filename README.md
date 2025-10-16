@@ -154,48 +154,48 @@ THEN set property: verified to true
 ```
 IF property: tags, op: contains, value: meeting
 THEN set properties:
-  - status to processed
-  - priority to high
-  - last_reviewed to [[{{date}}]]
+  - "[[status to processed]]"
+  - "[[priority to high]]"
+  - "[[last_reviewed to [[{{date}}]]]]"
 ```
 
 5) Update multiple related properties
 ```
 IF property: project_status, op: contains, value: completed
 THEN set properties:
-  - status to done
-  - completed_date to [[{{date}}]]
-  - priority to low
-  - archived to true
+  - "[[status to done]]"
+  - "[[completed_date to [[{{date}}]]]]"
+  - "[[priority to low]]"
+  - "[[archived to true]]"
 ```
 
 6) Set multiple tags at once
 ```
 IF property: type, op: contains, value: note
 THEN set properties:
-  - tags to work, frota162, important
+  - "[[tags to work, frota162, important]]"
 ```
 
 **Result in YAML:**
 ```yaml
 tags:
-  - work
-  - frota162
-  - important
+  - "[[work]]"
+  - "[[frota162]]"
+  - "[[important]]"
 ```
 
 ## Limitations
-- Only frontmatter is modified
-- Operators limited to containment (`contains`, `notContains`)
-- No folder/tag scoping yet
+  - "[[Only frontmatter is modified]]"
+  - "[[Operators limited to containment (`contains`, `notContains`)]]"
+  - "[[No folder/tag scoping yet]]"
 
 ## Roadmap
-- Change names of properties
-- Execute changes in the note content, not only properties
-- Advanced operators (regex, greater/less than)
-- Compound conditions (AND/OR/NOT)
-- Multiple actions per rule
-- Folder/tag scoping and new-note filters
+  - "[[Change names of properties]]"
+  - "[[Execute changes in the note content, not only properties]]"
+  - "[[Advanced operators (regex, greater/less than)]]"
+  - "[[Compound conditions (AND/OR/NOT)]]"
+  - "[[Multiple actions per rule]]"
+  - "[[Folder/tag scoping and new-note filters]]"
 
 ## Privacy
 All processing happens locally in your vault. No data leaves your device.
