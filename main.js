@@ -221,6 +221,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 								}
 								console.log("Current array now:", currentValue);
 							}
+						} else if (actionType === "overwrite") {
+							// OVERWRITE action: replace entire value
+							currentValue = [...valuesToProcess];
+							hasChanges = true;
+							console.log(`✓ Overwritten IF property with: ${valuesToProcess}`);
 						} else {
 							// ADD action: add values (default behavior) - use original value for preservation
 							for (const singleValue of valuesToProcess) {
@@ -282,6 +287,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 									console.log(`⚠ Value "${singleValue}" not found in ${prop}`);
 								}
 							}
+						} else if (actionType === "overwrite") {
+							// OVERWRITE action: replace entire value
+							currentValue = [...valuesToProcess];
+							hasChanges = true;
+							console.log(`✓ Overwritten ${prop} with: ${valuesToProcess}`);
 						} else {
 							// ADD action: add values if they don't exist
 							for (const singleValue of valuesToProcess) {
@@ -900,6 +910,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		actionSetting.addDropdown(d => {
 			d.addOption("add", "ADD");
 			d.addOption("remove", "REMOVE");
+			d.addOption("overwrite", "OVERWRITE");
 			d.setValue(action.action || "add");
 			d.onChange(async (v) => {
 				action.action = v;
