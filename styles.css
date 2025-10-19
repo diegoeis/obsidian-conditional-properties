@@ -9,17 +9,51 @@
 
 .eis-message-error {color: var(--red-color);}
 
-.eis-btn-red {
-	background: var(--red-color) !important;
+/* Buttons */
+.eis-btn, button.eis-btn:not(.clickable-icon) {
+	background: var(--color-accent);
+	color: var(--text-on-accent);
+	border-radius: 4px;
+	padding: 4px 8px;
+	font-size: 0.8rem;
+	cursor: pointer;
+}
+.eis-btn:hover {
+	background: var(--interactive-accent) !important;
 	color: #fff !important;
 }
 
-.eis-btn-red:hover {
-	background: #fff;
-	color: var(--red-color);
+.eis-btn-border {
+	background: transparent !important;
+	color: var(--color-accent) !important;
+	border: 1px solid var(--interactive-accent);
+	box-shadow: none !important;
 }
 
+.eis-btn-border:hover {
+	background: var(--interactive-accent) !important;
+	color: #fff !important;
+}
 
+.eis-btn-red,
+button.eis-btn-red:not(.clickable-icon),
+.eis-btn-red:not(.eis-btn-border) {
+	background: var(--red-color);
+	border-color: var(--red-color);
+}
+
+.eis-btn-red:hover {
+	background: #fff !important;
+	color: var(--red-color) !important;
+}
+
+.eis-btn-red.eis-btn-border {
+	color: var(--red-color) !important;
+}
+.eis-btn-red.eis-btn-border:hover {
+	background: var(--red-color) !important;
+	color: #fff !important;
+}
 /* Conditional Properties plugin styles */
 .conditional-rule {
 	margin: 8px 0;
@@ -43,15 +77,6 @@
 	margin: 8px 0 12px 0;
 }
 
-.eis-btn-primary {
-	background: var(--color-accent) !important;
-	color: var(--text-on-accent) !important;
-}
-.eis-btn-primary:hover {
-	background: var(--interactive-accent) !important;
-	color: #fff !important;
-}
-
 .conditional-to-label { margin: 0 6px; opacity: 0.8; }
 
 .conditional-actions {
@@ -60,6 +85,12 @@
 	margin-top: 6px;
 	align-items: center;
 	margin: 0;
+}
+
+.conditional-add-action {
+	margin: 8px 0;
+	margin-left: auto;
+	order: 3;
 }
 
 /* New styles for multiple THEN actions */
@@ -84,25 +115,6 @@
 	font-weight: 500;
 	color: var(--text-muted);
 	margin-bottom: 4px;
-}
-
-.conditional-add-action {
-	background: transparent !important;
-	color: var(--color-accent) !important;
-	border: 1px solid var(--interactive-accent) !important;
-	border-radius: 4px;
-	padding: 4px 8px;
-	font-size: 0.8rem;
-	margin: 8px 0;
-	margin-left: auto;
-	order: 3;
-	cursor: pointer;
-	box-shadow: none !important;
-}
-
-.conditional-add-action:hover {
-	background: var(--interactive-accent) !important;
-	color: #fff !important;
 }
 
 .conditional-remove-action {

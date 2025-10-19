@@ -432,7 +432,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.setDesc("Execute all rules across selected scope")
 			.addButton(btn => {
 				btn.setButtonText("Run now");
-				btn.buttonEl.classList.add("run-now-button", "eis-btn-primary");
+				btn.buttonEl.classList.add("run-now-button", "eis-btn");
 				btn.onClick(async () => {
 					btn.setDisabled(true);
 					try {
@@ -445,7 +445,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		this.plugin.settings.rules = this.plugin.settings.rules || [];
 		containerEl.createEl("h3", { text: "Add rules" });
 		const addWrap = containerEl.createEl("div", { cls: "conditional-add-wrap" });
-		const addBtn = addWrap.createEl("button", { text: "+ Add rule", cls: "eis-btn-primary" });
+		const addBtn = addWrap.createEl("button", { text: "+ Add rule", cls: "eis-btn" });
 		addBtn.onclick = async () => {
 			this.plugin.settings.rules.push({ ifType: "PROPERTY", ifProp: "", ifValue: "", op: "contains", thenActions: [{ prop: "", value: "", action: "add" }] });
 			await this.plugin.saveData(this.plugin.settings);
@@ -480,7 +480,42 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		});
 
 		if (rule.ifType === "TITLE") {
-			// For TITLE: show operator and value
+			// For TITLE: show operator and value, or error message if no title available
+			const activeFile = this.app.workspace.getActiveFile();
+			if (activeFile) {
+				const content = this.app.vault.cachedRead(activeFile);
+				if (typeof content === 'string' && content.length > 0) {
+					const lines = content.split('\n');
+					let inFrontmatter = false;
+					let foundH1 = false;
+					for (let i = 0; i < lines.length; i++) {
+						const line = lines[i].trim();
+						if (line === '---' && !inFrontmatter && i === 0) {
+							inFrontmatter = true;
+							continue;
+						}
+						if (line === '---' && inFrontmatter) {
+							inFrontmatter = false;
+							continue;
+						}
+						if (inFrontmatter) continue;
+						if (line.startsWith('# ') && !foundH1) {
+							foundH1 = true;
+							break;
+						}
+					}
+					if (!foundH1) {
+						const showInlineTitle = this.app.vault.getConfig('showInlineTitle');
+						if (!showInlineTitle) {
+							// Show error message instead of fields
+							const errorDiv = line1.controlEl.createEl("div", { cls: "eis-message eis-message-error" });
+							errorDiv.textContent = "Para usar essa opção de condição, você deve ter um título de primeiro nível na nota, ou a opção SHOW INLINE TITLE habilitada.";
+							return; // Don't show the fields
+						}
+					}
+				}
+			}
+			// Show fields
 			line1.addDropdown(d => {
 				const current = rule.op || "contains";
 				d.addOption("contains", "contains");
@@ -517,7 +552,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		});
 
 		const actions = wrap.createEl("div", { cls: "conditional-actions" });
-		const addActionBtn = actions.createEl("button", { text: "+ Add property", cls: "conditional-add-action" });
+		const addActionBtn = actions.createEl("button", { text: "+ Add property", cls: "eis-btn conditional-add-action" });
 		addActionBtn.addEventListener("click", async (e) => {
 			e.preventDefault();
 			e.stopPropagation();
@@ -526,7 +561,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			this.display();
 		}, true);
 
-		const runOne = actions.createEl("button", { text: "Run this rule", cls: "conditional-run-one eis-btn-primary" });
+		const runOne = actions.createEl("button", { text: "Run this rule", cls: "eis-btn-border conditional-run-one" });
 		runOne.addEventListener("click", async (e) => {
 			e.preventDefault();
 			e.stopPropagation();
@@ -539,7 +574,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			}
 		}, true);
 
-		const del = actions.createEl("button", { text: "Remove", cls: "conditional-remove eis-btn-red" });
+		const del = actions.createEl("button", { text: "Remove", cls: "conditional-remove eis-btn-red eis-btn-border" });
 		del.addEventListener("click", async (e) => {
 			e.preventDefault();
 			e.stopPropagation();
@@ -555,6 +590,27 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		if (!action.action) {
 			action.action = "add";
 		}
+
+		// Add remove button as first element in the setting's control area
+		const settingItem = actionSetting.settingEl;
+		const removeActionBtn = document.createElement("button");
+		removeActionBtn.textContent = "×";
+		removeActionBtn.className = "conditional-remove-action eis-btn eis-btn-red";
+		removeActionBtn.addEventListener("click", async (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			rule.thenActions.splice(actionIdx, 1);
+			await this.plugin.saveData(this.plugin.settings);
+			this.display();
+		}, true);
+
+		// Insert button as first child of setting-item
+		if (settingItem.firstChild) {
+			settingItem.insertBefore(removeActionBtn, settingItem.firstChild);
+		} else {
+			settingItem.appendChild(removeActionBtn);
+		}
+
 		actionSetting.addText(t => t
 			.setPlaceholder("property name")
 			.setValue(action.prop || "")
@@ -563,9 +619,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				await this.plugin.saveData(this.plugin.settings);
 			}));
 		actionSetting.addDropdown(d => {
-			d.addOption("add", "ADD");
-			d.addOption("remove", "REMOVE");
-			d.addOption("overwrite", "OVERWRITE");
+			d.addOption("add", "ADD VALUE");
+			d.addOption("remove", "REMOVE VALUE");
+			d.addOption("overwrite", "OVERWRITE ALL VALUES WITH");
 			d.addOption("delete", "DELETE PROPERTY");
 			d.setValue(action.action || "add");
 			d.onChange(async (v) => {
