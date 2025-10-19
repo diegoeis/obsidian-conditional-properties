@@ -70,8 +70,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 				hasChanges = true;
 				return migratedRule;
 			}
-			if (rule.ifType === "TITLE") {
-				rule.ifType = "HEADING_FIRST_LEVEL";
+			if (rule.ifType === "TITLE" || rule.ifType === "HEADING_FIRST_LEVEL") {
+				rule.ifType = "FIRST_LEVEL_HEADING";
 				hasChanges = true;
 			}
 			if (rule.ifType === undefined) {
@@ -157,7 +157,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 			if (!Array.isArray(thenActions) || thenActions.length === 0) continue;
 
 			let sourceValue;
-			if (ifType === "HEADING_FIRST_LEVEL") {
+			if (ifType === "FIRST_LEVEL_HEADING") {
 				sourceValue = await this._getNoteTitle(file);
 				// If no title available, show error message and skip rule
 				if (sourceValue === null) {
@@ -267,7 +267,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 		}
 		const s = source == null ? "" : String(source);
 		const e = expected == null ? "" : String(expected);
-		if (ifType === "HEADING_FIRST_LEVEL") {
+		if (ifType === "FIRST_LEVEL_HEADING") {
 			if (op === "contains") return s.includes(e);
 			if (op === "notContains") return !s.includes(e);
 		} else {
@@ -474,7 +474,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const line1 = new Setting(wrap).setName("IF");
 		line1.addDropdown(d => {
 			d.addOption("PROPERTY", "Property");
-			d.addOption("HEADING_FIRST_LEVEL", "Heading First Level");
+			d.addOption("FIRST_LEVEL_HEADING", "First Level Heading");
 			d.setValue(rule.ifType || "PROPERTY");
 			d.onChange(async (v) => {
 				rule.ifType = v;
@@ -483,7 +483,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 		});
 
-		if (rule.ifType === "HEADING_FIRST_LEVEL") {
+		if (rule.ifType === "FIRST_LEVEL_HEADING") {
 			// For TITLE: show operator and value (check is done during execution)
 			line1.addDropdown(d => {
 				const current = rule.op || "contains";

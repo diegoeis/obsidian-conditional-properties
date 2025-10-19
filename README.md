@@ -205,7 +205,7 @@ THEN set properties:
 
 7) Use heading-based condition
 ```
-IF heading first level, op: contains, value: Meeting
+IF first level heading, op: contains, value: Meeting
 THEN set properties:
   - tags to meeting, important
 ```
