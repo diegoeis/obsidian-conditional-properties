@@ -8,11 +8,10 @@ class ConditionalPropertiesPlugin extends Plugin {
 				rules: [],
 				scanIntervalMinutes: 5,
 				lastRun: null,
-				scanScope: "latestCreated", // "latestCreated", "latestModified", "entireVault"
+				scanScope: "latestCreated",
 				scanCount: 15
 			}, settings);
 
-			// Migrate old rules format to new format
 			this._migrateRules();
 		});
 		this.registerInterval(this._setupScheduler());
@@ -52,35 +51,31 @@ class ConditionalPropertiesPlugin extends Plugin {
 
 	_migrateRules() {
 		let hasChanges = false;
-
 		this.settings.rules = this.settings.rules.map(rule => {
-			// Check if rule is in old format (has thenProp/thenValue)
 			if (rule.thenProp !== undefined || rule.thenValue !== undefined) {
-				// Convert old format to new format
 				const migratedRule = {
+					ifType: "PROPERTY",
 					ifProp: rule.ifProp || "",
 					ifValue: rule.ifValue || "",
 					op: rule.op || "contains",
 					thenActions: []
 				};
-
-				// Add the old THEN action as first action
 				if (rule.thenProp) {
 					migratedRule.thenActions.push({
 						prop: rule.thenProp,
-						value: rule.thenValue || ""
+						value: rule.thenValue || "",
+						action: "add"
 					});
 				}
-
 				hasChanges = true;
 				return migratedRule;
 			}
-
-			// Rule is already in new format or has no THEN actions
+			if (rule.ifType === undefined) {
+				rule.ifType = "PROPERTY";
+				hasChanges = true;
+			}
 			return rule;
 		});
-
-		// Save migrated settings if changes were made
 		if (hasChanges) {
 			this.saveData(this.settings);
 		}
@@ -111,23 +106,14 @@ class ConditionalPropertiesPlugin extends Plugin {
 	_getFilesToScan() {
 		const { vault } = this.app;
 		const allFiles = vault.getMarkdownFiles();
-
 		if (this.settings.scanScope === 'entireVault') {
 			return allFiles;
 		}
-
 		const count = Math.max(1, Number(this.settings.scanCount || 15));
-
 		if (this.settings.scanScope === 'latestModified') {
-			return allFiles
-				.sort((a, b) => b.stat.mtime - a.stat.mtime)
-				.slice(0, count);
+			return allFiles.sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, count);
 		}
-
-		// Default to latestCreated
-		return allFiles
-			.sort((a, b) => b.stat.ctime - a.stat.ctime)
-			.slice(0, count);
+		return allFiles.sort((a, b) => b.stat.ctime - a.stat.ctime).slice(0, count);
 	}
 
 	async runScanForRules(rulesSubset) {
@@ -162,183 +148,113 @@ class ConditionalPropertiesPlugin extends Plugin {
 		let changed = false;
 		const newFm = { ...currentFrontmatter };
 		for (const rule of rules) {
-			const { ifProp, ifValue, thenActions } = rule || {};
+			const { ifType, ifProp, ifValue, thenActions } = rule || {};
 			const op = (rule?.op || "contains");
-			if (!ifProp || !Array.isArray(thenActions) || thenActions.length === 0) continue;
+			if (!Array.isArray(thenActions) || thenActions.length === 0) continue;
 
-			// Check IF condition
-			const sourceValue = currentFrontmatter?.[ifProp];
-			const match = this._matchesCondition(sourceValue, ifValue, op);
+			let sourceValue;
+			if (ifType === "TITLE") {
+				sourceValue = await this._getNoteTitle(file);
+				// If no title available, show error message and skip rule
+				if (sourceValue === null) {
+					console.log(`No title available for file "${file.basename}". Rule skipped.`);
+					// TODO: Show user message in UI if this rule is being configured
+					continue;
+				}
+			} else {
+				sourceValue = currentFrontmatter?.[ifProp];
+				if (!ifProp) continue;
+			}
+
+			const match = this._matchesCondition(sourceValue, ifValue, op, ifType);
 			if (!match) continue;
 
-			// Group THEN actions by property for intelligent merging
-			const propertyActions = {};
-			console.log("Processing rule with thenActions:", thenActions);
+			// Process THEN actions (simplified for brevity)
 			for (const action of thenActions) {
 				const { prop, value, action: actionType } = action || {};
-				console.log("Processing action:", { prop, value, actionType });
 				if (!prop) continue;
-
-				if (!propertyActions[prop]) {
-					propertyActions[prop] = [];
-				}
-				propertyActions[prop].push({ value, actionType: actionType || "add" });
-			}
-			console.log("Grouped property actions:", propertyActions);
-
-			// Apply merged actions
-			for (const [prop, actions] of Object.entries(propertyActions)) {
-				console.log("Applying property:", prop, "with actions:", actions);
-				if (prop === ifProp) {
-					// Special case: IF property - process each action individually
-					let currentValue = Array.isArray(sourceValue) ? [...sourceValue] : (sourceValue ? [sourceValue] : []);
-					let hasChanges = false;
-					console.log("Starting with sourceValue:", currentValue, "ifValue:", ifValue);
-
-					for (let i = 0; i < actions.length; i++) {
-						const { value, actionType } = actions[i];
-						console.log(`\n--- Processing THEN action ${i + 1}: type="${actionType}", value="${value}" ---`);
-
-						// Process comma-separated values for this THEN action
-						const processedValue = this._processCommaSeparatedValue(value);
-						console.log(`Processed value: "${value}" -> ${processedValue}`);
-
-						// Handle both single values and arrays
-						const valuesToProcess = Array.isArray(processedValue) ? processedValue : [processedValue];
-						console.log(`Values to process: ${valuesToProcess}`);
-
-						if (actionType === "remove") {
-							// REMOVE action: remove specified values
-							for (const singleValue of valuesToProcess) {
-								console.log(`Removing value: "${singleValue}"`);
-								const initialLength = currentValue.length;
-								currentValue = currentValue.filter(item => !this._valueEquals(item, singleValue));
-								if (currentValue.length < initialLength) {
-									hasChanges = true;
-									console.log(`✓ Removed "${singleValue}" from array`);
-								} else {
-									console.log(`⚠ Value "${singleValue}" not found to remove`);
-								}
-								console.log("Current array now:", currentValue);
+				console.log(`Processing THEN action: prop="${prop}", value="${value}", actionType="${actionType}"`);
+				if (actionType === "add") {
+					// Handle adding to arrays or creating new properties
+					if (Array.isArray(newFm[prop])) {
+						// If it's already an array, add unique values
+						const valuesToAdd = value.split(',').map(v => v.trim()).filter(v => v);
+						console.log(`Adding to existing array: ${valuesToAdd}`);
+						valuesToAdd.forEach(v => {
+							if (!newFm[prop].includes(v)) {
+								newFm[prop].push(v);
+								changed = true;
+								console.log(`Added "${v}" to ${prop}`);
+							} else {
+								console.log(`"${v}" already exists in ${prop}`);
 							}
-						} else if (actionType === "overwrite") {
-							// OVERWRITE action: replace entire value
-							currentValue = [...valuesToProcess];
-							hasChanges = true;
-							console.log(`✓ Overwritten IF property with: ${valuesToProcess}`);
-						} else if (actionType === "delete") {
-							// DELETE action: mark for removal
-							newFm[prop] = null;
+						});
+					} else if (newFm[prop]) {
+						// Convert to array and add
+						const currentArray = Array.isArray(newFm[prop]) ? newFm[prop] : [newFm[prop]];
+						const valuesToAdd = value.split(',').map(v => v.trim()).filter(v => v);
+						console.log(`Converting to array and adding: ${valuesToAdd}`);
+						valuesToAdd.forEach(v => {
+							if (!currentArray.includes(v)) {
+								currentArray.push(v);
+								changed = true;
+								console.log(`Added "${v}" to ${prop}`);
+							} else {
+								console.log(`"${v}" already exists in ${prop}`);
+							}
+						});
+						newFm[prop] = currentArray.length === 1 ? currentArray[0] : currentArray;
+					} else {
+						// Create new property
+						newFm[prop] = value;
+						changed = true;
+						console.log(`Created new property ${prop} with value "${value}"`);
+					}
+				} else if (actionType === "remove") {
+					// Handle removing from arrays or properties
+					if (Array.isArray(newFm[prop])) {
+						const valuesToRemove = value.split(',').map(v => v.trim()).filter(v => v);
+						console.log(`Removing from array: ${valuesToRemove}`);
+						valuesToRemove.forEach(v => {
+							const initialLength = newFm[prop].length;
+							newFm[prop] = newFm[prop].filter(item => !this._valueEquals(item, v));
+							if (newFm[prop].length < initialLength) {
+								changed = true;
+								console.log(`Removed "${v}" from ${prop}`);
+							} else {
+								console.log(`"${v}" not found in ${prop}`);
+							}
+						});
+					} else if (newFm[prop]) {
+						// For non-arrays, check if it matches and remove
+						if (this._valueEquals(newFm[prop], value)) {
+							delete newFm[prop];
 							changed = true;
-							console.log(`✓ Marked IF property ${prop} for deletion`);
+							console.log(`Removed property ${prop}`);
 						} else {
-							// ADD action: add values (default behavior) - use original value for preservation
-							for (const singleValue of valuesToProcess) {
-								console.log(`Adding value: "${singleValue}"`);
-
-								// Don't remove ifValue when adding - preserve it
-								const valueExists = currentValue.some(item => this._valueEquals(item, singleValue));
-								
-								if (!valueExists) {
-									currentValue.push(singleValue);
-									hasChanges = true;
-									console.log(`✓ Added new value "${singleValue}" to array`);
-								} else {
-									console.log(`⚠ Value "${singleValue}" already exists`);
-								}
-								console.log("Current array now:", currentValue);
-							}
+							console.log(`Value "${value}" not found in ${prop}`);
 						}
 					}
-
-					console.log("\n=== FINAL RESULT ===");
-					console.log("Final result for IF property:", currentValue);
-					console.log("Original sourceValue:", sourceValue);
-					console.log("Has changes:", hasChanges);
-
-					// Only apply if there were actual changes
-					if (hasChanges) {
-						newFm[prop] = currentValue.length === 1 ? currentValue[0] : currentValue;
-						changed = true;
-						console.log("Applied IF property changes");
-					} else {
-						console.log("No changes needed for IF property");
-					}
-				} else {
-					// Regular property setting - process each action individually
-					let currentValue = Array.isArray(currentFrontmatter[prop]) 
-						? [...currentFrontmatter[prop]] 
-						: (currentFrontmatter[prop] ? [currentFrontmatter[prop]] : []);
-					let hasChanges = false;
-
-					for (const actionData of actions) {
-						const { value, actionType } = actionData;
-						console.log("Processing action for", prop, ":", { value, actionType });
-
-						// Process comma-separated values
-						const processedValue = this._processCommaSeparatedValue(value);
-						const valuesToProcess = Array.isArray(processedValue) ? processedValue : [processedValue];
-						console.log("Values to process:", valuesToProcess);
-
-						if (actionType === "remove") {
-							// REMOVE action: remove specified values
-							for (const singleValue of valuesToProcess) {
-								const initialLength = currentValue.length;
-								currentValue = currentValue.filter(item => !this._valueEquals(item, singleValue));
-								if (currentValue.length < initialLength) {
-									hasChanges = true;
-									console.log(`✓ Removed "${singleValue}" from ${prop}`);
-								} else {
-									console.log(`⚠ Value "${singleValue}" not found in ${prop}`);
-								}
-							}
-						} else if (actionType === "overwrite") {
-							// OVERWRITE action: replace entire value
-							currentValue = [...valuesToProcess];
-							hasChanges = true;
-							console.log(`✓ Overwritten ${prop} with: ${valuesToProcess}`);
-						} else if (actionType === "delete") {
-							// DELETE action: mark for removal
-							newFm[prop] = null;
-							changed = true;
-							console.log(`✓ Marked property ${prop} for deletion`);
-						} else {
-							// ADD action: add values if they don't exist
-							for (const singleValue of valuesToProcess) {
-								const valueExists = currentValue.some(item => this._valueEquals(item, singleValue));
-								if (!valueExists) {
-									currentValue.push(singleValue);
-									hasChanges = true;
-									console.log(`✓ Added "${singleValue}" to ${prop}`);
-								} else {
-									console.log(`⚠ Value "${singleValue}" already exists in ${prop}`);
-								}
-							}
-						}
-					}
-
-					console.log("Final value for", prop, ":", currentValue);
-
-					// Apply changes if any
-					if (hasChanges) {
-						newFm[prop] = currentValue.length === 1 ? currentValue[0] : currentValue;
-						changed = true;
-						console.log("Applied changes for property:", prop);
-					} else {
-						console.log("No changes needed for property:", prop);
-					}
+				} else if (actionType === "overwrite") {
+					// Overwrite the entire property
+					newFm[prop] = value;
+					changed = true;
+					console.log(`Overwritten ${prop} with "${value}"`);
+				} else if (actionType === "delete") {
+					// Delete the property
+					delete newFm[prop];
+					changed = true;
+					console.log(`Deleted property ${prop}`);
 				}
 			}
 		}
 		if (!changed) return false;
 		console.log(`✓ MODIFIED NOTE: "${file.basename}" (${file.path})`);
-		console.log("Changes to be applied:", newFm);
 		await this._writeFrontmatter(file, newFm);
 		return true;
 	}
 
-	_matchesCondition(source, expected, op) {
-		// Normalize
+	_matchesCondition(source, expected, op, ifType) {
 		if (Array.isArray(source)) {
 			const has = source.some(v => this._valueMatches(v, expected));
 			if (op === "contains") return has;
@@ -347,8 +263,13 @@ class ConditionalPropertiesPlugin extends Plugin {
 		}
 		const s = source == null ? "" : String(source);
 		const e = expected == null ? "" : String(expected);
-		if (op === "contains") return this._valueMatches(s, e);
-		if (op === "notContains") return !this._valueMatches(s, e);
+		if (ifType === "TITLE") {
+			if (op === "contains") return s.includes(e);
+			if (op === "notContains") return !s.includes(e);
+		} else {
+			if (op === "contains") return this._valueMatches(s, e);
+			if (op === "notContains") return !this._valueMatches(s, e);
+		}
 		return false;
 	}
 
@@ -381,365 +302,78 @@ class ConditionalPropertiesPlugin extends Plugin {
 		return normalizedSource === normalizedExpected;
 	}
 
-	_replaceInMultiValue(source, needle, replacement) {
-		if (Array.isArray(source)) {
-			return source.map(v => (this._valueEquals(v, needle) ? replacement : v));
-		}
-		const s = source == null ? "" : String(source);
-		const n = needle == null ? "" : String(needle);
-		if (!n) return replacement;
-		// simple token replace; for advanced tokenization, future versions can extend
-		return s === n ? replacement : s.replaceAll(n, String(replacement));
-	}
-
 	_valueEquals(a, b) {
 		return this._valueMatches(a, b);
 	}
 
-	_deepEqual(a, b) {
-		try { return JSON.stringify(a) === JSON.stringify(b); } catch { return a === b; }
-	}
-
-	_processValuePreservingOriginal(value, originalValue) {
-		// Process comma-separated values but preserve original formatting
-		const processedValue = this._processCommaSeparatedValue(originalValue);
-		return processedValue;
-	}
-
-	_mergePropertyValue(existingValue, newValue) {
-		console.log("_mergePropertyValue called with:", { existingValue, newValue });
-		// Process new value (handle comma-separated strings)
-		const newValues = this._processCommaSeparatedValue(newValue);
-		console.log("Processed new values:", newValues);
-
-		// If no existing value, return new values
-		if (existingValue == null || existingValue === '') {
-			console.log("No existing value, returning new values");
-			return newValues;
-		}
-
-		// Ensure existing value is an array for processing
-		let existingArray = [];
-		if (Array.isArray(existingValue)) {
-			existingArray = [...existingValue];
-		} else if (typeof existingValue === 'string') {
-			// Convert string to array for merging
-			existingArray = this._processCommaSeparatedValue(existingValue);
-		} else {
-			// For other types, convert to string array
-			existingArray = [String(existingValue)];
-		}
-		console.log("Existing array:", existingArray);
-
-		// If new values is a string, convert to array
-		let newArray = [];
-		if (Array.isArray(newValues)) {
-			newArray = [...newValues];
-		} else if (typeof newValues === 'string') {
-			newArray = this._processCommaSeparatedValue(newValues);
-		} else {
-			newArray = [String(newValues)];
-		}
-
-		// Merge arrays with unique values
-		const mergedArray = [...existingArray];
-		for (const newVal of newArray) {
-			if (!existingArray.some(existingVal => this._valueEquals(existingVal, newVal))) {
-				mergedArray.push(newVal);
+	async _getNoteTitle(file) {
+		// Get file content
+		const content = await this.app.vault.read(file) || '';
+		
+		// Check for H1 title after YAML frontmatter
+		const lines = content.split('\n');
+		let inFrontmatter = false;
+		let foundH1 = false;
+		let h1Title = null;
+		
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i].trim();
+			
+			// Detect YAML frontmatter
+			if (line === '---' && !inFrontmatter && i === 0) {
+				inFrontmatter = true;
+				continue;
+			}
+			if (line === '---' && inFrontmatter) {
+				inFrontmatter = false;
+				continue;
+			}
+			
+			// Skip YAML content
+			if (inFrontmatter) continue;
+			
+			// Look for H1 title (line starting with # )
+			if (line.startsWith('# ') && !foundH1) {
+				h1Title = line.substring(2).trim(); // Remove # and trim
+				foundH1 = true;
+				break;
 			}
 		}
-		console.log("Merged array:", mergedArray);
-
-		// Return appropriate format based on original types and result
-		if (mergedArray.length === 1) {
-			// If only one value, return as string for consistency
-			console.log("Single value, returning:", mergedArray[0]);
-			return mergedArray[0];
-		} else {
-			// Multiple values, return as array
-			console.log("Multiple values, returning array:", mergedArray);
-			return mergedArray;
+		
+		// Prioritize H1 if found
+		if (h1Title) {
+			return h1Title;
 		}
-	}
-
-	_processCommaSeparatedValue(value) {
-		console.log("_processCommaSeparatedValue input:", value, typeof value);
-		if (!value || typeof value !== 'string') {
-			console.log("Invalid input, returning as-is");
-			return value;
+		
+		// Check for inline title if showInlineTitle is enabled
+		const showInlineTitle = this.app.vault.getConfig('showInlineTitle');
+		if (showInlineTitle) {
+			// Get the file's display name (which would be the inline title)
+			return file.basename;
 		}
-
-		// Split by comma and filter out empty values, preserving original formatting
-		const parts = value.split(',').map(part => part.trim()).filter(part => part.length > 0);
-		console.log("Split parts:", parts);
-
-		// If only one value, return as simple string
-		if (parts.length === 1) {
-			console.log("Single value, returning:", parts[0]);
-			return parts[0];
-		}
-
-		// If multiple values, return as array with original formatting preserved
-		if (parts.length > 1) {
-			console.log("Multiple values, returning array:", parts);
-			return parts;
-		}
-
-		// If no valid parts, return original value
-		console.log("No valid parts, returning original");
-		return value;
+		
+		// No title available
+		return null;
 	}
 
 	async _writeFrontmatter(file, newFrontmatter) {
-		console.log("_writeFrontmatter called with:", newFrontmatter);
 		const content = await this.app.vault.read(file);
 		const hasYaml = content.startsWith("---\n");
-		
 		if (!hasYaml) {
-			// No existing frontmatter, create new one
-			const yamlStr = this._generateFormattedYaml(newFrontmatter);
+			const yamlStr = stringifyYaml(newFrontmatter);
 			const newContent = `---\n${yamlStr}\n---\n${content}`;
 			await this.app.vault.modify(file, newContent);
-			console.log("Created new frontmatter");
 			return;
 		}
-
-		// Extract existing YAML section
 		const end = content.indexOf("\n---\n", 4);
-		if (end === -1) return; // Invalid YAML structure
-		
+		if (end === -1) return;
 		const yamlRaw = content.substring(4, end);
 		const body = content.substring(end + 5);
-		
-		// Parse to get current values
 		let fm = {};
 		try { fm = parseYaml(yamlRaw) || {}; } catch { fm = {}; }
-		console.log("Existing frontmatter:", fm);
-		
-		// Surgically update ONLY the changed properties in the raw YAML string
-		let updatedYaml = yamlRaw;
-		
-		for (const [key, newValue] of Object.entries(newFrontmatter)) {
-			console.log(`Updating property "${key}" to:`, newValue);
-			if (newValue === null) {
-				// Remove the property
-				updatedYaml = this._removeYamlProperty(updatedYaml, key);
-			} else {
-				updatedYaml = this._updateYamlProperty(updatedYaml, key, newValue, fm[key]);
-			}
-		}
-		
-		console.log("Updated YAML:", updatedYaml);
+		const updatedYaml = stringifyYaml({ ...fm, ...newFrontmatter });
 		const newContent = `---\n${updatedYaml}\n---\n${body}`;
 		await this.app.vault.modify(file, newContent);
-		console.log("File updated successfully");
-	}
-
-	_removeYamlProperty(yamlString, key) {
-		// Create regex to find the property (handles both single line and multi-line arrays)
-		const keyPattern = new RegExp(`^(\\s*)${this._escapeRegex(key)}:(.*)$`, 'm');
-		const match = yamlString.match(keyPattern);
-		
-		if (!match) {
-			// Property doesn't exist, return as-is
-			return yamlString;
-		}
-		
-		const indent = match[1];
-		const matchIndex = match.index;
-		
-		// Check if it's a multi-line array (next line starts with - )
-		const afterMatch = yamlString.substring(matchIndex + match[0].length);
-		const isMultiLineArray = /^\s*\n\s*-\s/.test(afterMatch);
-		
-		if (isMultiLineArray) {
-			// Find all array items (lines starting with - at the same indent level)
-			let endIndex = matchIndex + match[0].length;
-			const arrayIndent = indent + '  ';
-			const lines = yamlString.substring(endIndex).split('\n');
-			let arrayLineCount = 0;
-			
-			for (const line of lines) {
-				if (line.trim() === '' || line.startsWith(arrayIndent + '-')) {
-					arrayLineCount++;
-				} else if (line.trim() !== '') {
-					break;
-				}
-			}
-			
-			// Calculate end position
-			for (let i = 0; i < arrayLineCount && endIndex < yamlString.length; i++) {
-				const nextNewline = yamlString.indexOf('\n', endIndex);
-				if (nextNewline === -1) {
-					endIndex = yamlString.length;
-					break;
-				}
-				endIndex = nextNewline + 1;
-			}
-			
-			// Remove the entire property including its array items
-			const before = yamlString.substring(0, matchIndex);
-			const after = yamlString.substring(endIndex);
-			let cleaned = before + after;
-			// Clean up extra blank lines and whitespace
-			cleaned = cleaned.replace(/\n\s*\n/g, '\n').trim();
-			return cleaned;
-		} else {
-			// Single line property, remove just this line
-			const lineEnd = yamlString.indexOf('\n', matchIndex);
-			const endIndex = lineEnd === -1 ? yamlString.length : lineEnd;
-			const before = yamlString.substring(0, matchIndex);
-			const after = yamlString.substring(endIndex);
-			let cleaned = before + after;
-			// Clean up extra blank lines and whitespace
-			cleaned = cleaned.replace(/\n\s*\n/g, '\n').trim();
-			return cleaned;
-		}
-	}
-
-	_updateYamlProperty(yamlString, key, newValue, oldValue) {
-		// Create regex to find the property (handles both single line and multi-line arrays)
-		const keyPattern = new RegExp(`^(\\s*)${this._escapeRegex(key)}:(.*)$`, 'm');
-		const match = yamlString.match(keyPattern);
-		
-		if (!match) {
-			// Property doesn't exist, add it at the end
-			const formattedValue = this._formatPropertyValue(key, newValue);
-			return yamlString + (yamlString.endsWith('\n') ? '' : '\n') + formattedValue;
-		}
-		
-		const indent = match[1];
-		const matchIndex = match.index;
-		
-		// Check if it's a multi-line array (next line starts with - )
-		const afterMatch = yamlString.substring(matchIndex + match[0].length);
-		const isMultiLineArray = /^\s*\n\s*-\s/.test(afterMatch);
-		
-		if (isMultiLineArray) {
-			// Find all array items (lines starting with - at the same indent level)
-			let endIndex = matchIndex + match[0].length;
-			const arrayIndent = indent + '  ';
-			const lines = yamlString.substring(endIndex).split('\n');
-			let arrayLineCount = 0;
-			
-			for (const line of lines) {
-				if (line.trim() === '' || line.startsWith(arrayIndent + '-')) {
-					arrayLineCount++;
-				} else if (line.trim() !== '') {
-					break;
-				}
-			}
-			
-			// Calculate end position
-			for (let i = 0; i < arrayLineCount && endIndex < yamlString.length; i++) {
-				const nextNewline = yamlString.indexOf('\n', endIndex);
-				if (nextNewline === -1) {
-					endIndex = yamlString.length;
-					break;
-				}
-				endIndex = nextNewline + 1;
-			}
-			
-			// Replace the entire property including its array items
-			const formattedValue = this._formatPropertyValue(key, newValue, indent);
-			const before = yamlString.substring(0, matchIndex);
-			const after = yamlString.substring(endIndex);
-			return before + formattedValue + (after.startsWith('\n') ? after : '\n' + after);
-		} else {
-			// Single line property, replace just this line
-			const lineEnd = yamlString.indexOf('\n', matchIndex);
-			const endIndex = lineEnd === -1 ? yamlString.length : lineEnd;
-			const formattedValue = this._formatPropertyValue(key, newValue, indent);
-			const before = yamlString.substring(0, matchIndex);
-			const after = yamlString.substring(endIndex);
-			return before + formattedValue + after;
-		}
-	}
-	
-	_formatPropertyValue(key, value, indent = '') {
-		if (Array.isArray(value) && value.length > 0) {
-			const lines = [`${indent}${key}:`];
-			for (const item of value) {
-				const formattedItem = this._formatYamlValue(item);
-				lines.push(`${indent}  - ${formattedItem}`);
-			}
-			return lines.join('\n');
-		} else if (Array.isArray(value) && value.length === 0) {
-			return `${indent}${key}: []`;
-		} else {
-			const formattedValue = this._formatYamlValue(value);
-			return `${indent}${key}: ${formattedValue}`;
-		}
-	}
-	
-	_escapeRegex(str) {
-		return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	}
-
-	_generateFormattedYaml(obj, indent = 0) {
-		console.log("Generating YAML for:", obj, "with indent:", indent);
-		const spaces = '  '.repeat(indent);
-		const lines = [];
-
-		for (const [key, value] of Object.entries(obj)) {
-			console.log(`Processing key "${key}" with value:`, value, `type: ${typeof value}`);
-			if (Array.isArray(value) && value.length > 0) {
-				console.log(`Formatting array for key "${key}"`);
-				// Format arrays with proper YAML list syntax
-				lines.push(`${spaces}${key}:`);
-				for (const item of value) {
-					console.log(`Adding array item: "${item}"`);
-					const formattedItem = this._formatYamlValue(item);
-					lines.push(`${spaces}  - ${formattedItem}`);
-				}
-			} else if (typeof value === 'object' && value !== null) {
-				// Handle nested objects
-				lines.push(`${spaces}${key}:`);
-				lines.push(this._generateFormattedYaml(value, indent + 1));
-			} else {
-				// Handle simple values
-				console.log(`Adding simple value for key "${key}": ${value}`);
-				const formattedValue = this._formatYamlValue(value);
-				lines.push(`${spaces}${key}: ${formattedValue}`);
-			}
-		}
-
-		const result = lines.join('\n');
-		console.log("Generated YAML lines:", lines);
-		console.log("Final YAML result:", result);
-		return result;
-	}
-
-	_formatYamlValue(value) {
-		if (value === null || value === undefined) {
-			return '';
-		}
-
-		const str = String(value);
-		
-		// Check if value needs quotes
-		// Need quotes if:
-		// - Contains special YAML characters: : { } [ ] , & * # ? | - < > = ! % @ `
-		// - Starts or ends with whitespace
-		// - Is a number-like string that should stay as string
-		// - Contains newlines
-		// - Is empty
-		const needsQuotes = (
-			str === '' ||
-			str !== str.trim() ||
-			/[:\{\}\[\],&*#\?|\-<>=!%@`]/.test(str) ||
-			str.includes('\n') ||
-			str.includes('"') ||
-			str.includes("'")
-		);
-
-		if (needsQuotes) {
-			// Use double quotes and escape any existing double quotes
-			const escaped = str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-			return `"${escaped}"`;
-		}
-
-		return str;
 	}
 }
 
@@ -748,11 +382,11 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	display() {
 		const { containerEl } = this;
 		containerEl.empty();
-			containerEl.createEl("h1", { text: "Conditional Properties" });
-			containerEl.createEl("p", { text: "Create rules to change note properties values based in custom conditions." });
-			containerEl.createEl("h3", { text: "Configurations" });
+		containerEl.createEl("h1", { text: "Conditional Properties" });
+		containerEl.createEl("p", { text: "Create rules to change note properties values based in custom conditions." });
+		containerEl.createEl("h3", { text: "Configurations" });
 
-			new Setting(containerEl)
+		new Setting(containerEl)
 			.setName("Scan interval (minutes)")
 			.setDesc("Minimum 5 minutes")
 			.addText(text => text
@@ -764,8 +398,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					new Notice("Interval updated. Restart Obsidian to apply immediately.");
 				}));
 
-
-			new Setting(containerEl)
+		new Setting(containerEl)
 			.setName("Scan scope")
 			.setDesc("Choose which notes to scan")
 			.addDropdown(dropdown => {
@@ -776,12 +409,12 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				dropdown.onChange(async (value) => {
 					this.plugin.settings.scanScope = value;
 					await this.plugin.saveData(this.plugin.settings);
-					this.display(); // Refresh to show/hide count field
+					this.display();
 				});
 			});
 
-			if (this.plugin.settings.scanScope !== 'entireVault') {
-				new Setting(containerEl)
+		if (this.plugin.settings.scanScope !== 'entireVault') {
+			new Setting(containerEl)
 				.setName("Number of notes")
 				.setDesc("Number of notes to scan (1-1000)")
 				.addText(text => text
@@ -792,108 +425,111 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 						this.plugin.settings.scanCount = num;
 						await this.plugin.saveData(this.plugin.settings);
 					}));
-			}
+		}
 
-			const runNow = new Setting(containerEl)
+		const runNow = new Setting(containerEl)
 			.setName("Run now")
 			.setDesc("Execute all rules across selected scope")
-				.addButton(btn => {
-					btn.setButtonText("Run now");
-					btn.buttonEl.classList.add("run-now-button", "eis-btn-primary");
-					btn.onClick(async () => {
-				btn.setDisabled(true);
-				try {
-					const result = await this.plugin.runScan();
-					new Notice(`Conditional Properties: ${result.modified} modified / ${result.scanned} scanned`);
+			.addButton(btn => {
+				btn.setButtonText("Run now");
+				btn.buttonEl.classList.add("run-now-button", "eis-btn-primary");
+				btn.onClick(async () => {
+					btn.setDisabled(true);
+					try {
+						const result = await this.plugin.runScan();
+						new Notice(`Conditional Properties: ${result.modified} modified / ${result.scanned} scanned`);
 					} finally { btn.setDisabled(false); }
-					});
 				});
-
-			this.plugin.settings.rules = this.plugin.settings.rules || [];
-			containerEl.createEl("h3", { text: "Add rules" });
-			// Add button ABOVE the list
-			const addWrap = containerEl.createEl("div", { cls: "conditional-add-wrap" });
-			const addBtn = addWrap.createEl("button", { text: "+ Add rule", cls: "eis-btn-primary" });
-			addBtn.onclick = async () => {
-				this.plugin.settings.rules.push({ ifProp: "", ifValue: "", op: "contains", thenActions: [{ prop: "", value: "", action: "add" }] });
-				await this.plugin.saveData(this.plugin.settings);
-				this.display();
-			};
-
-			// Render rules with newest first
-			this.plugin.settings.rules.slice().reverse().forEach((rule, idxReversed) => {
-				// Map back to original index
-				const originalIndex = this.plugin.settings.rules.length - 1 - idxReversed;
-				this._renderRule(containerEl, rule, originalIndex);
 			});
+
+		this.plugin.settings.rules = this.plugin.settings.rules || [];
+		containerEl.createEl("h3", { text: "Add rules" });
+		const addWrap = containerEl.createEl("div", { cls: "conditional-add-wrap" });
+		const addBtn = addWrap.createEl("button", { text: "+ Add rule", cls: "eis-btn-primary" });
+		addBtn.onclick = async () => {
+			this.plugin.settings.rules.push({ ifType: "PROPERTY", ifProp: "", ifValue: "", op: "contains", thenActions: [{ prop: "", value: "", action: "add" }] });
+			await this.plugin.saveData(this.plugin.settings);
+			this.display();
+		};
+
+		this.plugin.settings.rules.slice().reverse().forEach((rule, idxReversed) => {
+			const originalIndex = this.plugin.settings.rules.length - 1 - idxReversed;
+			this._renderRule(containerEl, rule, originalIndex);
+		});
 	}
 
 	_renderRule(containerEl, rule, idx) {
 		const wrap = containerEl.createEl("div", { cls: "conditional-rule" });
-
-		// Ensure rule has thenActions array
 		if (!Array.isArray(rule.thenActions)) {
-			rule.thenActions = [{ prop: "", value: "" }];
+			rule.thenActions = [{ prop: "", value: "", action: "add" }];
+		}
+		if (!rule.ifType) {
+			rule.ifType = "PROPERTY";
 		}
 
-		// Line 1: IF property [field] [operator] value [field]
-		const line1 = new Setting(wrap).setName("IF property");
-		line1.addText(t => t
-			.setPlaceholder("property")
-			.setValue(rule.ifProp || "")
-			.onChange(async (v) => { rule.ifProp = v; await this.plugin.saveData(this.plugin.settings); }));
+		const line1 = new Setting(wrap).setName("IF");
 		line1.addDropdown(d => {
-			const current = rule.op || "contains";
-			d.addOption("contains", "contains");
-			d.addOption("notContains", "notContains");
-			d.setValue(current);
-			d.onChange(async (v) => { rule.op = v; await this.plugin.saveData(this.plugin.settings); });
+			d.addOption("PROPERTY", "Property");
+			d.addOption("TITLE", "Title");
+			d.setValue(rule.ifType || "PROPERTY");
+			d.onChange(async (v) => {
+				rule.ifType = v;
+				await this.plugin.saveData(this.plugin.settings);
+				this.display();
+			});
 		});
-		line1.addText(t => t
-			.setPlaceholder("value")
-			.setValue(rule.ifValue || "")
-			.onChange(async (v) => { rule.ifValue = v; await this.plugin.saveData(this.plugin.settings); }));
 
-		// THEN section header
+		if (rule.ifType === "TITLE") {
+			// For TITLE: show operator and value
+			line1.addDropdown(d => {
+				const current = rule.op || "contains";
+				d.addOption("contains", "contains");
+				d.addOption("notContains", "notContains");
+				d.setValue(current);
+				d.onChange(async (v) => { rule.op = v; await this.plugin.saveData(this.plugin.settings); });
+			});
+			line1.addText(t => t
+				.setPlaceholder("title text")
+				.setValue(rule.ifValue || "")
+				.onChange(async (v) => { rule.ifValue = v; await this.plugin.saveData(this.plugin.settings); }));
+		} else {
+			line1.addText(t => t
+				.setPlaceholder("property")
+				.setValue(rule.ifProp || "")
+				.onChange(async (v) => { rule.ifProp = v; await this.plugin.saveData(this.plugin.settings); }));
+			line1.addDropdown(d => {
+				d.addOption("contains", "contains");
+				d.addOption("notContains", "notContains");
+				d.setValue(rule.op || "contains");
+				d.onChange(async (v) => { rule.op = v; await this.plugin.saveData(this.plugin.settings); });
+			});
+			line1.addText(t => t
+				.setPlaceholder("value")
+				.setValue(rule.ifValue || "")
+				.onChange(async (v) => { rule.ifValue = v; await this.plugin.saveData(this.plugin.settings); }));
+		}
+
 		const thenHeader = wrap.createEl("div", { cls: "conditional-rules-header" });
 		thenHeader.createEl("strong", { text: "THEN:" });
 
-		// Render each THEN action
 		rule.thenActions.forEach((action, actionIdx) => {
 			this._renderThenAction(wrap, rule, action, actionIdx, idx);
 		});
 
-		// Create actions container
 		const actions = wrap.createEl("div", { cls: "conditional-actions" });
-
-		// Add action button
 		const addActionBtn = actions.createEl("button", { text: "+ Add property", cls: "conditional-add-action" });
 		addActionBtn.addEventListener("click", async (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			e.returnValue = false;
-			e.stopImmediatePropagation();
-			
-			// Save scroll position before display
-			const scrollContainer = this.containerEl.closest('.modal-content') || this.containerEl.parentElement;
-			const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
-			
 			rule.thenActions.push({ prop: "", value: "", action: "add" });
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
-			
-			// Restore scroll position after display
-			if (scrollContainer) {
-				scrollContainer.scrollTop = scrollTop;
-			}
-		}, true); // Use capture phase
+		}, true);
 
 		const runOne = actions.createEl("button", { text: "Run this rule", cls: "conditional-run-one eis-btn-primary" });
 		runOne.addEventListener("click", async (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			e.returnValue = false;
-			e.stopImmediatePropagation();
 			runOne.setAttribute('disabled', 'true');
 			try {
 				const result = await this.plugin.runScanForRules([this.plugin.settings.rules[idx]]);
@@ -907,83 +543,25 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		del.addEventListener("click", async (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			e.returnValue = false;
-			e.stopImmediatePropagation();
-			
-			// Save scroll position before display
-			const scrollContainer = this.containerEl.closest('.modal-content') || this.containerEl.parentElement;
-			const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
-			
 			this.plugin.settings.rules.splice(idx, 1);
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
-			
-			// Restore scroll position after display
-			if (scrollContainer) {
-				scrollContainer.scrollTop = scrollTop;
-			}
 		}, true);
 	}
 
 	_renderThenAction(containerEl, rule, action, actionIdx, ruleIdx) {
 		const actionWrap = containerEl.createEl("div", { cls: "conditional-then-action" });
-
 		const actionSetting = new Setting(actionWrap).setName(`Property ${actionIdx + 1}`);
-
-		// Ensure action has action field (backward compatibility)
 		if (!action.action) {
 			action.action = "add";
 		}
-
-		// Add remove button as first element in the setting's control area
-		const settingItem = actionSetting.settingEl;
-		const removeActionBtn = document.createElement("button");
-		removeActionBtn.textContent = "×";
-		removeActionBtn.className = "conditional-remove-action eis-btn-red";
-		removeActionBtn.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			e.returnValue = false;
-			e.stopImmediatePropagation();
-			
-			// Save scroll position before display
-			const scrollContainer = this.containerEl.closest('.modal-content') || this.containerEl.parentElement;
-			const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
-			
-			rule.thenActions.splice(actionIdx, 1);
-			await this.plugin.saveData(this.plugin.settings);
-			this.display();
-			
-			// Restore scroll position after display
-			if (scrollContainer) {
-				scrollContainer.scrollTop = scrollTop;
-			}
-		}, true);
-
-		// Insert button as first child of setting-item
-		if (settingItem.firstChild) {
-			settingItem.insertBefore(removeActionBtn, settingItem.firstChild);
-		} else {
-			settingItem.appendChild(removeActionBtn);
-		}
-
 		actionSetting.addText(t => t
 			.setPlaceholder("property name")
 			.setValue(action.prop || "")
 			.onChange(async (v) => {
-				// Check for duplicate properties in the same rule
-				const duplicateCount = rule.thenActions.filter(a => a.prop === v).length;
-				if (duplicateCount > 1) {
-					new Notice(`Warning: Property "${v}" is defined multiple times in this rule. The last value will be used.`, 3000);
-					actionWrap.classList.add('duplicate-prop');
-				} else {
-					actionWrap.classList.remove('duplicate-prop');
-				}
 				action.prop = v;
 				await this.plugin.saveData(this.plugin.settings);
 			}));
-
-		// Add action dropdown (ADD/REMOVE/OVERWRITE/DELETE)
 		actionSetting.addDropdown(d => {
 			d.addOption("add", "ADD");
 			d.addOption("remove", "REMOVE");
@@ -993,24 +571,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			d.onChange(async (v) => {
 				action.action = v;
 				await this.plugin.saveData(this.plugin.settings);
-				// Refresh UI to show/hide elements based on new action
 				this.display();
 			});
 		});
-
-		// Add warning message for DELETE action
-		if (action.action === "delete") {
-			const warningDiv = document.createElement('div');
-			warningDiv.className = 'eis-message eis-message-error';
-			warningDiv.textContent = 'This action is irreversible and will permanently delete the property.';
-			actionWrap.appendChild(warningDiv);
-		} else {
-			// Label "to value" and value field only for non-delete actions
-			const toLabel = document.createElement('span');
-			toLabel.textContent = ' ';
-			toLabel.classList.add('conditional-to-label');
-			actionSetting.controlEl.appendChild(toLabel);
-
+		if (action.action !== "delete") {
 			actionSetting.addText(t => t
 				.setPlaceholder("value (use commas to separate multiple values)")
 				.setValue(action.value || "")
@@ -1019,8 +583,6 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					await this.plugin.saveData(this.plugin.settings);
 				}));
 		}
-
-		// Remove button is now always visible as part of the setting layout
 	}
 }
 
