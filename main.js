@@ -70,6 +70,10 @@ class ConditionalPropertiesPlugin extends Plugin {
 				hasChanges = true;
 				return migratedRule;
 			}
+			if (rule.ifType === "TITLE") {
+				rule.ifType = "HEADING_FIRST_LEVEL";
+				hasChanges = true;
+			}
 			if (rule.ifType === undefined) {
 				rule.ifType = "PROPERTY";
 				hasChanges = true;
@@ -153,7 +157,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 			if (!Array.isArray(thenActions) || thenActions.length === 0) continue;
 
 			let sourceValue;
-			if (ifType === "TITLE") {
+			if (ifType === "HEADING_FIRST_LEVEL") {
 				sourceValue = await this._getNoteTitle(file);
 				// If no title available, show error message and skip rule
 				if (sourceValue === null) {
@@ -263,7 +267,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 		}
 		const s = source == null ? "" : String(source);
 		const e = expected == null ? "" : String(expected);
-		if (ifType === "TITLE") {
+		if (ifType === "HEADING_FIRST_LEVEL") {
 			if (op === "contains") return s.includes(e);
 			if (op === "notContains") return !s.includes(e);
 		} else {
@@ -470,7 +474,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const line1 = new Setting(wrap).setName("IF");
 		line1.addDropdown(d => {
 			d.addOption("PROPERTY", "Property");
-			d.addOption("TITLE", "Title");
+			d.addOption("HEADING_FIRST_LEVEL", "Heading First Level");
 			d.setValue(rule.ifType || "PROPERTY");
 			d.onChange(async (v) => {
 				rule.ifType = v;
@@ -479,43 +483,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 		});
 
-		if (rule.ifType === "TITLE") {
-			// For TITLE: show operator and value, or error message if no title available
-			const activeFile = this.app.workspace.getActiveFile();
-			if (activeFile) {
-				const content = this.app.vault.cachedRead(activeFile);
-				if (typeof content === 'string' && content.length > 0) {
-					const lines = content.split('\n');
-					let inFrontmatter = false;
-					let foundH1 = false;
-					for (let i = 0; i < lines.length; i++) {
-						const line = lines[i].trim();
-						if (line === '---' && !inFrontmatter && i === 0) {
-							inFrontmatter = true;
-							continue;
-						}
-						if (line === '---' && inFrontmatter) {
-							inFrontmatter = false;
-							continue;
-						}
-						if (inFrontmatter) continue;
-						if (line.startsWith('# ') && !foundH1) {
-							foundH1 = true;
-							break;
-						}
-					}
-					if (!foundH1) {
-						const showInlineTitle = this.app.vault.getConfig('showInlineTitle');
-						if (!showInlineTitle) {
-							// Show error message instead of fields
-							const errorDiv = line1.controlEl.createEl("div", { cls: "eis-message eis-message-error" });
-							errorDiv.textContent = "Para usar essa opção de condição, você deve ter um título de primeiro nível na nota, ou a opção SHOW INLINE TITLE habilitada.";
-							return; // Don't show the fields
-						}
-					}
-				}
-			}
-			// Show fields
+		if (rule.ifType === "HEADING_FIRST_LEVEL") {
+			// For TITLE: show operator and value (check is done during execution)
 			line1.addDropdown(d => {
 				const current = rule.op || "contains";
 				d.addOption("contains", "contains");
@@ -524,7 +493,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				d.onChange(async (v) => { rule.op = v; await this.plugin.saveData(this.plugin.settings); });
 			});
 			line1.addText(t => t
-				.setPlaceholder("title text")
+				.setPlaceholder("heading text")
 				.setValue(rule.ifValue || "")
 				.onChange(async (v) => { rule.ifValue = v; await this.plugin.saveData(this.plugin.settings); }));
 		} else {

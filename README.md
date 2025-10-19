@@ -203,9 +203,9 @@ THEN set properties:
   - tags to work, apple, important
 ```
 
-7) Use title-based condition
+7) Use heading-based condition
 ```
-IF title, op: contains, value: Meeting
+IF heading first level, op: contains, value: Meeting
 THEN set properties:
   - tags to meeting, important
 ```
