@@ -18,6 +18,7 @@ My Granola meeting notes imports weren’t bringing the same name values as my p
 - **Smart property merging**: Add values to existing properties without duplicating
 - **Scan Scope Options**: Choose between entire vault, latest created notes, or latest modified notes
 - **Configurable scan count**: Set number of notes to scan (1-1000, default 15) for latest notes options
+- **Title-based conditions**: Use the note's title (first H1 after YAML frontmatter or inline title) as the IF condition
 - Run on the entire vault (settings button or command)
 - Run on the current file (command palette)
 - Scheduled scans with a minimum interval of 5 minutes
@@ -202,13 +203,13 @@ THEN set properties:
   - tags to work, apple, important
 ```
 
-**Result in YAML:**
-```yaml
-tags:
-  - "[[work]]"
-  - "[[apple]]"
-  - "[[important]]"
+7) Use title-based condition
 ```
+IF title, op: contains, value: Meeting
+THEN set properties:
+  - tags to meeting, important
+```
+*Note: The title is the first H1 heading after the YAML frontmatter, or the inline title if enabled. Rules are skipped for notes without a title.*
 
 ## Limitations
   - Only frontmatter is modified
