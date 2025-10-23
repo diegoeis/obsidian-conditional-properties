@@ -420,7 +420,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		if (this.plugin.settings.scanScope !== 'entireVault') {
 			new Setting(containerEl)
 				.setName("Number of notes")
-				.setDesc("Number of notes to scan (1-1000)")
+				.setDesc("Number of recent created notes to scan (1-1000)")
 				.addText(text => text
 					.setPlaceholder("15")
 					.setValue(String(this.plugin.settings.scanCount || 15))
@@ -590,6 +590,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		actionSetting.addDropdown(d => {
 			d.addOption("add", "ADD VALUE");
 			d.addOption("remove", "REMOVE VALUE");
+			d.addOption("replace", "REPLACE VALUE");
 			d.addOption("overwrite", "OVERWRITE ALL VALUES WITH");
 			d.addOption("delete", "DELETE PROPERTY");
 			d.setValue(action.action || "add");
