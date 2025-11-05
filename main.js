@@ -214,6 +214,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 						changed = true;
 						console.log(`Created new property ${prop} with value "${value}"`);
 					}
+				} else if (actionType === "overwrite") {
+					// Overwrite the entire property
+					newFm[prop] = value;
+					changed = true;
+					console.log(`Overwritten ${prop} with "${value}"`);
 				} else if (actionType === "remove") {
 					// Handle removing from arrays or properties
 					if (Array.isArray(newFm[prop])) {
@@ -239,16 +244,6 @@ class ConditionalPropertiesPlugin extends Plugin {
 							console.log(`Value "${value}" not found in ${prop}`);
 						}
 					}
-				} else if (actionType === "overwrite") {
-					// Overwrite the entire property
-					newFm[prop] = value;
-					changed = true;
-					console.log(`Overwritten ${prop} with "${value}"`);
-				} else if (actionType === "delete") {
-					// Delete the property
-					delete newFm[prop];
-					changed = true;
-					console.log(`Deleted property ${prop}`);
 				}
 			}
 		}
@@ -590,7 +585,6 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		actionSetting.addDropdown(d => {
 			d.addOption("add", "ADD VALUE");
 			d.addOption("remove", "REMOVE VALUE");
-			d.addOption("replace", "REPLACE VALUE");
 			d.addOption("overwrite", "OVERWRITE ALL VALUES WITH");
 			d.addOption("delete", "DELETE PROPERTY");
 			d.setValue(action.action || "add");
