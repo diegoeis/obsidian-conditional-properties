@@ -1,7 +1,7 @@
 {
   "id": "conditional-properties",
   "name": "Conditional Properties",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "minAppVersion": "1.5.0",
   "description": "Automate frontmatter updates using conditional rules (IF/THEN).",
   "author": "Diego Eis",

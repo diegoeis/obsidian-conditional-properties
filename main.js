@@ -481,115 +481,151 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	}
 
 	display() {
-		const { containerEl } = this;
-		containerEl.empty();
-		containerEl.createEl("h1", { text: "Conditional Properties" });
-		containerEl.createEl("p", { text: "Create rules to change note properties values based in custom conditions." });
-		containerEl.createEl("h3", { text: "Configurations" });
+		try {
+			const { containerEl } = this;
+			containerEl.empty();
 
-		new Setting(containerEl)
-			.setName("Scan interval (minutes)")
-			.setDesc("Minimum 5 minutes")
-			.addText(text => text
-				.setPlaceholder("5")
-				.setValue(String(this.plugin.settings.scanIntervalMinutes || 5))
-				.onChange(async (value) => {
-					this.plugin.settings.scanIntervalMinutes = Math.max(5, Number(value) || 5);
-					await this.plugin.saveData(this.plugin.settings);
-					new Notice("Interval updated. Restart Obsidian to apply immediately.");
-				}));
+			// Header
+			containerEl.createEl("h1", { text: "Conditional Properties" });
+			containerEl.createEl("p", { text: "Create rules to change note properties values based in custom conditions." });
 
-		new Setting(containerEl)
-			.setName("Scan scope")
-			.setDesc("Choose which notes to scan")
-			.addDropdown(dropdown => {
-				dropdown.addOption("latestCreated", "Latest Created notes");
-				dropdown.addOption("latestModified", "Latest Modified notes");
-				dropdown.addOption("entireVault", "Entire vault");
-				dropdown.setValue(this.plugin.settings.scanScope || "latestCreated");
-				dropdown.onChange(async (value) => {
-					this.plugin.settings.scanScope = value;
-					await this.plugin.saveData(this.plugin.settings);
-					this.display();
-				});
-			});
+			// Configurations Section
+			containerEl.createEl("h3", { text: "Configurations" });
 
-		if (this.plugin.settings.scanScope !== 'entireVault') {
+			// Scan Interval Setting
 			new Setting(containerEl)
-				.setName("Number of notes")
-				.setDesc("Number of recent created notes to scan (1-1000)")
-				.addText(text => text
-					.setPlaceholder("15")
-					.setValue(String(this.plugin.settings.scanCount || 15))
+				.setName("Scan interval (minutes)")
+				.setDesc("Minimum 5 minutes")
+				.addText(text => {
+					text.setPlaceholder("5")
+					.setValue(String(this.plugin.settings.scanIntervalMinutes || 5))
 					.onChange(async (value) => {
-						const num = Math.max(1, Math.min(1000, Number(value) || 15));
-						this.plugin.settings.scanCount = num;
+						this.plugin.settings.scanIntervalMinutes = Math.max(5, Number(value) || 5);
 						await this.plugin.saveData(this.plugin.settings);
-					}));
-		}
-
-		// Backup & Restore Settings
-		const backupSettings = new Setting(containerEl)
-			.setName("Backup & Restore")
-			.setDesc("Export your current settings or import from a backup file");
-
-		backupSettings.addButton(btn => {
-			btn.setButtonText("Export Settings")
-				.setCta()
-				.onClick(() => this.exportSettings());
-		});
-
-		const importInput = document.createElement('input');
-		importInput.type = 'file';
-		importInput.accept = '.json';
-		importInput.style.display = 'none';
-		importInput.addEventListener('change', (e) => {
-			const file = e.target.files[0];
-			if (file) {
-				this.importSettings(file);
-			}
-			// Reset the input to allow importing the same file again
-			importInput.value = '';
-		});
-
-		backupSettings.addButton(btn => {
-			btn.setButtonText("Import Settings")
-				.setWarning()
-				.buttonEl.classList.add("eis-btn-border")
-				.onClick(() => importInput.click());
-		});
-
-		containerEl.appendChild(importInput);
-
-		const runNow = new Setting(containerEl)
-			.setName("Run now")
-			.setDesc("Execute all rules across selected scope")
-			.addButton(btn => {
-				btn.setButtonText("Run now");
-				btn.buttonEl.classList.add("run-now-button", "eis-btn");
-				btn.onClick(async () => {
-					btn.setDisabled(true);
-					try {
-						const result = await this.plugin.runScan();
-						new Notice(`Conditional Properties: ${result.modified} modified / ${result.scanned} scanned`);
-					} finally { btn.setDisabled(false); }
+						new Notice("Interval updated. Restart Obsidian to apply immediately.");
+					});
 				});
+
+			// Scan Scope Setting
+			new Setting(containerEl)
+				.setName("Scan scope")
+				.setDesc("Choose which notes to scan")
+				.addDropdown(dropdown => {
+					dropdown.addOption("latestCreated", "Latest Created notes");
+					dropdown.addOption("latestModified", "Latest Modified notes");
+					dropdown.addOption("entireVault", "Entire vault");
+					dropdown.setValue(this.plugin.settings.scanScope || "latestCreated");
+					dropdown.onChange(async (value) => {
+						this.plugin.settings.scanScope = value;
+						await this.plugin.saveData(this.plugin.settings);
+						this.display();
+					});
+				});
+
+			// Number of Notes Setting (conditionally shown)
+			if (this.plugin.settings.scanScope !== 'entireVault') {
+				new Setting(containerEl)
+					.setName("Number of notes")
+					.setDesc("Number of recent created notes to scan (1-1000)")
+					.addText(text => {
+						text.setPlaceholder("15")
+						.setValue(String(this.plugin.settings.scanCount || 15))
+						.onChange(async (value) => {
+							const num = Math.max(1, Math.min(1000, Number(value) || 15));
+							this.plugin.settings.scanCount = num;
+							await this.plugin.saveData(this.plugin.settings);
+						});
+					});
+			}
+
+			// Add Export/Import Buttons to Configurations
+			const exportImportSetting = new Setting(containerEl)
+				.setName("Backup & Restore")
+				.setDesc("Export or import your plugin settings");
+
+			exportImportSetting.addButton(btn => {
+				btn.setButtonText("Export Settings")
+					.setCta()
+					.onClick(() => this.exportSettings());
 			});
 
-		this.plugin.settings.rules = this.plugin.settings.rules || [];
-		containerEl.createEl("h3", { text: "Add rules" });
-		const addWrap = containerEl.createEl("div", { cls: "conditional-add-wrap" });
-		const addBtn = addWrap.createEl("button", { text: "+ Add rule", cls: "eis-btn" });
-		addBtn.onclick = async () => {
-			this.plugin.settings.rules.push({ ifType: "PROPERTY", ifProp: "", ifValue: "", op: "exactly", thenActions: [{ prop: "", value: "", action: "add" }] });
-			await this.plugin.saveData(this.plugin.settings);
-			this.display();
-		};
+			// Hidden file input for import
+			const importInput = document.createElement('input');
+			importInput.type = 'file';
+			importInput.accept = '.json';
+			importInput.style.display = 'none';
+			importInput.addEventListener('change', (e) => {
+				const file = e.target.files[0];
+				if (file) {
+					this.importSettings(file);
+				}
+				importInput.value = ''; // Reset input
+			});
 
-		this.plugin.settings.rules.slice().reverse().forEach((rule, idxReversed) => {
-			const originalIndex = this.plugin.settings.rules.length - 1 - idxReversed;
-			this._renderRule(containerEl, rule, originalIndex);
-		});
+			exportImportSetting.addButton(btn => {
+				btn.setButtonText("Import Settings")
+					.setWarning();
+				btn.buttonEl.classList.add("eis-btn-border");
+				btn.onClick(() => importInput.click());
+			});
+
+			containerEl.appendChild(importInput);
+
+			// Run Now Button
+			const runNow = new Setting(containerEl)
+				.setName("Run now")
+				.setDesc("Execute all rules across selected scope")
+				.addButton(btn => {
+					btn.setButtonText("Run now");
+					btn.buttonEl.classList.add("run-now-button", "eis-btn");
+					btn.onClick(async () => {
+						btn.setDisabled(true);
+						try {
+							const result = await this.plugin.runScan();
+							new Notice(`Conditional Properties: ${result.modified} modified / ${result.scanned} scanned`);
+						} finally { 
+							btn.setDisabled(false); 
+						}
+					});
+				});
+
+			// Rules Section
+			containerEl.createEl("h3", { text: "Rules" });
+			this.plugin.settings.rules = this.plugin.settings.rules || [];
+
+			// Add Rule Button
+			const addWrap = containerEl.createEl("div", { cls: "setting-item" });
+			const addBtn = addWrap.createEl("button", { 
+				text: "+ Add Rule", 
+				cls: "mod-cta eis-btn"
+			});
+
+			addBtn.onclick = async () => {
+				this.plugin.settings.rules.push({ 
+					ifType: "PROPERTY", 
+					ifProp: "", 
+					ifValue: "", 
+					op: "exactly", 
+					thenActions: [{ 
+						prop: "", 
+						value: "", 
+						action: "add" 
+					}] 
+				});
+				await this.plugin.saveData(this.plugin.settings);
+				this.display();
+			};
+
+			// Render Rules
+			this.plugin.settings.rules.slice().reverse().forEach((rule, idxReversed) => {
+				const originalIndex = this.plugin.settings.rules.length - 1 - idxReversed;
+				this._renderRule(containerEl, rule, originalIndex);
+			});
+
+		} catch (error) {
+			console.error("Error in display():", error);
+			new Notice("An error occurred while loading the settings. Check the console for details.", 5000);
+		}
 	}
 
 	_renderRule(containerEl, rule, idx) {
