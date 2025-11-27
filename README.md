@@ -11,7 +11,7 @@ My Granola meeting notes imports weren’t bringing the same name values as my p
 ## Features
 
 - Define multiple rules with a simple IF/THEN model
-- Operators: `contains`, `notContains`
+- Operators: `exactly`, `contains`, `notContains`
 - **Multiple THEN actions per rule**: Set multiple properties in a single rule
 - **Comma-separated values**: Set multiple values for a property (e.g., "work, apple" → properly formatted YAML array)
 - **ADD/REMOVE actions**: Choose to ADD values to a property or REMOVE specific values
@@ -101,37 +101,37 @@ In the rules editor, each THEN action has a dropdown between the property name a
 
 ### Examples
 
-**Add tags without duplicating:**
+**Add tags without duplicating (exact match):**
 ```
-IF property: type, op: contains, value: meeting
+IF property: type, op: exactly, value: meeting
 THEN set property: tags [ADD] work, important
 ```
 Result: Adds "work" and "important" tags only if they don't already exist.
 
-**Remove old tags:**
+**Remove old tags (exact match):**
 ```
-IF property: status, op: contains, value: archived
+IF property: status, op: exactly, value: archived
 THEN set property: tags [REMOVE] draft, wip
 ```
 Result: Removes "draft" and "wip" tags if they exist.
 
-**Overwrite property value:**
+**Overwrite property value (exact match):**
 ```
-IF property: status, op: contains, value: old
+IF property: status, op: exactly, value: old
 THEN set property: status [OVERWRITE] new
 ```
 Result: Replaces the entire "status" property with "new", removing any previous values.
 
-**Delete a property:**
+**Delete a property (exact match):**
 ```
-IF property: tags, op: contains, value: deprecated
+IF property: tags, op: exactly, value: deprecated
 THEN set property: old_tags [DELETE PROPERTY]
 ```
 Result: Completely removes the "old_tags" property from the frontmatter.
 
-**Combine ADD and REMOVE:**
+**Combine ADD and REMOVE (exact match):**
 ```
-IF property: tags, op: contains, value: old-project
+IF property: tags, op: exactly, value: old-project
 THEN set properties:
   - tags [REMOVE] old-project, legacy
   - tags [ADD] new-project, active
@@ -139,12 +139,19 @@ THEN set properties:
 ```
 Result: Removes old tags, adds new ones, and sets status.
 
+**Substring containment:**
+```
+IF property: name, op: contains, value: iago
+THEN set property: tags [ADD] review
+```
+Result: Matches any value where the normalized text contains "iago" (e.g. `"[[Diago Silva]]"`).
+
 ## Rules
 
 Each rule has:
-- `ifProp`: source property name
-- `op`: operator (`contains`, `notContains`)
-- `ifValue`: value to test
+- `ifProp`: source property name (ignored for heading-based rules)
+- `op`: operator (`exactly`, `contains`, `notContains`)
+- `ifValue`: value to test (substring for `contains`/`notContains`)
 - `thenActions`: array of actions to execute, each with `prop`, `value`, and `action` (add/remove/overwrite/delete)
 
 ### Examples
@@ -157,7 +164,7 @@ related_people: ["[[steve_works]]", "[[John Doe]]"]
 ```
 Rule:
 ```
-IF property: related_people, op: contains, value: [[steve_works]]
+IF property: related_people, op: exactly, value: [[steve_works]]
 THEN set property: related_people to [[Steve Jobs]]
 ```
 Result:
@@ -169,7 +176,7 @@ related_people: ["[[Steve Jobs]]", "[[John Doe]]"]
 
 2) Set a status if a tag contains a keyword
 ```
-IF property: tags, op: contains, value: meeting
+IF property: tags, op: exactly, value: meeting
 THEN set property: status to processed
 ```
 
@@ -181,7 +188,7 @@ THEN set property: verified to true
 
 4) Set multiple properties when a condition is met (NEW!)
 ```
-IF property: tags, op: contains, value: meeting
+IF property: tags, op: exactly, value: meeting
 THEN set properties:
   - status to processed
   - priority to high
@@ -189,7 +196,7 @@ THEN set properties:
 
 5) Update multiple related properties
 ```
-IF property: project_status, op: contains, value: completed
+IF property: project_status, op: exactly, value: completed
 THEN set properties:
   - "status to done
   - "priority to low
@@ -198,7 +205,7 @@ THEN set properties:
 
 6) Set multiple tags at once
 ```
-IF property: type, op: contains, value: note
+IF property: type, op: exactly, value: note
 THEN set properties:
   - tags to work, apple, important
 ```
@@ -213,7 +220,7 @@ THEN set properties:
 
 ## Limitations
   - Only frontmatter is modified
-  - Operators limited to containment (`contains`, `notContains`)
+  - Operators available: `exactly`, `contains`, `notContains`
   - No folder/tag scoping yet
 
 ## Roadmap

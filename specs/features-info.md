@@ -9,7 +9,7 @@ The Conditional Properties plugin for Obsidian provides automated frontmatter pr
 ### 1. Rule-Based Property Automation
 - **IF/THEN Logic**: Define conditional rules that trigger property modifications
 - **Multiple Conditions**: Support for property-based and title-based conditions
-- **Flexible Operators**: `contains` and `notContains` operations with normalization
+- **Flexible Operators**: `exactly`, `contains`, and `notContains` operations with normalization
 - **Persistent Storage**: Rules saved in plugin settings (JSON format)
 
 ### 2. Property Action Types
@@ -48,7 +48,7 @@ The Conditional Properties plugin for Obsidian provides automated frontmatter pr
 
 #### Property-Based Conditions
 - **Target**: Frontmatter property values
-- **Operators**: `contains`, `notContains`
+- **Operators**: `exactly`, `contains`, `notContains`
 - **Normalization**: Wiki link syntax handling (`[[link]]` → `link`)
 - **Case Handling**: Case-insensitive matching
 
@@ -125,7 +125,7 @@ The Conditional Properties plugin for Obsidian provides automated frontmatter pr
   ifType: "PROPERTY" | "FIRST_LEVEL_HEADING",
   ifProp: "property_name", // for PROPERTY type
   ifValue: "expected_value",
-  op: "contains" | "notContains",
+  op: "exactly" | "contains" | "notContains",
   thenActions: [
     {
       prop: "target_property", // not used for REPLACE action

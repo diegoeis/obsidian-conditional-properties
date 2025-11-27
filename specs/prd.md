@@ -239,4 +239,3 @@ The Conditional Properties plugin provides a rule-based system for automatically
 **Document Version**: 1.0
 **Last Updated**: October 2025
 **Status**: Complete
-**Next Review**: January 2026

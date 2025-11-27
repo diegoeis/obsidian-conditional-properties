@@ -9,7 +9,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 				scanIntervalMinutes: 5,
 				lastRun: null,
 				scanScope: "latestCreated",
-				scanCount: 15
+				scanCount: 15,
+				operatorMigrationVersion: 0
 			}, settings);
 
 			this._migrateRules();
@@ -50,14 +51,39 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	_migrateRules() {
+		if (!this.settings) return;
+		const migrationVersion = this.settings.operatorMigrationVersion || 0;
+		if (migrationVersion >= 2) return;
+
 		let hasChanges = false;
-		this.settings.rules = this.settings.rules.map(rule => {
+		const ensureRuleArray = Array.isArray(this.settings.rules) ? this.settings.rules : [];
+		const convertLegacyOperator = (op) => {
+			if (!op || op === "contains") {
+				if (op !== "exactly") hasChanges = true;
+				return "exactly";
+			}
+			if (op === "notContains") {
+				hasChanges = true;
+				return "notContains";
+			}
+			return op;
+		};
+		const removeNotExactly = (op) => {
+			if (op === "notExactly") {
+				hasChanges = true;
+				return "notContains";
+			}
+			return op;
+		};
+
+		this.settings.rules = ensureRuleArray.map(rule => {
+			let migratedRule = rule;
 			if (rule.thenProp !== undefined || rule.thenValue !== undefined) {
-				const migratedRule = {
+				migratedRule = {
 					ifType: "PROPERTY",
 					ifProp: rule.ifProp || "",
 					ifValue: rule.ifValue || "",
-					op: rule.op || "contains",
+					op: removeNotExactly(convertLegacyOperator(rule.op)),
 					thenActions: []
 				};
 				if (rule.thenProp) {
@@ -68,19 +94,38 @@ class ConditionalPropertiesPlugin extends Plugin {
 					});
 				}
 				hasChanges = true;
-				return migratedRule;
+			} else {
+				if (rule.ifType === "TITLE" || rule.ifType === "HEADING_FIRST_LEVEL") {
+					migratedRule = { ...migratedRule, ifType: "FIRST_LEVEL_HEADING" };
+					hasChanges = true;
+				} else if (rule.ifType === undefined) {
+					migratedRule = { ...migratedRule, ifType: "PROPERTY" };
+					hasChanges = true;
+				}
+				const updatedOp = removeNotExactly(convertLegacyOperator(migratedRule.op));
+				if (updatedOp !== migratedRule.op) {
+					migratedRule = { ...migratedRule, op: updatedOp };
+				}
+				if (Array.isArray(migratedRule.ifConditions)) {
+					const convertedConditions = migratedRule.ifConditions.map(condition => {
+						if (!condition) return condition;
+						const nextOp = removeNotExactly(convertLegacyOperator(condition.op));
+						if (nextOp !== condition.op) {
+							hasChanges = true;
+							return { ...condition, op: nextOp };
+						}
+						return condition;
+					});
+					if (convertedConditions !== migratedRule.ifConditions) {
+						migratedRule = { ...migratedRule, ifConditions: convertedConditions };
+					}
+				}
 			}
-			if (rule.ifType === "TITLE" || rule.ifType === "HEADING_FIRST_LEVEL") {
-				rule.ifType = "FIRST_LEVEL_HEADING";
-				hasChanges = true;
-			}
-			if (rule.ifType === undefined) {
-				rule.ifType = "PROPERTY";
-				hasChanges = true;
-			}
-			return rule;
+			return migratedRule;
 		});
-		if (hasChanges) {
+
+		this.settings.operatorMigrationVersion = 2;
+		if (hasChanges || migrationVersion !== 2) {
 			this.saveData(this.settings);
 		}
 	}
@@ -153,7 +198,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 		const newFm = { ...currentFrontmatter };
 		for (const rule of rules) {
 			const { ifType, ifProp, ifValue, thenActions } = rule || {};
-			const op = (rule?.op || "contains");
+			const op = (rule?.op || "exactly"); // Default operator for new rules
 			if (!Array.isArray(thenActions) || thenActions.length === 0) continue;
 
 			let sourceValue;
@@ -254,50 +299,47 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	_matchesCondition(source, expected, op, ifType) {
+		const normalizedExpected = this._normalizeValue(expected);
+		const evaluate = (value) => {
+			const normalizedSource = this._normalizeValue(value);
+			switch (op) {
+				case "exactly":
+					return normalizedSource === normalizedExpected;
+				case "contains":
+					if (normalizedExpected === "") return false;
+					return normalizedSource.includes(normalizedExpected);
+				case "notContains":
+					if (normalizedExpected === "") return true;
+					return !normalizedSource.includes(normalizedExpected);
+				default:
+					return false;
+			}
+		};
 		if (Array.isArray(source)) {
-			const has = source.some(v => this._valueMatches(v, expected));
-			if (op === "contains") return has;
-			if (op === "notContains") return !has;
-			return false;
+			if (op === "notContains") {
+				return source.every(item => evaluate(item));
+			}
+			return source.some(item => evaluate(item));
 		}
-		const s = source == null ? "" : String(source);
-		const e = expected == null ? "" : String(expected);
-		if (ifType === "FIRST_LEVEL_HEADING") {
-			if (op === "contains") return s.includes(e);
-			if (op === "notContains") return !s.includes(e);
-		} else {
-			if (op === "contains") return this._valueMatches(s, e);
-			if (op === "notContains") return !this._valueMatches(s, e);
+		return evaluate(source == null ? "" : source);
+	}
+
+	_normalizeValue(value) {
+		const strValue = String(value ?? "");
+		let normalized = strValue.replace(/\[\[([^\]]+)\]\]/g, "$1");
+		if (normalized.startsWith('"') && normalized.endsWith('"') && normalized.length > 1) {
+			normalized = normalized.slice(1, -1);
 		}
-		return false;
+		return normalized.trim();
 	}
 
 	_valueMatches(source, expected) {
-		// Convert both to strings for comparison
-		const sourceStr = String(source || '');
-		const expectedStr = String(expected || '');
-
-		// For arrays, check if any item matches
 		if (Array.isArray(source)) {
 			return source.some(item => this._valueMatches(item, expected));
 		}
-
-		// Normalize: remove wiki links [[ ]] and quotes " " for comparison purposes only
-		const normalize = (str) => {
-			// Remove wiki link brackets [[ ]]
-			let normalized = str.replace(/\[\[([^\]]+)\]\]/g, '$1');
-			// Remove surrounding quotes if they wrap the entire string
-			if (normalized.startsWith('"') && normalized.endsWith('"')) {
-				normalized = normalized.slice(1, -1);
-			}
-			return normalized.trim();
-		};
-
-		const normalizedSource = normalize(sourceStr);
-		const normalizedExpected = normalize(expectedStr);
-
-		console.log(`Comparing "${sourceStr}" (normalized: "${normalizedSource}") with "${expectedStr}" (normalized: "${normalizedExpected}")`);
-
+		const normalizedSource = this._normalizeValue(source);
+		const normalizedExpected = this._normalizeValue(expected);
+		console.log(`Comparing "${String(source || '')}" (normalized: "${normalizedSource}") with "${String(expected || '')}" (normalized: "${normalizedExpected}")`);
 		return normalizedSource === normalizedExpected;
 	}
 
@@ -446,7 +488,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const addWrap = containerEl.createEl("div", { cls: "conditional-add-wrap" });
 		const addBtn = addWrap.createEl("button", { text: "+ Add rule", cls: "eis-btn" });
 		addBtn.onclick = async () => {
-			this.plugin.settings.rules.push({ ifType: "PROPERTY", ifProp: "", ifValue: "", op: "contains", thenActions: [{ prop: "", value: "", action: "add" }] });
+			this.plugin.settings.rules.push({ ifType: "PROPERTY", ifProp: "", ifValue: "", op: "exactly", thenActions: [{ prop: "", value: "", action: "add" }] });
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
 		};
@@ -481,31 +523,39 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		if (rule.ifType === "FIRST_LEVEL_HEADING") {
 			// For TITLE: show operator and value (check is done during execution)
 			line1.addDropdown(d => {
-				const current = rule.op || "contains";
-				d.addOption("contains", "contains");
-				d.addOption("notContains", "notContains");
-				d.setValue(current);
-				d.onChange(async (v) => { rule.op = v; await this.plugin.saveData(this.plugin.settings); });
+				this._configureOperatorDropdown(d, rule.op || "exactly", async (value) => {
+					rule.op = value;
+					await this.plugin.saveData(this.plugin.settings);
+				});
 			});
 			line1.addText(t => t
 				.setPlaceholder("heading text")
 				.setValue(rule.ifValue || "")
-				.onChange(async (v) => { rule.ifValue = v; await this.plugin.saveData(this.plugin.settings); }));
+				.onChange(async (v) => {
+					rule.ifValue = v;
+					await this.plugin.saveData(this.plugin.settings);
+				}));
 		} else {
 			line1.addText(t => t
 				.setPlaceholder("property")
 				.setValue(rule.ifProp || "")
-				.onChange(async (v) => { rule.ifProp = v; await this.plugin.saveData(this.plugin.settings); }));
+				.onChange(async (v) => {
+					rule.ifProp = v;
+					await this.plugin.saveData(this.plugin.settings);
+				}));
 			line1.addDropdown(d => {
-				d.addOption("contains", "contains");
-				d.addOption("notContains", "notContains");
-				d.setValue(rule.op || "contains");
-				d.onChange(async (v) => { rule.op = v; await this.plugin.saveData(this.plugin.settings); });
+				this._configureOperatorDropdown(d, rule.op || "exactly", async (value) => {
+					rule.op = value;
+					await this.plugin.saveData(this.plugin.settings);
+				});
 			});
 			line1.addText(t => t
 				.setPlaceholder("value")
 				.setValue(rule.ifValue || "")
-				.onChange(async (v) => { rule.ifValue = v; await this.plugin.saveData(this.plugin.settings); }));
+				.onChange(async (v) => {
+					rule.ifValue = v;
+					await this.plugin.saveData(this.plugin.settings);
+				}));
 		}
 
 		const thenHeader = wrap.createEl("div", { cls: "conditional-rules-header" });
@@ -546,6 +596,22 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
 		}, true);
+	}
+
+	_configureOperatorDropdown(dropdown, currentValue, onChange) {
+		const options = [
+			{ value: "exactly", label: "exactly match" },
+			{ value: "contains", label: "contains" },
+			{ value: "notContains", label: "does not contain" }
+		];
+		options.forEach(({ value, label }) => dropdown.addOption(value, label));
+		const fallback = options.some(option => option.value === currentValue) ? currentValue : "exactly";
+		dropdown.setValue(fallback);
+		dropdown.onChange(async (value) => {
+			if (typeof onChange === "function") {
+				await onChange(value);
+			}
+		});
 	}
 
 	_renderThenAction(containerEl, rule, action, actionIdx, ruleIdx) {
