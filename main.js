@@ -420,6 +420,66 @@ class ConditionalPropertiesPlugin extends Plugin {
 
 class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	constructor(app, plugin) { super(app, plugin); this.plugin = plugin; }
+
+	async exportSettings() {
+		try {
+			const settings = JSON.stringify(this.plugin.settings, null, 2);
+			const blob = new Blob([settings], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `conditional-properties-settings-${new Date().toISOString().split('T')[0]}.json`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+			new Notice('Settings exported successfully!');
+		} catch (error) {
+			console.error('Error exporting settings:', error);
+			new Notice('Failed to export settings: ' + error.message, 5000);
+		}
+	}
+
+	async importSettings(file) {
+		try {
+			const reader = new FileReader();
+			reader.onload = async (e) => {
+				try {
+					const settings = JSON.parse(e.target.result);
+					// Validate the imported settings
+					if (!settings || typeof settings !== 'object') {
+						throw new Error('Invalid settings format');
+					}
+
+					// Merge with default settings to ensure all required fields are present
+					this.plugin.settings = {
+						rules: [],
+						scanIntervalMinutes: 5,
+						lastRun: null,
+						scanScope: "latestCreated",
+						scanCount: 15,
+						operatorMigrationVersion: 2,
+						...settings
+					};
+
+					await this.plugin.saveData(this.plugin.settings);
+					new Notice('Settings imported successfully! The plugin will now reload.');
+					this.display();
+				} catch (parseError) {
+					console.error('Error parsing settings file:', parseError);
+					new Notice('Failed to parse settings file. Please check the file format.', 5000);
+				}
+			};
+			reader.onerror = () => {
+				new Notice('Error reading file', 5000);
+			};
+			reader.readAsText(file);
+		} catch (error) {
+			console.error('Error importing settings:', error);
+			new Notice('Failed to import settings: ' + error.message, 5000);
+		}
+	}
+
 	display() {
 		const { containerEl } = this;
 		containerEl.empty();
@@ -467,6 +527,39 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 						await this.plugin.saveData(this.plugin.settings);
 					}));
 		}
+
+		// Backup & Restore Settings
+		const backupSettings = new Setting(containerEl)
+			.setName("Backup & Restore")
+			.setDesc("Export your current settings or import from a backup file");
+
+		backupSettings.addButton(btn => {
+			btn.setButtonText("Export Settings")
+				.setCta()
+				.onClick(() => this.exportSettings());
+		});
+
+		const importInput = document.createElement('input');
+		importInput.type = 'file';
+		importInput.accept = '.json';
+		importInput.style.display = 'none';
+		importInput.addEventListener('change', (e) => {
+			const file = e.target.files[0];
+			if (file) {
+				this.importSettings(file);
+			}
+			// Reset the input to allow importing the same file again
+			importInput.value = '';
+		});
+
+		backupSettings.addButton(btn => {
+			btn.setButtonText("Import Settings")
+				.setWarning()
+				.buttonEl.classList.add("eis-btn-border")
+				.onClick(() => importInput.click());
+		});
+
+		containerEl.appendChild(importInput);
 
 		const runNow = new Setting(containerEl)
 			.setName("Run now")
