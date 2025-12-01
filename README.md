@@ -11,7 +11,8 @@ My Granola meeting notes imports weren’t bringing the same name values as my p
 ## Features
 
 - Define multiple rules with a simple IF/THEN model
-- Operators: `exactly`, `contains`, `notContains`
+- **Property Existence Check**: Check if a property exists or not in the frontmatter
+- **Operators**: `exactly`, `contains`, `notContains`, `exists`, `notExists`
 - **Multiple THEN actions per rule**: Set multiple properties in a single rule
 - **Comma-separated values**: Set multiple values for a property (e.g., "work, apple" → properly formatted YAML array)
 - **ADD/REMOVE actions**: Choose to ADD values to a property or REMOVE specific values
@@ -41,6 +42,27 @@ My Granola meeting notes imports weren’t bringing the same name values as my p
 2. In Obsidian, go to Settings → Community Plugins → toggle this plugin.
 
 This repository ships the compiled `main.js`. No build step is required for testing.
+
+## Operators
+
+### Property Operators
+- **exactly**: Checks if the property value exactly matches the specified value
+- **contains**: Checks if the property value contains the specified text
+- **notContains**: Checks if the property value does not contain the specified text
+- **exists**: Checks if the property exists in the frontmatter (ignores the value field)
+- **notExists**: Checks if the property does not exist in the frontmatter (ignores the value field)
+
+### Example: Using exists/notExists
+
+```yaml
+# Rule: If 'status' property exists
+IF: status exists
+THEN: set priority to 'high'
+
+# Rule: If 'reviewed' property does not exist
+IF: reviewed notExists
+THEN: set needs_review to true
+```
 
 ## Usage
 
