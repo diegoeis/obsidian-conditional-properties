@@ -192,10 +192,15 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	async applyRulesToFrontmatter(file, currentFrontmatter, rulesOverride) {
-		const rules = Array.isArray(rulesOverride) ? rulesOverride : this.settings.rules;
-		if (!Array.isArray(rules) || rules.length === 0) return false;
+		const rules = rulesOverride || this.settings.rules || [];
+		if (!rules.length) return false;
+
+		// Create a copy to avoid modifying the original
+		const newFm = { ...(currentFrontmatter || {}) };
 		let changed = false;
-		const newFm = { ...currentFrontmatter };
+		let titleChanged = false;
+		let newTitle = null;
+
 		for (const rule of rules) {
 			const { ifType, ifProp, ifValue, thenActions } = rule || {};
 			const op = (rule?.op || "exactly"); // Default operator for new rules
@@ -207,7 +212,6 @@ class ConditionalPropertiesPlugin extends Plugin {
 				// If no title available, show error message and skip rule
 				if (sourceValue === null) {
 					console.log(`No title available for file "${file.basename}". Rule skipped.`);
-					// TODO: Show user message in UI if this rule is being configured
 					continue;
 				}
 			} else {
@@ -218,11 +222,41 @@ class ConditionalPropertiesPlugin extends Plugin {
 			const match = this._matchesCondition(sourceValue, ifValue, op, ifType);
 			if (!match) continue;
 
-			// Process THEN actions (simplified for brevity)
+			// Process THEN actions
 			for (const action of thenActions) {
-				const { prop, value, action: actionType } = action || {};
+				const { type = 'property', prop, value, action: actionType, modificationType, text } = action || {};
+				
+				// Handle title modification
+				if (type === 'title' && text) {
+					try {
+						const currentTitle = await this._getNoteTitle(file);
+						if (currentTitle === null) {
+							console.log(`No title available for modification in file "${file.basename}"`);
+							continue;
+						}
+
+						// Format the text with any date placeholders
+						const formattedText = await this._formatTitle(text, file);
+						
+						// Apply prefix or suffix
+						if (modificationType === 'prefix') {
+							newTitle = formattedText + currentTitle;
+						} else {
+							newTitle = currentTitle + formattedText;
+						}
+						
+						titleChanged = true;
+						console.log(`Title changed to: ${newTitle}`);
+					} catch (e) {
+						console.error(`Error modifying title for file ${file.path}:`, e);
+					}
+					continue;
+				}
+
+				// Handle property modifications (original functionality)
 				if (!prop) continue;
 				console.log(`Processing THEN action: prop="${prop}", value="${value}", actionType="${actionType}"`);
+				
 				if (actionType === "add") {
 					// Handle adding to arrays or creating new properties
 					if (Array.isArray(newFm[prop])) {
@@ -292,10 +326,42 @@ class ConditionalPropertiesPlugin extends Plugin {
 				}
 			}
 		}
-		if (!changed) return false;
-		console.log(`✓ MODIFIED NOTE: "${file.basename}" (${file.path})`);
-		await this._writeFrontmatter(file, newFm);
-		return true;
+
+		// Save changes if any
+		if (changed || titleChanged) {
+			console.log(`✓ MODIFIED NOTE: "${file.basename}" (${file.path})`);
+			if (titleChanged) {
+				// Update the title in the file content
+				await this._updateNoteTitle(file, newTitle);
+			}
+			if (changed) {
+				await this._writeFrontmatter(file, newFm);
+			}
+			return true;
+		}
+		
+		return false;
+	}
+
+	async _formatTitle(text, file) {
+		// Handle date formatting
+		const formatDate = (format) => {
+			try {
+				// Use Obsidian's built-in date format if no specific format provided
+				if (!format) {
+					return window.moment().format(this.app.vault.config.dateFormat || 'YYYY-MM-DD');
+				}
+				return window.moment().format(format);
+			} catch (e) {
+				console.error("Error formatting date:", e);
+				return "[date-format-error]";
+			}
+		};
+
+		// Replace {date} and {date:FORMAT} placeholders
+		return text.replace(/\{date(?::([^}]+))?\}/g, (match, format) => {
+			return formatDate(format);
+		});
 	}
 
 	_matchesCondition(source, expected, op, ifType) {
@@ -395,6 +461,33 @@ class ConditionalPropertiesPlugin extends Plugin {
 		
 		// No title available
 		return null;
+	}
+
+	async _updateNoteTitle(file, newTitle) {
+		let content = await this.app.vault.read(file);
+		
+		// Find the first heading (h1) in the content
+		const headingMatch = content.match(/^#\s+(.+)$/m);
+		
+		if (headingMatch) {
+			// Replace the existing heading
+			content = content.replace(/^#\s+.+$/m, `# ${newTitle}`);
+		} else {
+			// If no heading exists, add one at the top (after YAML if it exists)
+			if (content.startsWith('---\n')) {
+				const yamlEnd = content.indexOf('\n---\n', 4);
+				if (yamlEnd !== -1) {
+					const yaml = content.substring(0, yamlEnd + 5);
+					const rest = content.substring(yamlEnd + 5).trim();
+					content = `${yaml}\n# ${newTitle}\n\n${rest}`.trim() + '\n';
+				}
+			} else {
+				// No YAML, just add the heading at the top
+				content = `# ${newTitle}\n\n${content}`.trim() + '\n';
+			}
+		}
+		
+		await this.app.vault.modify(file, content);
 	}
 
 	async _writeFrontmatter(file, newFrontmatter) {
@@ -695,11 +788,16 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		});
 
 		const actions = wrap.createEl("div", { cls: "conditional-actions" });
-		const addActionBtn = actions.createEl("button", { text: "+ Add property", cls: "eis-btn conditional-add-action" });
+		const addActionBtn = actions.createEl("button", { text: "+ Add action", cls: "eis-btn conditional-add-action" });
 		addActionBtn.addEventListener("click", async (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			rule.thenActions.push({ prop: "", value: "", action: "add" });
+			rule.thenActions.push({ 
+				type: "property",
+				prop: "", 
+				value: "", 
+				action: "add" 
+			});
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
 		}, true);
@@ -745,8 +843,13 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 	_renderThenAction(containerEl, rule, action, actionIdx, ruleIdx) {
 		const actionWrap = containerEl.createEl("div", { cls: "conditional-then-action" });
-		const actionSetting = new Setting(actionWrap).setName(`Property ${actionIdx + 1}`);
-		if (!action.action) {
+		const actionSetting = new Setting(actionWrap).setName(`Action ${actionIdx + 1}`);
+		
+		// Initialize action type if not set
+		if (!action.type) {
+			action.type = "property";
+		}
+		if (!action.action && action.type === "property") {
 			action.action = "add";
 		}
 
@@ -770,31 +873,70 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			settingItem.appendChild(removeActionBtn);
 		}
 
-		actionSetting.addText(t => t
-			.setPlaceholder("property name")
-			.setValue(action.prop || "")
-			.onChange(async (v) => {
-				action.prop = v;
-				await this.plugin.saveData(this.plugin.settings);
-			}));
+		// Action type selector (Title or Property)
 		actionSetting.addDropdown(d => {
-			d.addOption("add", "ADD VALUE");
-			d.addOption("remove", "REMOVE VALUE");
-			d.addOption("overwrite", "OVERWRITE ALL VALUES WITH");
-			d.addOption("delete", "DELETE PROPERTY");
-			d.setValue(action.action || "add");
+			d.addOption("property", "Change Property");
+			d.addOption("title", "Change Title");
+			d.setValue(action.type || "property");
 			d.onChange(async (v) => {
-				action.action = v;
+				action.type = v;
+				if (v === "title") {
+					action.action = "modify";
+				}
 				await this.plugin.saveData(this.plugin.settings);
 				this.display();
 			});
 		});
-		if (action.action !== "delete") {
+
+		if (action.type === "property") {
+			// Property modification controls
 			actionSetting.addText(t => t
-				.setPlaceholder("value (use commas to separate multiple values)")
-				.setValue(action.value || "")
+				.setPlaceholder("property name")
+				.setValue(action.prop || "")
 				.onChange(async (v) => {
-					action.value = v;
+					action.prop = v;
+					await this.plugin.saveData(this.plugin.settings);
+				}));
+
+			actionSetting.addDropdown(d => {
+				d.addOption("add", "ADD VALUE");
+				d.addOption("remove", "REMOVE VALUE");
+				d.addOption("overwrite", "OVERWRITE ALL VALUES WITH");
+				d.addOption("delete", "DELETE PROPERTY");
+				d.setValue(action.action || "add");
+				d.onChange(async (v) => {
+					action.action = v;
+					await this.plugin.saveData(this.plugin.settings);
+					this.display();
+				});
+			});
+
+			if (action.action !== "delete") {
+				actionSetting.addText(t => t
+					.setPlaceholder("value (use commas to separate multiple values)")
+					.setValue(action.value || "")
+					.onChange(async (v) => {
+						action.value = v;
+						await this.plugin.saveData(this.plugin.settings);
+					}));
+			}
+		} else {
+			// Title modification controls
+			actionSetting.addDropdown(d => {
+				d.addOption("prefix", "Add prefix");
+				d.addOption("suffix", "Add suffix");
+				d.setValue(action.modificationType || "prefix");
+				d.onChange(async (v) => {
+					action.modificationType = v;
+					await this.plugin.saveData(this.plugin.settings);
+				});
+			});
+
+			actionSetting.addText(t => t
+				.setPlaceholder("Text to add (use {date} or {date:FORMAT} for dates)")
+				.setValue(action.text || "")
+				.onChange(async (v) => {
+					action.text = v;
 					await this.plugin.saveData(this.plugin.settings);
 				}));
 		}
