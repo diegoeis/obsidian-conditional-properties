@@ -64,9 +64,11 @@ Choose which notes the plugin will scan when running rules:
 
 The scan scope can be configured in Settings → Conditional Properties → "Scan Scope".
 
-## ADD/REMOVE Actions
+## Action Types
 
-When setting properties in THEN actions, you can now choose between two modes:
+### Property Actions
+
+When setting properties in THEN actions, you can choose between different modes:
 
 ### ADD (Default)
 - Adds the specified values to the property
@@ -92,12 +94,32 @@ When setting properties in THEN actions, you can now choose between two modes:
 - Warning: This action is irreversible and will permanently delete the property
 - No value field is required, as nothing is being set
 
-### How to use
+### How to use Property Actions
 In the rules editor, each THEN action has a dropdown between the property name and value field:
 - Select **ADD** to add values (default behavior)
 - Select **REMOVE** to remove values
 - Select **OVERWRITE** to replace the entire property value
 - Select **DELETE PROPERTY** to remove the property entirely
+
+### Title Modification Actions
+
+You can now modify note titles based on conditions. When adding a new action, select **Change Title** from the action type dropdown.
+
+#### Features:
+- **Add prefix**: Add text at the beginning of the title
+- **Add suffix**: Add text at the end of the title
+- **Date formatting**: Use `{date}` for default date format or `{date:FORMAT}` for custom formats (e.g., `{date:DD-MM-YYYY}`)
+
+#### How to use:
+1. In the rules editor, click "+ Add action"
+2. Select "Change Title" from the action type dropdown
+3. Choose between "Add prefix" or "Add suffix"
+4. Enter the text to add (use `{date}` or `{date:FORMAT}` for dynamic dates)
+
+#### Examples:
+- Add today's date as a prefix: `{date} - `
+- Add a custom formatted date as a suffix: ` - {date:DD/MM/YYYY}`
+- Add a fixed prefix: `[ARCHIVED] `
 
 ### Examples
 
