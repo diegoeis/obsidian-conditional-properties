@@ -47,6 +47,35 @@ button.eis-btn-red:not(.clickable-icon),
 	color: var(--red-color) !important;
 }
 
+/* Estilo para campos de entrada desabilitados */
+.disabled-input {
+    opacity: 0.5;
+    background-color: var(--background-modifier-form-field);
+    cursor: not-allowed;
+}
+
+/* Melhora a aparência do tooltip */
+[title] {
+    position: relative;
+}
+
+[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    background-color: var(--background-modifier-form-field);
+    color: var(--text-normal);
+    border-radius: 4px;
+    font-size: 0.8em;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-bottom: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
 .eis-btn-red.eis-btn-border {
 	color: var(--red-color) !important;
 }

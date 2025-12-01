@@ -365,6 +365,18 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	_matchesCondition(source, expected, op, ifType) {
+		// Para os operadores 'exists' e 'notExists', verificamos apenas a existência da propriedade
+		if (op === "exists") {
+			// Retorna true se a propriedade existir (não for undefined ou null)
+			return source !== undefined && source !== null;
+		}
+		
+		if (op === "notExists") {
+			// Retorna true se a propriedade não existir (for undefined ou null)
+			return source === undefined || source === null;
+		}
+
+		// Para os outros operadores, mantemos a lógica existente
 		const normalizedExpected = this._normalizeValue(expected);
 		const evaluate = (value) => {
 			const normalizedSource = this._normalizeValue(value);
@@ -758,26 +770,39 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					await this.plugin.saveData(this.plugin.settings);
 				}));
 		} else {
-			line1.addText(t => t
+			// Adiciona o campo de nome da propriedade
+			const propInput = line1.addText(t => t
 				.setPlaceholder("property")
 				.setValue(rule.ifProp || "")
 				.onChange(async (v) => {
 					rule.ifProp = v;
 					await this.plugin.saveData(this.plugin.settings);
 				}));
-			line1.addDropdown(d => {
+			
+			// Adiciona o dropdown de operadores
+			const dropdown = line1.addDropdown(d => {
 				this._configureOperatorDropdown(d, rule.op || "exactly", async (value) => {
 					rule.op = value;
+					// Se for 'exists' ou 'notExists', limpa o valor
+					if (value === 'exists' || value === 'notExists') {
+						rule.ifValue = '';
+					}
 					await this.plugin.saveData(this.plugin.settings);
+					// Recarrega a visualização para atualizar a interface
+					this.display();
 				});
 			});
-			line1.addText(t => t
-				.setPlaceholder("value")
-				.setValue(rule.ifValue || "")
-				.onChange(async (v) => {
-					rule.ifValue = v;
-					await this.plugin.saveData(this.plugin.settings);
-				}));
+			
+			// Adiciona o campo de valor apenas se não for 'exists' ou 'notExists'
+			if (rule.op !== 'exists' && rule.op !== 'notExists') {
+				line1.addText(t => t
+					.setPlaceholder("value")
+					.setValue(rule.ifValue || "")
+					.onChange(async (v) => {
+						rule.ifValue = v;
+						await this.plugin.saveData(this.plugin.settings);
+					}));
+			}
 		}
 
 		const thenHeader = wrap.createEl("div", { cls: "conditional-rules-header" });
@@ -829,7 +854,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const options = [
 			{ value: "exactly", label: "exactly match" },
 			{ value: "contains", label: "contains" },
-			{ value: "notContains", label: "does not contain" }
+			{ value: "notContains", label: "does not contain" },
+			{ value: "exists", label: "exists" },
+			{ value: "notExists", label: "does not exist" }
 		];
 		options.forEach(({ value, label }) => dropdown.addOption(value, label));
 		const fallback = options.some(option => option.value === currentValue) ? currentValue : "exactly";
@@ -840,6 +867,28 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			}
 		});
 	}
+	
+     // Atualiza o estado do campo de valor com base no operador selecionado
+    _updateValueInputState(inputEl, operator) {
+        // Verifica se o elemento de entrada é válido
+        if (!inputEl) return;
+
+        try {
+            // Desabilita o campo de valor se o operador for 'exists' ou 'notExists'
+            const isDisabled = operator === 'exists' || operator === 'notExists';
+            inputEl.disabled = isDisabled;
+            
+            if (isDisabled) {
+                inputEl.setAttribute('title', 'This field is not needed for the selected operator');
+                inputEl.classList.add('disabled-input');
+            } else {
+                inputEl.removeAttribute('title');
+                inputEl.classList.remove('disabled-input');
+            }
+        } catch (error) {
+            console.error('Erro ao atualizar estado do campo de valor:', error);
+        }
+    }
 
 	_renderThenAction(containerEl, rule, action, actionIdx, ruleIdx) {
 		const actionWrap = containerEl.createEl("div", { cls: "conditional-then-action" });
