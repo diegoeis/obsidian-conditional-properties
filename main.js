@@ -238,12 +238,20 @@ class ConditionalPropertiesPlugin extends Plugin {
 						// Format the text with any date placeholders
 						const formattedText = await this._formatTitle(text, file);
 						
-						// Apply prefix or suffix
-						if (modificationType === 'prefix') {
-							newTitle = formattedText + currentTitle;
-						} else {
-							newTitle = currentTitle + formattedText;
+						// Check if the title already has this modification
+						const alreadyHasModification = modificationType === 'prefix' 
+							? currentTitle.startsWith(formattedText)
+							: currentTitle.endsWith(formattedText);
+						
+						if (alreadyHasModification) {
+							console.log(`Title already has the ${modificationType}: "${currentTitle}"`);
+							continue; // Skip to next action as the modification is already applied
 						}
+
+						// Apply prefix or suffix
+						newTitle = modificationType === 'prefix' 
+							? formattedText + currentTitle 
+							: currentTitle + formattedText;
 						
 						titleChanged = true;
 						console.log(`Title changed to: ${newTitle}`);
@@ -344,14 +352,28 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	async _formatTitle(text, file) {
+		// Get file creation date or use current date as fallback
+		const getMomentDate = () => {
+			try {
+				// Try to get file creation date, fallback to current date
+				return file && file.stat && file.stat.ctime 
+					? window.moment(file.stat.ctime) 
+					: window.moment();
+			} catch (e) {
+				console.error("Error getting file creation date:", e);
+				return window.moment();
+			}
+		};
+
 		// Handle date formatting
 		const formatDate = (format) => {
 			try {
+				const momentDate = getMomentDate();
 				// Use Obsidian's built-in date format if no specific format provided
 				if (!format) {
-					return window.moment().format(this.app.vault.config.dateFormat || 'YYYY-MM-DD');
+					return momentDate.format(this.app.vault.config.dateFormat || 'YYYY-MM-DD');
 				}
-				return window.moment().format(format);
+				return momentDate.format(format);
 			} catch (e) {
 				console.error("Error formatting date:", e);
 				return "[date-format-error]";
@@ -359,6 +381,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 		};
 
 		// Replace {date} and {date:FORMAT} placeholders
+		// Keep the exact formatting the user typed, just replace the {date} part
 		return text.replace(/\{date(?::([^}]+))?\}/g, (match, format) => {
 			return formatDate(format);
 		});
