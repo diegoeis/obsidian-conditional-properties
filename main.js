@@ -236,7 +236,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 						}
 
 						// Format the text with any date placeholders
-						const formattedText = await this._formatTitle(text, file);
+						const formattedText = this._formatText(text, file);
 						
 						// Check if the title already has this modification
 						const alreadyHasModification = modificationType === 'prefix' 
@@ -265,11 +265,14 @@ class ConditionalPropertiesPlugin extends Plugin {
 				if (!prop) continue;
 				console.log(`Processing THEN action: prop="${prop}", value="${value}", actionType="${actionType}"`);
 				
+				// Process any date placeholders in the value
+				const processedValue = this._formatText(value, file);
+				
 				if (actionType === "add") {
 					// Handle adding to arrays or creating new properties
 					if (Array.isArray(newFm[prop])) {
 						// If it's already an array, add unique values
-						const valuesToAdd = value.split(',').map(v => v.trim()).filter(v => v);
+						const valuesToAdd = processedValue.split(',').map(v => v.trim()).filter(v => v);
 						console.log(`Adding to existing array: ${valuesToAdd}`);
 						valuesToAdd.forEach(v => {
 							if (!newFm[prop].includes(v)) {
@@ -283,7 +286,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 					} else if (newFm[prop]) {
 						// Convert to array and add
 						const currentArray = Array.isArray(newFm[prop]) ? newFm[prop] : [newFm[prop]];
-						const valuesToAdd = value.split(',').map(v => v.trim()).filter(v => v);
+						const valuesToAdd = processedValue.split(',').map(v => v.trim()).filter(v => v);
 						console.log(`Converting to array and adding: ${valuesToAdd}`);
 						valuesToAdd.forEach(v => {
 							if (!currentArray.includes(v)) {
@@ -296,16 +299,16 @@ class ConditionalPropertiesPlugin extends Plugin {
 						});
 						newFm[prop] = currentArray.length === 1 ? currentArray[0] : currentArray;
 					} else {
-						// Create new property
-						newFm[prop] = value;
+						// Create new property with processed value
+						newFm[prop] = processedValue;
 						changed = true;
 						console.log(`Created new property ${prop} with value "${value}"`);
 					}
 				} else if (actionType === "overwrite") {
-					// Overwrite the entire property
-					newFm[prop] = value;
+					// Overwrite the entire property with processed value
+					newFm[prop] = processedValue;
 					changed = true;
-					console.log(`Overwritten ${prop} with "${value}"`);
+					console.log(`Overwritten ${prop} with "${processedValue}"`);
 				} else if (actionType === "remove") {
 					// Handle removing from arrays or properties
 					if (Array.isArray(newFm[prop])) {
@@ -351,7 +354,13 @@ class ConditionalPropertiesPlugin extends Plugin {
 		return false;
 	}
 
-	async _formatTitle(text, file) {
+	/**
+	 * Formats text by replacing {date} placeholders with the file's creation date
+	 * @param {string} text - The text containing placeholders
+	 * @param {TFile} file - The file to get creation date from
+	 * @returns {string} The formatted text with placeholders replaced
+	 */
+	_formatText(text, file) {
 		// Get file creation date or use current date as fallback
 		const getMomentDate = () => {
 			try {
