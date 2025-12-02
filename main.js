@@ -264,11 +264,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 				// Handle property modifications (original functionality)
 				if (!prop) continue;
 				console.log(`Processing THEN action: prop="${prop}", value="${value}", actionType="${actionType}"`);
-				
-				// Process any date placeholders in the value
-				const processedValue = this._formatText(value, file);
-				
-				if (actionType === "add") {
+								// Process any date placeholders in the value
+					const processedValue = this._formatText(value, file);
+					console.log(`[DEBUG] Processing action: prop="${prop}", actionType="${actionType}", value="${value}", processedValue="${processedValue}"`);
+
+					if (actionType === "add") {
 					// Handle adding to arrays or creating new properties
 					if (Array.isArray(newFm[prop])) {
 						// If it's already an array, add unique values
@@ -310,37 +310,69 @@ class ConditionalPropertiesPlugin extends Plugin {
 					changed = true;
 					console.log(`Overwritten ${prop} with "${processedValue}"`);
 				} else if (actionType === "remove") {
+					// Process any date placeholders in the value before removal
+					const processedValue = this._formatText(value, file);
+					
 					// Handle removing from arrays or properties
 					if (Array.isArray(newFm[prop])) {
-						const valuesToRemove = value.split(',').map(v => v.trim()).filter(v => v);
+						const valuesToRemove = processedValue.split(',').map(v => v.trim()).filter(v => v);
 						console.log(`Removing from array: ${valuesToRemove}`);
 						valuesToRemove.forEach(v => {
 							const initialLength = newFm[prop].length;
-							newFm[prop] = newFm[prop].filter(item => !this._valueEquals(item, v));
+							// Process each item in the array to handle date placeholders
+							const processedItem = this._formatText(v, file);
+							newFm[prop] = newFm[prop].filter(item => !this._valueEquals(item, processedItem));
 							if (newFm[prop].length < initialLength) {
 								changed = true;
-								console.log(`Removed "${v}" from ${prop}`);
+								console.log(`Removed "${processedItem}" from ${prop}`);
 							} else {
-								console.log(`"${v}" not found in ${prop}`);
+								console.log(`"${processedItem}" not found in ${prop}`);
 							}
 						});
 					} else if (newFm[prop]) {
-						// For non-arrays, check if it matches and remove
-						if (this._valueEquals(newFm[prop], value)) {
+						// For non-arrays, check if it matches (after processing date placeholders) and remove
+						if (this._valueEquals(newFm[prop], processedValue)) {
 							delete newFm[prop];
 							changed = true;
 							console.log(`Removed property ${prop}`);
 						} else {
-							console.log(`Value "${value}" not found in ${prop}`);
+							console.log(`Value "${processedValue}" not found in ${prop}`);
 						}
+					}
+				} else if (actionType === "delete") {
+					console.log(`[DEBUG] ====== INICIANDO AÇÃO DELETE PROPERTY ======`);
+					console.log(`[DEBUG] Propriedade a ser deletada: "${prop}"`);
+					console.log(`[DEBUG] Propriedades atuais no frontmatter:`, Object.keys(newFm));
+					
+					// Encontra o nome exato da propriedade (case insensitive)
+					const propToDelete = Object.keys(newFm).find(key => {
+						const match = key.toLowerCase() === prop.toLowerCase();
+						console.log(`[DEBUG] Comparando: "${key}" com "${prop}" - ${match ? 'MATCH' : 'não'}`);
+						return match;
+					});
+					
+					console.log(`[DEBUG] Propriedade encontrada para deletar:`, propToDelete);
+					
+					if (propToDelete) {
+					console.log(`[DEBUG] Deletando propriedade "${propToDelete}"`);
+					// Define como undefined para garantir que será removido no _writeFrontmatter
+					newFm[propToDelete] = undefined;
+					changed = true;
+					console.log(`[DEBUG] Propriedade "${propToDelete}" marcada para deleção`);
+					console.log(`[DEBUG] Propriedades após marcação para deleção:`, Object.keys(newFm).filter(k => newFm[k] !== undefined));
+					} else {
+						console.log(`[ERRO] Não foi possível encontrar a propriedade "${prop}" para deletar`);
+						console.log(`[DEBUG] Propriedades disponíveis:`, Object.keys(newFm));
 					}
 				}
 			}
 		}
 
 		// Save changes if any
+		console.log(`[DEBUG] Verificando alterações - changed: ${changed}, titleChanged: ${titleChanged}`);
 		if (changed || titleChanged) {
-			console.log(`✓ MODIFIED NOTE: "${file.basename}" (${file.path})`);
+			console.log(`[DEBUG] Salvando alterações no arquivo: "${file.basename}" (${file.path})`);
+			console.log(`[DEBUG] Novo frontmatter:`, newFm);
 			if (titleChanged) {
 				// Update the title in the file content
 				await this._updateNoteTitle(file, newTitle);
@@ -535,23 +567,66 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	async _writeFrontmatter(file, newFrontmatter) {
+		console.log(`[DEBUG] _writeFrontmatter - Iniciando escrita do frontmatter`);
+		console.log(`[DEBUG] Novos valores do frontmatter:`, newFrontmatter);
+		
 		const content = await this.app.vault.read(file);
 		const hasYaml = content.startsWith("---\n");
+		
 		if (!hasYaml) {
-			const yamlStr = stringifyYaml(newFrontmatter);
+			console.log(`[DEBUG] Nenhum YAML encontrado, criando novo`);
+			// Remove propriedades nulas/indefinidas
+			Object.keys(newFrontmatter).forEach(key => {
+				if (newFrontmatter[key] === null || newFrontmatter[key] === undefined) {
+					delete newFrontmatter[key];
+				}
+			});
+			
+			const yamlStr = stringifyYaml(newFrontmatter).trim();
 			const newContent = `---\n${yamlStr}\n---\n${content}`;
 			await this.app.vault.modify(file, newContent);
+			console.log(`[DEBUG] Novo YAML criado com sucesso`);
 			return;
 		}
+		
 		const end = content.indexOf("\n---\n", 4);
 		if (end === -1) return;
+		
 		const yamlRaw = content.substring(4, end);
 		const body = content.substring(end + 5);
 		let fm = {};
-		try { fm = parseYaml(yamlRaw) || {}; } catch { fm = {}; }
-		const updatedYaml = stringifyYaml({ ...fm, ...newFrontmatter });
+		try { 
+			fm = parseYaml(yamlRaw) || {}; 
+		} catch (e) { 
+			console.error("[ERRO] Erro ao fazer parse do YAML:", e);
+			fm = {}; 
+		}
+		
+		console.log(`[DEBUG] Frontmatter atual:`, fm);
+		
+		// Atualiza o frontmatter com as novas propriedades
+		const updatedFm = { ...fm };
+		
+		// Processa as propriedades do novo frontmatter
+		Object.keys(newFrontmatter).forEach(key => {
+			if (newFrontmatter[key] === null || newFrontmatter[key] === undefined) {
+				// Remove a propriedade se estiver marcada como nula/indefinida
+				delete updatedFm[key];
+			} else {
+				// Atualiza o valor da propriedade
+				updatedFm[key] = newFrontmatter[key];
+			}
+		});
+		
+		console.log(`[DEBUG] Frontmatter atualizado:`, updatedFm);
+		
+		// Gera o YAML final
+		const updatedYaml = stringifyYaml(updatedFm).trim();
 		const newContent = `---\n${updatedYaml}\n---\n${body}`;
+		
+		console.log(`[DEBUG] Salvando alterações no arquivo`);
 		await this.app.vault.modify(file, newContent);
+		console.log(`[DEBUG] Alterações salvas com sucesso`);
 	}
 }
 
