@@ -34,7 +34,7 @@ The Conditional Properties plugin provides a rule-based system for automatically
 
 1. **Rule-Based Automation**: IF/THEN conditional logic for property updates
 2. **Multiple Action Types**: ADD, REMOVE, REPLACE, OVERWRITE, DELETE PROPERTY, and TITLE modification operations
-3. **Advanced Operators**: Exactly, contains, notContains, exists, and notExists operators
+3. **Advanced Operators**: Exactly, contains, notContains, exists, notExists, and isEmpty operators
 4. **Flexible Conditions**: Support for property values and note titles (H1 or inline)
 5. **Title Modification**: Add prefix/suffix to note titles with date placeholder support
 6. **Date Placeholders**: Support for `{date}` and `{date:FORMAT}` in property values and titles
@@ -60,6 +60,7 @@ The Conditional Properties plugin provides a rule-based system for automatically
   - **notContains**: Negative substring matching
   - **exists**: Check if property exists (value field not required)
   - **notExists**: Check if property doesn't exist (value field not required)
+  - **isEmpty**: Check if property exists but is empty - empty string or empty array (value field not required)
 - Case-insensitive string matching with normalization
 - Wiki link syntax handling ([[link]] normalization)
 - Title extraction from H1 headers or inline titles with fallback support
@@ -95,7 +96,7 @@ The Conditional Properties plugin provides a rule-based system for automatically
 - Intuitive rule builder interface
 - Real-time rule testing
 - Clear action type selection
-- Dynamic UI based on operator selection (hide value field for exists/notExists)
+- Dynamic UI based on operator selection (hide value field for exists/notExists/isEmpty)
 - Visual feedback for rule execution results
 - Export/Import settings functionality (v0.12.1)
 
@@ -266,7 +267,7 @@ The Conditional Properties plugin provides a rule-based system for automatically
 - ✅ Rule definition and execution system
 - ✅ Multiple action types (ADD, REMOVE, OVERWRITE, DELETE PROPERTY)
 - ✅ Title modification actions (PREFIX, SUFFIX)
-- ✅ Advanced operators (exactly, contains, notContains, exists, notExists)
+- ✅ Advanced operators (exactly, contains, notContains, exists, notExists, isEmpty)
 - ✅ Date placeholder support ({date} and {date:FORMAT})
 - ✅ Flexible scanning options (entire vault, latest created/modified)
 - ✅ Scheduled execution with configurable intervals

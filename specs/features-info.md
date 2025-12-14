@@ -9,7 +9,7 @@ The Conditional Properties plugin for Obsidian provides automated frontmatter pr
 ### 1. Rule-Based Property Automation
 - **IF/THEN Logic**: Define conditional rules that trigger property modifications
 - **Multiple Conditions**: Support for property-based and title-based conditions
-- **Flexible Operators**: `exactly`, `contains`, and `notContains` operations with normalization
+- **Flexible Operators**: `exactly`, `contains`, `notContains`, `exists`, `notExists`, and `isEmpty` operations with normalization
 - **Persistent Storage**: Rules saved in plugin settings (JSON format)
 
 ### 2. Property Action Types
@@ -48,7 +48,13 @@ The Conditional Properties plugin for Obsidian provides automated frontmatter pr
 
 #### Property-Based Conditions
 - **Target**: Frontmatter property values
-- **Operators**: `exactly`, `contains`, `notContains`
+- **Operators**:
+  - `exactly`: Exact value matching (case-insensitive)
+  - `contains`: Substring matching
+  - `notContains`: Negative substring matching
+  - `exists`: Check if property exists (value not required)
+  - `notExists`: Check if property doesn't exist (value not required)
+  - `isEmpty`: Check if property exists but is empty - empty string or empty array (value not required)
 - **Normalization**: Wiki link syntax handling (`[[link]]` → `link`)
 - **Case Handling**: Case-insensitive matching
 
@@ -125,7 +131,7 @@ The Conditional Properties plugin for Obsidian provides automated frontmatter pr
   ifType: "PROPERTY" | "FIRST_LEVEL_HEADING",
   ifProp: "property_name", // for PROPERTY type
   ifValue: "expected_value",
-  op: "exactly" | "contains" | "notContains",
+  op: "exactly" | "contains" | "notContains" | "exists" | "notExists" | "isEmpty",
   thenActions: [
     {
       prop: "target_property", // not used for REPLACE action
@@ -208,6 +214,6 @@ The Conditional Properties plugin for Obsidian provides automated frontmatter pr
 
 ---
 
-**Last Updated**: October 2025
-**Plugin Version**: 0.12.0
-**Status**: Feature Complete
+**Last Updated**: December 2025
+**Plugin Version**: 0.14.1
+**Status**: Active Development
