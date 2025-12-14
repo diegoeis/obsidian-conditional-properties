@@ -434,10 +434,25 @@ class ConditionalPropertiesPlugin extends Plugin {
 			// Retorna true se a propriedade existir (não for undefined ou null)
 			return source !== undefined && source !== null;
 		}
-		
+
 		if (op === "notExists") {
 			// Retorna true se a propriedade não existir (for undefined ou null)
 			return source === undefined || source === null;
+		}
+
+		// Para o operador 'isEmpty', verificamos se a propriedade existe mas está vazia
+		if (op === "isEmpty") {
+			// Retorna false se a propriedade não existir
+			if (source === undefined || source === null) {
+				return false;
+			}
+			// Verifica se é um array vazio
+			if (Array.isArray(source)) {
+				return source.length === 0;
+			}
+			// Verifica se é string vazia após normalização
+			const normalizedSource = this._normalizeValue(source);
+			return normalizedSource === "";
 		}
 
 		// Para os outros operadores, mantemos a lógica existente
@@ -963,7 +978,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			{ value: "contains", label: "contains" },
 			{ value: "notContains", label: "does not contain" },
 			{ value: "exists", label: "exists" },
-			{ value: "notExists", label: "does not exist" }
+			{ value: "notExists", label: "does not exist" },
+			{ value: "isEmpty", label: "is empty" }
 		];
 		options.forEach(({ value, label }) => dropdown.addOption(value, label));
 		const fallback = options.some(option => option.value === currentValue) ? currentValue : "exactly";
@@ -981,10 +997,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
         if (!inputEl) return;
 
         try {
-            // Desabilita o campo de valor se o operador for 'exists' ou 'notExists'
-            const isDisabled = operator === 'exists' || operator === 'notExists';
+            // Desabilita o campo de valor se o operador for 'exists', 'notExists' ou 'isEmpty'
+            const isDisabled = operator === 'exists' || operator === 'notExists' || operator === 'isEmpty';
             inputEl.disabled = isDisabled;
-            
+
             if (isDisabled) {
                 inputEl.setAttribute('title', 'This field is not needed for the selected operator');
                 inputEl.classList.add('disabled-input');

@@ -12,7 +12,7 @@ My Granola meeting notes imports weren’t bringing the same name values as my p
 
 - Define multiple rules with a simple IF/THEN model
 - **Property Existence Check**: Check if a property exists or not in the frontmatter
-- **Operators**: `exactly`, `contains`, `notContains`, `exists`, `notExists`
+- **Operators**: `exactly`, `contains`, `notContains`, `exists`, `notExists`, `isEmpty`
 - **Multiple THEN actions per rule**: Set multiple properties in a single rule
 - **Comma-separated values**: Set multiple values for a property (e.g., "work, apple" → properly formatted YAML array)
 - **ADD/REMOVE actions**: Choose to ADD values to a property or REMOVE specific values
@@ -51,8 +51,9 @@ This repository ships the compiled `main.js`. No build step is required for test
 - **notContains**: Checks if the property value does not contain the specified text
 - **exists**: Checks if the property exists in the frontmatter (ignores the value field)
 - **notExists**: Checks if the property does not exist in the frontmatter (ignores the value field)
+- **isEmpty**: Checks if the property exists but is empty (empty string or empty array) (ignores the value field)
 
-### Example: Using exists/notExists
+### Example: Using exists/notExists/isEmpty
 
 ```yaml
 # Rule: If 'status' property exists
@@ -62,6 +63,14 @@ THEN: set priority to 'high'
 # Rule: If 'reviewed' property does not exist
 IF: reviewed notExists
 THEN: set needs_review to true
+
+# Rule: If 'tags' property exists but is empty
+IF: tags isEmpty
+THEN: add tags 'untagged'
+
+# Note: isEmpty vs notExists
+# - isEmpty: property exists in frontmatter but has no value (e.g., tags: "" or tags: [])
+# - notExists: property is not present in frontmatter at all
 ```
 
 ## Usage
@@ -264,7 +273,7 @@ THEN set properties:
 
 ## Limitations
   - Only frontmatter is modified
-  - Operators available: `exactly`, `contains`, `notContains`
+  - Operators available: `exactly`, `contains`, `notContains`, `exists`, `notExists`, `isEmpty`
   - No folder/tag scoping yet
 
 ## Roadmap
