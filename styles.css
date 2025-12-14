@@ -3,14 +3,106 @@
 }
 
 
-/* Conditional Properties plugin styles */
-
 #eis-cp-plugin .conditional-rule {
-	margin: 8px 0;
-	padding: 8px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  padding: 20px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+	transition: all .15s linear;
 }
+
+#eis-cp-plugin .conditional-rule:hover {
+  box-shadow: 0px 0px 7px rgba(0, 0, 0, 0.2);
+}
+
+#eis-cp-plugin .conditional-rule .setting-item {
+  display: block;
+}
+#eis-cp-plugin .conditional-rule .setting-item-control {
+  display: flex;
+  text-align: left;
+  flex-wrap: wrap;
+}
+
+#eis-cp-plugin .conditional-rule .setting-item-control * {
+  display: inline-block;
+  width: 100%;
+  flex: 1 0 120px;
+}
+
+#eis-cp-plugin .conditional-rule > .setting-item .setting-item-info .setting-item-name, 
+#eis-cp-plugin .conditional-rules-header {
+  font-size: 0.9rem;
+	font-weight: bold;
+}
+
+#eis-cp-plugin .conditional-then-action .setting-item-info .setting-item-name {
+	font-size: .7rem; 
+	font-weight: normal;
+}
+
+#eis-cp-plugin .conditional-rules-header {
+	padding-top: 15px;
+  padding-bottom: 10px;
+  border-top: 3px solid var(--modal-border-color);
+  margin-top: 10px;
+}
+
+#eis-cp-plugin button.conditional-remove-action {
+	max-width: 30px;
+  padding: 0;
+  font-size: 1.2rem;
+}
+
+#eis-cp-plugin .conditional-actions {
+  padding-top: 15px;
+}
+
+#eis-cp-plugin .conditional-then-action {
+  border-bottom: 2px dotted var(--background-modifier-border);
+}
+
+#eis-cp-plugin .conditional-then-action:last-child {
+  border-bottom-style: solid;
+}
+
+#eis-cp-plugin .conditional-then-action .setting-item-info {
+	padding-bottom: 5px;
+}
+
+#eis-cp-plugin .conditional-then-action .setting-item {
+  padding-top: 12px;
+  margin-bottom: 7px;
+}
+
+.eis-btn-red {
+	background-color: var(--red-color) !important;
+	border-color: var(--red-color) !important;
+	color: #fff !important;
+}
+
+#eis-cp-plugin .conditional-remove {
+	float: right;
+	margin: 0;
+}
+
+#eis-cp-plugin .conditional-actions button {
+	margin-right: 10px;
+}
+
+#eis-cp-plugin .eis-btn,
+#eis-cp-plugin button.eis-btn:not(.clickable-icon) {
+	background: var(--color-accent);
+	color: var(--text-on-accent);
+	cursor: pointer;
+}
+#eis-cp-plugin .eis-btn:hover {
+	opacity: .8;
+	color: #fff !important;
+}
+
+
+/*
 #eis-cp-plugin .conditional-rules-header {
 	font-weight: 600;
 	margin-top: 12px;
@@ -50,8 +142,6 @@
 #eis-cp-plugin .setting-item-control {
 	flex-wrap: wrap !important;
 }
-
-/* Buttons */
 #eis-cp-plugin .eis-btn,
 #eis-cp-plugin button.eis-btn:not(.clickable-icon) {
 	background: var(--color-accent);
@@ -90,22 +180,12 @@
 	color: var(--red-color) !important;
 }
 
-/* Estilo para campos de entrada desabilitados */
 #eis-cp-plugin .disabled-input {
     opacity: 0.5;
     background-color: var(--background-modifier-form-field);
     cursor: not-allowed;
 }
 
-
-
-
-
-
-
-
-
-/* Melhora a aparência do tooltip */
 #eis-cp-plugin [title] {
     position: relative;
 }
@@ -136,31 +216,6 @@
 }
 
 
-
-/* New styles for multiple THEN actions */
-#eis-cp-plugin .conditional-then-action {
-	margin: 8px 0;
-	padding: 8px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
-	background: var(--background-primary);
-}
-
-#eis-cp-plugin .conditional-then-action .setting-item {
-	border: none;
-	padding: 0;
-	margin: 0;
-}
-
-#eis-cp-plugin .conditional-then-action .eis-message {text-align: right;}
-
-#eis-cp-plugin .conditional-then-action .setting-item-name {
-	font-size: 0.85rem;
-	font-weight: 500;
-	color: var(--text-muted);
-	margin-bottom: 4px;
-}
-
 #eis-cp-plugin .conditional-remove-action {
 	border: none;
 	width: 20px;
@@ -174,4 +229,4 @@
 	margin-left: 8px;
 }
 
-#eis-cp-plugin .setting-item-info {min-width: 50px;}
+#eis-cp-plugin .setting-item-info {min-width: 50px;} */

@@ -1027,7 +1027,6 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			action.action = "add";
 		}
 
-		// Add remove button as first element in the setting's control area
 		const settingItem = actionSetting.settingEl;
 		const removeActionBtn = document.createElement("button");
 		removeActionBtn.textContent = "×";
@@ -1039,13 +1038,6 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
 		}, true);
-
-		// Insert button as first child of setting-item
-		if (settingItem.firstChild) {
-			settingItem.insertBefore(removeActionBtn, settingItem.firstChild);
-		} else {
-			settingItem.appendChild(removeActionBtn);
-		}
 
 		// Action type selector (Title or Property)
 		actionSetting.addDropdown(d => {
@@ -1113,6 +1105,14 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					action.text = v;
 					await this.plugin.saveData(this.plugin.settings);
 				}));
+		}
+
+		// Append remove button after other controls so it renders last
+		const controlEl = actionSetting.controlEl || settingItem.querySelector(".setting-item-control");
+		if (controlEl) {
+			controlEl.appendChild(removeActionBtn);
+		} else {
+			settingItem.appendChild(removeActionBtn);
 		}
 	}
 }
