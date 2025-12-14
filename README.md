@@ -271,19 +271,20 @@ THEN set properties:
 ```
 *Note: The title is the first H1 heading after the YAML frontmatter, or the inline title if enabled. Rules are skipped for notes without a title.*
 
-## Limitations
-  - Only frontmatter is modified
-  - Operators available: `exactly`, `contains`, `notContains`, `exists`, `notExists`, `isEmpty`
-  - No folder/tag scoping yet
-
 ## Roadmap
-  - Accept native obsidian variables like {{date}}
-  - Change names of properties
-  - Execute changes in the note content, not only propertie"
-  - Advanced operators (regex, greater/less than)
-  - Compound conditions (AND/OR/NOT)
-  - Multiple actions per rule
-  - Folder/tag scoping and new-note filters
+  - [x] Conditional IF/THEN rules engine
+  - [x] Property operators (`exactly`, `contains`, `notContains`, `exists`, `notExists`, `isEmpty`)
+  - [x] Multiple actions per rule
+  - [x] Export/import settings UI
+  - [x] Title prefix/suffix modifications with `{date}` placeholders
+  - [x] Scheduled scans and scoped run options
+  - [x] Run on current file
+  - [x] Verify if property is empty
+  - [ ] Rename property
+  - [ ] Execute changes in the note content, not only properties or titles
+  - [ ] Advanced operators (regex, greater/less than)
+  - [ ] Compound conditions (AND/OR/NOT)
+  - [ ] Folder/tag scoping and new-note filters
 
 ## Privacy
 All processing happens locally in your vault. No data leaves your device.
