@@ -905,8 +905,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			const dropdown = line1.addDropdown(d => {
 				this._configureOperatorDropdown(d, rule.op || "exactly", async (value) => {
 					rule.op = value;
-					// Se for 'exists' ou 'notExists', limpa o valor
-					if (value === 'exists' || value === 'notExists') {
+					// Se for 'exists', 'notExists' ou 'isEmpty', limpa o valor
+					if (value === 'exists' || value === 'notExists' || value === 'isEmpty') {
 						rule.ifValue = '';
 					}
 					await this.plugin.saveData(this.plugin.settings);
@@ -914,9 +914,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					this.display();
 				});
 			});
-			
-			// Adiciona o campo de valor apenas se não for 'exists' ou 'notExists'
-			if (rule.op !== 'exists' && rule.op !== 'notExists') {
+
+			// Adiciona o campo de valor apenas se não for 'exists', 'notExists' ou 'isEmpty'
+			if (rule.op !== 'exists' && rule.op !== 'notExists' && rule.op !== 'isEmpty') {
 				line1.addText(t => t
 					.setPlaceholder("value")
 					.setValue(rule.ifValue || "")
