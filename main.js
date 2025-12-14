@@ -711,16 +711,17 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		try {
 			const { containerEl } = this;
 			containerEl.empty();
+			const rootEl = containerEl.createEl("div", { attr: { id: "eis-cp-plugin" } });
 
 			// Header
-			containerEl.createEl("h1", { text: "Conditional Properties" });
-			containerEl.createEl("p", { text: "Create rules to change note properties values based in custom conditions." });
+			rootEl.createEl("h1", { text: "Conditional Properties" });
+			rootEl.createEl("p", { text: "Create rules to change note properties values based in custom conditions." });
 
 			// Configurations Section
-			containerEl.createEl("h3", { text: "Configurations" });
+			rootEl.createEl("h3", { text: "Configurations" });
 
 			// Scan Interval Setting
-			new Setting(containerEl)
+			new Setting(rootEl)
 				.setName("Scan interval (minutes)")
 				.setDesc("Minimum 5 minutes")
 				.addText(text => {
@@ -734,7 +735,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				});
 
 			// Scan Scope Setting
-			new Setting(containerEl)
+			new Setting(rootEl)
 				.setName("Scan scope")
 				.setDesc("Choose which notes to scan")
 				.addDropdown(dropdown => {
@@ -751,7 +752,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			// Number of Notes Setting (conditionally shown)
 			if (this.plugin.settings.scanScope !== 'entireVault') {
-				new Setting(containerEl)
+				new Setting(rootEl)
 					.setName("Number of notes")
 					.setDesc("Number of recent created notes to scan (1-1000)")
 					.addText(text => {
@@ -766,7 +767,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			}
 
 			// Add Export/Import Buttons to Configurations
-			const exportImportSetting = new Setting(containerEl)
+			const exportImportSetting = new Setting(rootEl)
 				.setName("Backup & Restore")
 				.setDesc("Export or import your plugin settings");
 
@@ -796,10 +797,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				btn.onClick(() => importInput.click());
 			});
 
-			containerEl.appendChild(importInput);
+			rootEl.appendChild(importInput);
 
 			// Run Now Button
-			const runNow = new Setting(containerEl)
+			const runNow = new Setting(rootEl)
 				.setName("Run now")
 				.setDesc("Execute all rules across selected scope")
 				.addButton(btn => {
@@ -817,11 +818,11 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				});
 
 			// Rules Section
-			containerEl.createEl("h3", { text: "Rules" });
+			rootEl.createEl("h3", { text: "Rules" });
 			this.plugin.settings.rules = this.plugin.settings.rules || [];
 
 			// Add Rule Button
-			const addWrap = containerEl.createEl("div", { cls: "setting-item" });
+			const addWrap = rootEl.createEl("div", { cls: "setting-item" });
 			const addBtn = addWrap.createEl("button", { 
 				text: "+ Add Rule", 
 				cls: "mod-cta eis-btn"
@@ -846,7 +847,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			// Render Rules
 			this.plugin.settings.rules.slice().reverse().forEach((rule, idxReversed) => {
 				const originalIndex = this.plugin.settings.rules.length - 1 - idxReversed;
-				this._renderRule(containerEl, rule, originalIndex);
+				this._renderRule(rootEl, rule, originalIndex);
 			});
 
 		} catch (error) {

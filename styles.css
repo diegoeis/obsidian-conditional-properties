@@ -2,15 +2,58 @@
 	--red-color: #e93147;
 }
 
-.eis-message {
+
+/* Conditional Properties plugin styles */
+
+#eis-cp-plugin .conditional-rule {
+	margin: 8px 0;
+	padding: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+}
+#eis-cp-plugin .conditional-rules-header {
+	font-weight: 600;
+	margin-top: 12px;
+	display: flex;
+	align-items: center;
+}
+#eis-cp-plugin .conditional-rules-header * {flex: 1;}
+
+
+#eis-cp-plugin .conditional-add-wrap {
+	margin: 8px 0 12px 0;
+}
+
+#eis-cp-plugin .conditional-to-label { margin: 0 6px; opacity: 0.8; }
+
+#eis-cp-plugin .conditional-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 6px;
+	align-items: center;
+	margin: 0;
+}
+
+#eis-cp-plugin .conditional-add-action {
+	margin: 8px 0;
+	margin-left: auto;
+	order: 3;
+}
+
+#eis-cp-plugin .eis-message {
 	font-size: .8rem;
     padding: 7px 0 0;
 }
 
-.eis-message-error {color: var(--red-color);}
+#eis-cp-plugin .eis-message-error {color: var(--red-color);}
+
+#eis-cp-plugin .setting-item-control {
+	flex-wrap: wrap !important;
+}
 
 /* Buttons */
-.eis-btn, button.eis-btn:not(.clickable-icon) {
+#eis-cp-plugin .eis-btn,
+#eis-cp-plugin button.eis-btn:not(.clickable-icon) {
 	background: var(--color-accent);
 	color: var(--text-on-accent);
 	border-radius: 4px;
@@ -18,48 +61,56 @@
 	font-size: 0.8rem;
 	cursor: pointer;
 }
-.eis-btn:hover {
+#eis-cp-plugin .eis-btn:hover {
 	background: var(--interactive-accent) !important;
 	color: #fff !important;
 }
 
-.eis-btn-border {
+#eis-cp-plugin .eis-btn-border {
 	background: transparent !important;
 	color: var(--color-accent) !important;
 	border: 1px solid var(--interactive-accent);
 	box-shadow: none !important;
 }
 
-.eis-btn-border:hover {
+#eis-cp-plugin .eis-btn-border:hover {
 	background: var(--interactive-accent) !important;
 	color: #fff !important;
 }
 
-.eis-btn-red,
-button.eis-btn-red:not(.clickable-icon),
-.eis-btn-red:not(.eis-btn-border) {
+#eis-cp-plugin .eis-btn-red,
+#eis-cp-plugin button.eis-btn-red:not(.clickable-icon),
+#eis-cp-plugin .eis-btn-red:not(.eis-btn-border) {
 	background: var(--red-color);
 	border-color: var(--red-color);
 }
 
-.eis-btn-red:hover {
+#eis-cp-plugin .eis-btn-red:hover {
 	background: #fff !important;
 	color: var(--red-color) !important;
 }
 
 /* Estilo para campos de entrada desabilitados */
-.disabled-input {
+#eis-cp-plugin .disabled-input {
     opacity: 0.5;
     background-color: var(--background-modifier-form-field);
     cursor: not-allowed;
 }
 
+
+
+
+
+
+
+
+
 /* Melhora a aparência do tooltip */
-[title] {
+#eis-cp-plugin [title] {
     position: relative;
 }
 
-[title]:hover::after {
+#eis-cp-plugin [title]:hover::after {
     content: attr(title);
     position: absolute;
     bottom: 100%;
@@ -76,54 +127,18 @@ button.eis-btn-red:not(.clickable-icon),
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
-.eis-btn-red.eis-btn-border {
+#eis-cp-plugin .eis-btn-red.eis-btn-border {
 	color: var(--red-color) !important;
 }
-.eis-btn-red.eis-btn-border:hover {
+#eis-cp-plugin .eis-btn-red.eis-btn-border:hover {
 	background: var(--red-color) !important;
 	color: #fff !important;
 }
-/* Conditional Properties plugin styles */
-.conditional-rule {
-	margin: 8px 0;
-	padding: 8px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
-}
-.conditional-rules-header {
-	font-weight: 600;
-	margin-top: 12px;
-	display: flex;
-	align-items: center;
-}
-.conditional-rules-header * {flex: 1;}
 
-.setting-item-control {
-	flex-wrap: wrap !important;
-}
 
-.conditional-add-wrap {
-	margin: 8px 0 12px 0;
-}
-
-.conditional-to-label { margin: 0 6px; opacity: 0.8; }
-
-.conditional-actions {
-	display: flex;
-	gap: 8px;
-	margin-top: 6px;
-	align-items: center;
-	margin: 0;
-}
-
-.conditional-add-action {
-	margin: 8px 0;
-	margin-left: auto;
-	order: 3;
-}
 
 /* New styles for multiple THEN actions */
-.conditional-then-action {
+#eis-cp-plugin .conditional-then-action {
 	margin: 8px 0;
 	padding: 8px;
 	border: 1px solid var(--background-modifier-border);
@@ -131,22 +146,22 @@ button.eis-btn-red:not(.clickable-icon),
 	background: var(--background-primary);
 }
 
-.conditional-then-action .setting-item {
+#eis-cp-plugin .conditional-then-action .setting-item {
 	border: none;
 	padding: 0;
 	margin: 0;
 }
 
-.conditional-then-action .eis-message {text-align: right;}
+#eis-cp-plugin .conditional-then-action .eis-message {text-align: right;}
 
-.conditional-then-action .setting-item-name {
+#eis-cp-plugin .conditional-then-action .setting-item-name {
 	font-size: 0.85rem;
 	font-weight: 500;
 	color: var(--text-muted);
 	margin-bottom: 4px;
 }
 
-.conditional-remove-action {
+#eis-cp-plugin .conditional-remove-action {
 	border: none;
 	width: 20px;
 	height: 20px;
@@ -159,4 +174,4 @@ button.eis-btn-red:not(.clickable-icon),
 	margin-left: 8px;
 }
 
-.setting-item-info {min-width: 50px;}
+#eis-cp-plugin .setting-item-info {min-width: 50px;}
