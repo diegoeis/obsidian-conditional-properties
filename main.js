@@ -773,7 +773,6 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			exportImportSetting.addButton(btn => {
 				btn.setButtonText("Export Settings")
-					.setCta()
 					.onClick(() => this.exportSettings());
 			});
 
@@ -791,8 +790,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			exportImportSetting.addButton(btn => {
-				btn.setButtonText("Import Settings")
-					.setWarning();
+				btn.setButtonText("Import Settings").setCta();
 				btn.buttonEl.classList.add("eis-btn-border");
 				btn.onClick(() => importInput.click());
 			});
