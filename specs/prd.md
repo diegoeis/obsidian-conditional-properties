@@ -3,11 +3,12 @@
 ## Executive Summary
 
 **Product**: Conditional Properties Plugin for Obsidian
-**Version**: 0.12.0
+**Version**: 0.14.1
 **Author**: Diego Eis
-**Release Date**: October 2025
+**Last Updated**: December 2025
+**Status**: Production-ready with active development
 
-The Conditional Properties plugin enables Obsidian users to automate frontmatter property updates using conditional rules. Users can define IF/THEN rules to automatically modify note properties based on specific conditions, eliminating manual property management and ensuring consistency across their knowledge base.
+The Conditional Properties plugin enables Obsidian users to automate frontmatter property updates using conditional rules. Users can define IF/THEN rules to automatically modify note properties based on specific conditions, eliminating manual property management and ensuring consistency across their knowledge base. The plugin now includes advanced operators (exists/notExists), date placeholders support, title modification capabilities, and robust settings import/export functionality.
 
 ## Problem Statement
 
@@ -32,11 +33,15 @@ The Conditional Properties plugin provides a rule-based system for automatically
 ### Core Features
 
 1. **Rule-Based Automation**: IF/THEN conditional logic for property updates
-2. **Multiple Action Types**: ADD, REMOVE, REPLACE, OVERWRITE, and DELETE operations
-3. **Flexible Conditions**: Support for property values and note titles
-4. **Batch Processing**: Scan entire vaults or specific note subsets
-5. **Scheduled Execution**: Automated runs with configurable intervals
-6. **Smart Merging**: Intelligent handling of multi-value properties
+2. **Multiple Action Types**: ADD, REMOVE, REPLACE, OVERWRITE, DELETE PROPERTY, and TITLE modification operations
+3. **Advanced Operators**: Exactly, contains, notContains, exists, and notExists operators
+4. **Flexible Conditions**: Support for property values and note titles (H1 or inline)
+5. **Title Modification**: Add prefix/suffix to note titles with date placeholder support
+6. **Date Placeholders**: Support for `{date}` and `{date:FORMAT}` in property values and titles
+7. **Batch Processing**: Scan entire vaults or specific note subsets (latest created/modified)
+8. **Scheduled Execution**: Automated runs with configurable intervals (minimum 5 minutes)
+9. **Smart Merging**: Intelligent handling of multi-value properties with duplicate prevention
+10. **Settings Management**: Export and import rules and configuration as JSON
 
 ## Requirements
 
@@ -49,17 +54,29 @@ The Conditional Properties plugin provides a rule-based system for automatically
 - Persistent rule storage in plugin settings
 
 #### FR-2: Condition Evaluation
-- Support for "contains" and "notContains" operators
+- Support for multiple operators:
+  - **exactly**: Exact value matching (case-insensitive)
+  - **contains**: Substring matching
+  - **notContains**: Negative substring matching
+  - **exists**: Check if property exists (value field not required)
+  - **notExists**: Check if property doesn't exist (value field not required)
 - Case-insensitive string matching with normalization
 - Wiki link syntax handling ([[link]] normalization)
-- Title extraction from H1 headers or inline titles
+- Title extraction from H1 headers or inline titles with fallback support
 
 #### FR-3: Property Actions
 - **ADD**: Add values to existing properties without duplication
 - **REMOVE**: Remove specific values from properties
-- **REPLACE**: Replace IF property value with new value
+- **REPLACE**: Replace IF property value with new value (planned)
 - **OVERWRITE**: Completely replace property with new value
-- **DELETE**: Remove properties entirely from frontmatter
+- **DELETE PROPERTY**: Remove properties entirely from frontmatter
+
+#### FR-3.1: Title Actions (NEW in v0.13.0)
+- **PREFIX**: Add text before note title
+- **SUFFIX**: Add text after note title
+- **Date Placeholder Support**: Use `{date}` or `{date:FORMAT}` in prefix/suffix text
+- **Duplicate Prevention**: Intelligent detection to avoid repeated prefix/suffix application
+- Support for both H1 headings and inline title modifications
 
 #### FR-4: Execution Engine
 - Process rules against frontmatter properties only
@@ -78,6 +95,16 @@ The Conditional Properties plugin provides a rule-based system for automatically
 - Intuitive rule builder interface
 - Real-time rule testing
 - Clear action type selection
+- Dynamic UI based on operator selection (hide value field for exists/notExists)
+- Visual feedback for rule execution results
+- Export/Import settings functionality (v0.12.1)
+
+#### FR-7: Date Formatting (NEW in v0.13.0)
+- Support for `{date}` placeholder using Obsidian's configured date format
+- Support for `{date:FORMAT}` with custom moment.js format strings
+- Examples: `{date:DD/MM/YYYY}`, `{date:YYYY-MM-DD HH:mm}`, `{date:MMM Do, YYYY}`
+- Fallback to YYYY-MM-DD if no format configured
+- Date extraction from file creation time (ctime)
 
 ### Non-Functional Requirements
 
@@ -140,19 +167,34 @@ The Conditional Properties plugin provides a rule-based system for automatically
 ## Success Metrics
 
 ### Adoption Metrics
-- **Installation Rate**: Number of active installations
-- **Usage Frequency**: Average rules executed per user per week
-- **Retention Rate**: Users continuing to use plugin after 30 days
+- **Installation Rate**: Target 1,000+ active installations within 6 months
+- **Usage Frequency**: Average 10+ rules executed per user per week
+- **Retention Rate**: 70%+ users continuing to use plugin after 30 days
+- **Community Growth**: GitHub stars, forks, and community contributions
 
 ### Performance Metrics
-- **Processing Speed**: Average time to scan 100 notes
-- **Success Rate**: Percentage of successful rule executions
-- **Error Rate**: Number of failed operations per 1000 executions
+- **Processing Speed**:
+  - 100 notes: < 2 seconds
+  - 500 notes: < 10 seconds
+  - 1000 notes: < 30 seconds
+- **Success Rate**: 99%+ successful rule executions
+- **Error Rate**: < 1% failed operations per 1000 executions
+- **Memory Efficiency**: < 50MB memory overhead during execution
+
+### Feature Adoption
+- **Operator Usage**: Track usage distribution across operators (exists, contains, exactly, etc.)
+- **Action Type Distribution**: Monitor which actions are most used (ADD vs OVERWRITE vs DELETE)
+- **Advanced Features**:
+  - 30%+ users using date placeholders
+  - 20%+ users using title modification
+  - 40%+ users using scheduled execution
+  - 15%+ users using settings import/export
 
 ### User Satisfaction
-- **Feature Usage**: Percentage of users utilizing advanced features
-- **Rule Complexity**: Average number of THEN actions per rule
-- **Feedback Score**: User ratings and reviews
+- **Feature Utilization**: Average 2+ different action types per user
+- **Rule Complexity**: Average 1.5+ THEN actions per rule
+- **Feedback Score**: Target 4.5+ stars on community plugin directory
+- **Support Requests**: < 5% users requiring support documentation clarification
 
 ## Technical Architecture
 
@@ -178,20 +220,33 @@ The Conditional Properties plugin provides a rule-based system for automatically
 
 ## Future Roadmap
 
-### Phase 1 (v0.13.0 - Q4 2025)
-- **Variable Support**: Native Obsidian variables ({{date}}, {{title}})
-- **Property Renaming**: Change property names dynamically
-- **Content Modification**: Extend rules to note body content
+### Completed Features (v0.14.1 - Current)
+- ✅ **exists/notExists Operators**: Check property existence without value matching
+- ✅ **Date Placeholders**: `{date}` and `{date:FORMAT}` support in properties and titles
+- ✅ **Title Modification**: Prefix/suffix actions with duplicate prevention
+- ✅ **DELETE PROPERTY Action**: Complete property removal from frontmatter
+- ✅ **Settings Import/Export**: Backup and restore configuration as JSON
+- ✅ **Enhanced UI**: Dynamic field visibility based on operator selection
+- ✅ **Robust Debugging**: Comprehensive logging for troubleshooting
 
-### Phase 2 (v0.14.0 - Q1 2026)
-- **Advanced Operators**: Regex matching, numeric comparisons
-- **Compound Conditions**: AND/OR/NOT logical operators
-- **Folder Scoping**: Apply rules to specific folders or tags
+### Phase 1 (v0.15.0 - Q1 2026)
+- **REPLACE Action Completion**: Full implementation of value replacement logic
+- **Regex Operator**: Pattern matching for advanced string conditions
+- **Numeric Operators**: Greater than, less than, equals for numeric comparisons
+- **Content Modification**: Extend rules to note body content (not just frontmatter)
 
-### Phase 3 (v0.15.0 - Q2 2026)
+### Phase 2 (v0.16.0 - Q2 2026)
+- **Compound Conditions**: AND/OR/NOT logical operators for complex rules
+- **Folder/Tag Scoping**: Apply rules to specific vault locations or tagged notes
+- **Variable Support**: Native Obsidian variables ({{date}}, {{title}}, {{time}})
+- **Property Renaming**: Dynamic property name changes
+
+### Phase 3 (v0.17.0 - Q3 2026)
 - **Template Integration**: Rule-based template application
-- **API Extensions**: External trigger support
-- **Performance Optimization**: Parallel processing capabilities
+- **Batch Actions**: Apply multiple rules to multiple files efficiently
+- **API Extensions**: External trigger support via plugin API
+- **Performance Optimization**: Parallel processing for large vaults (1000+ notes)
+- **Undo/Redo**: Rollback capability for rule executions
 
 ## Risk Assessment
 
@@ -207,13 +262,17 @@ The Conditional Properties plugin provides a rule-based system for automatically
 
 ## Implementation Plan
 
-### Current Release (v0.12.0)
+### Current Release (v0.14.1)
 - ✅ Rule definition and execution system
-- ✅ Multiple action types (ADD, REMOVE, OVERWRITE, DELETE)
-- ✅ REPLACE functionality for IF property substitution
-- ✅ Flexible scanning options
-- ✅ Scheduled execution
-- ✅ Title-based conditions
+- ✅ Multiple action types (ADD, REMOVE, OVERWRITE, DELETE PROPERTY)
+- ✅ Title modification actions (PREFIX, SUFFIX)
+- ✅ Advanced operators (exactly, contains, notContains, exists, notExists)
+- ✅ Date placeholder support ({date} and {date:FORMAT})
+- ✅ Flexible scanning options (entire vault, latest created/modified)
+- ✅ Scheduled execution with configurable intervals
+- ✅ Title-based and property-based conditions
+- ✅ Settings import/export functionality
+- ✅ Comprehensive debugging and logging
 
 ### Testing Strategy
 - Unit tests for core rule engine logic
@@ -234,8 +293,28 @@ The Conditional Properties plugin provides a rule-based system for automatically
 - Architecture decision records
 - Contributing guidelines for open source
 
+## Change Log
+
+### v2.0 (December 2025)
+- Updated to version 0.14.1
+- Added exists/notExists operators documentation
+- Added title modification features (prefix/suffix)
+- Added date placeholder support ({date} and {date:FORMAT})
+- Added DELETE PROPERTY action
+- Added settings import/export functionality
+- Enhanced success metrics with specific targets
+- Reorganized roadmap to reflect completed features
+- Updated performance targets and benchmarks
+
+### v1.0 (October 2025)
+- Initial PRD creation
+- Core features documentation
+- Basic requirements and user stories
+- Initial roadmap planning
+
 ---
 
-**Document Version**: 1.0
-**Last Updated**: October 2025
-**Status**: Complete
+**Document Version**: 2.0
+**Last Updated**: December 2025
+**Status**: Production-ready - Active Development
+**Next Review**: March 2026
