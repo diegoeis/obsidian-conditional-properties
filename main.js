@@ -997,14 +997,15 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
         if (!inputEl) return;
 
         try {
-            // Desabilita o campo de valor se o operador for 'exists', 'notExists' ou 'isEmpty'
-            const isDisabled = operator === 'exists' || operator === 'notExists' || operator === 'isEmpty';
-            inputEl.disabled = isDisabled;
+            // Esconde o campo de valor se o operador for 'exists', 'notExists' ou 'isEmpty'
+            const shouldHide = operator === 'exists' || operator === 'notExists' || operator === 'isEmpty';
 
-            if (isDisabled) {
-                inputEl.setAttribute('title', 'This field is not needed for the selected operator');
-                inputEl.classList.add('disabled-input');
+            if (shouldHide) {
+                inputEl.style.display = 'none';
+                inputEl.disabled = true;
             } else {
+                inputEl.style.display = '';
+                inputEl.disabled = false;
                 inputEl.removeAttribute('title');
                 inputEl.classList.remove('disabled-input');
             }
