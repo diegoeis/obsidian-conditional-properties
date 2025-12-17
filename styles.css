@@ -62,6 +62,8 @@
   border-bottom: 2px dotted var(--background-modifier-border);
 }
 
+#eis-cp-plugin .conditional-then-action:hover .setting-item-name {font-weight: bold;}
+
 #eis-cp-plugin .conditional-then-action:last-child {
   border-bottom-style: solid;
 }
