@@ -139,7 +139,7 @@
     padding: 7px 0 0;
 }
 
-#eis-cp-plugin .eis-message-error {color: var(--red-color);}
+#eis-cp-plugin .eis-message-error {color: var(--cp-red-color);}
 
 #eis-cp-plugin .setting-item-control {
 	flex-wrap: wrap !important;
@@ -173,13 +173,13 @@
 #eis-cp-plugin .eis-btn-red,
 #eis-cp-plugin button.eis-btn-red:not(.clickable-icon),
 #eis-cp-plugin .eis-btn-red:not(.eis-btn-border) {
-	background: var(--red-color);
-	border-color: var(--red-color);
+	background: var(--cp-red-color);
+	border-color: var(--cp-red-color);
 }
 
 #eis-cp-plugin .eis-btn-red:hover {
 	background: #fff !important;
-	color: var(--red-color) !important;
+	color: var(--cp-red-color) !important;
 }
 
 #eis-cp-plugin .disabled-input {
@@ -210,10 +210,10 @@
 }
 
 #eis-cp-plugin .eis-btn-red.eis-btn-border {
-	color: var(--red-color) !important;
+	color: var(--cp-red-color) !important;
 }
 #eis-cp-plugin .eis-btn-red.eis-btn-border:hover {
-	background: var(--red-color) !important;
+	background: var(--cp-red-color) !important;
 	color: #fff !important;
 }
 
