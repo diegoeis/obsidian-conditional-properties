@@ -1,5 +1,5 @@
 :root {
-	--red-color: #e93147;
+	--cp-red-color: #e93147;
 }
 
 
@@ -78,8 +78,8 @@
 }
 
 .eis-btn-red {
-	background-color: var(--red-color) !important;
-	border-color: var(--red-color) !important;
+	background-color: var(--cp-red-color) !important;
+	border-color: var(--cp-red-color) !important;
 	color: #fff !important;
 }
 

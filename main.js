@@ -1,5 +1,5 @@
 /* eslint-disable */
-const { Plugin, Notice, Setting, PluginSettingTab, parseYaml, stringifyYaml } = require("obsidian");
+const { Plugin, Notice, Setting, PluginSettingTab, parseYaml, stringifyYaml, moment } = require("obsidian");
 
 class ConditionalPropertiesPlugin extends Plugin {
 	async onload() {
@@ -17,7 +17,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 		});
 		this.registerInterval(this._setupScheduler());
 		this.addCommand({
-			id: "conditional-properties-run-now",
+			id: "run-now",
 			name: "Run conditional rules on vault",
 			callback: async () => {
 				const result = await this.runScan();
@@ -25,13 +25,17 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		});
 		this.addCommand({
-			id: "conditional-properties-run-current-file",
+			id: "run-current-file",
 			name: "Run conditional rules on current file",
-			callback: async () => {
+			checkCallback: (checking) => {
 				const file = this.app.workspace.getActiveFile();
+				if (checking) {
+					return file !== null;
+				}
 				if (!file) { new Notice("No active file."); return; }
-				const modified = await this.runScanOnFile(file);
-				new Notice(modified ? "Conditional Properties: file modified" : "Conditional Properties: no changes");
+				this.runScanOnFile(file).then(modified => {
+					new Notice(modified ? "Conditional Properties: file modified" : "Conditional Properties: no changes");
+				});
 			}
 		});
 		this.addSettingTab(new ConditionalPropertiesSettingTab(this.app, this));
@@ -133,12 +137,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 	async runScan() {
 		const { vault, metadataCache } = this.app;
 		const files = this._getFilesToScan();
-		console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-		console.log(`🔍 STARTING SCAN: ${files.length} notes to process`);
-		console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 		let modifiedCount = 0;
 		for (const file of files) {
-			console.log(`📄 Scanning: "${file.basename}" (${file.path})`);
 			const cache = metadataCache.getFileCache(file) || {};
 			const frontmatter = cache.frontmatter ?? {};
 			const applied = await this.applyRulesToFrontmatter(file, frontmatter);
@@ -146,9 +146,6 @@ class ConditionalPropertiesPlugin extends Plugin {
 		}
 		this.settings.lastRun = new Date().toISOString();
 		await this.saveData(this.settings);
-		console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-		console.log(`✅ SCAN COMPLETE: ${modifiedCount} modified / ${files.length} scanned`);
-		console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 		return { scanned: files.length, modified: modifiedCount };
 	}
 
@@ -168,20 +165,13 @@ class ConditionalPropertiesPlugin extends Plugin {
 	async runScanForRules(rulesSubset) {
 		const { vault, metadataCache } = this.app;
 		const files = this._getFilesToScan();
-		console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-		console.log(`🔍 STARTING SINGLE RULE SCAN: ${files.length} notes to process`);
-		console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 		let modifiedCount = 0;
 		for (const file of files) {
-			console.log(`📄 Scanning: "${file.basename}" (${file.path})`);
 			const cache = metadataCache.getFileCache(file) || {};
 			const frontmatter = cache.frontmatter ?? {};
 			const applied = await this.applyRulesToFrontmatter(file, frontmatter, rulesSubset);
 			if (applied) modifiedCount++;
 		}
-		console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-		console.log(`✅ SINGLE RULE SCAN COMPLETE: ${modifiedCount} modified / ${files.length} scanned`);
-		console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 		return { scanned: files.length, modified: modifiedCount };
 	}
 
@@ -209,9 +199,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 			let sourceValue;
 			if (ifType === "FIRST_LEVEL_HEADING") {
 				sourceValue = await this._getNoteTitle(file);
-				// If no title available, show error message and skip rule
+				// If no title available, skip rule
 				if (sourceValue === null) {
-					console.log(`No title available for file "${file.basename}". Rule skipped.`);
 					continue;
 				}
 			} else {
@@ -231,30 +220,27 @@ class ConditionalPropertiesPlugin extends Plugin {
 					try {
 						const currentTitle = await this._getNoteTitle(file);
 						if (currentTitle === null) {
-							console.log(`No title available for modification in file "${file.basename}"`);
 							continue;
 						}
 
 						// Format the text with any date placeholders
 						const formattedText = this._formatText(text, file);
-						
+
 						// Check if the title already has this modification
-						const alreadyHasModification = modificationType === 'prefix' 
+						const alreadyHasModification = modificationType === 'prefix'
 							? currentTitle.startsWith(formattedText)
 							: currentTitle.endsWith(formattedText);
-						
+
 						if (alreadyHasModification) {
-							console.log(`Title already has the ${modificationType}: "${currentTitle}"`);
 							continue; // Skip to next action as the modification is already applied
 						}
 
 						// Apply prefix or suffix
-						newTitle = modificationType === 'prefix' 
-							? formattedText + currentTitle 
+						newTitle = modificationType === 'prefix'
+							? formattedText + currentTitle
 							: currentTitle + formattedText;
-						
+
 						titleChanged = true;
-						console.log(`Title changed to: ${newTitle}`);
 					} catch (e) {
 						console.error(`Error modifying title for file ${file.path}:`, e);
 					}
@@ -263,38 +249,28 @@ class ConditionalPropertiesPlugin extends Plugin {
 
 				// Handle property modifications (original functionality)
 				if (!prop) continue;
-				console.log(`Processing THEN action: prop="${prop}", value="${value}", actionType="${actionType}"`);
-								// Process any date placeholders in the value
-					const processedValue = this._formatText(value, file);
-					console.log(`[DEBUG] Processing action: prop="${prop}", actionType="${actionType}", value="${value}", processedValue="${processedValue}"`);
+				// Process any date placeholders in the value
+				const processedValue = this._formatText(value, file);
 
-					if (actionType === "add") {
+				if (actionType === "add") {
 					// Handle adding to arrays or creating new properties
 					if (Array.isArray(newFm[prop])) {
 						// If it's already an array, add unique values
 						const valuesToAdd = processedValue.split(',').map(v => v.trim()).filter(v => v);
-						console.log(`Adding to existing array: ${valuesToAdd}`);
 						valuesToAdd.forEach(v => {
 							if (!newFm[prop].includes(v)) {
 								newFm[prop].push(v);
 								changed = true;
-								console.log(`Added "${v}" to ${prop}`);
-							} else {
-								console.log(`"${v}" already exists in ${prop}`);
 							}
 						});
 					} else if (newFm[prop]) {
 						// Convert to array and add
 						const currentArray = Array.isArray(newFm[prop]) ? newFm[prop] : [newFm[prop]];
 						const valuesToAdd = processedValue.split(',').map(v => v.trim()).filter(v => v);
-						console.log(`Converting to array and adding: ${valuesToAdd}`);
 						valuesToAdd.forEach(v => {
 							if (!currentArray.includes(v)) {
 								currentArray.push(v);
 								changed = true;
-								console.log(`Added "${v}" to ${prop}`);
-							} else {
-								console.log(`"${v}" already exists in ${prop}`);
 							}
 						});
 						newFm[prop] = currentArray.length === 1 ? currentArray[0] : currentArray;
@@ -302,21 +278,18 @@ class ConditionalPropertiesPlugin extends Plugin {
 						// Create new property with processed value
 						newFm[prop] = processedValue;
 						changed = true;
-						console.log(`Created new property ${prop} with value "${value}"`);
 					}
 				} else if (actionType === "overwrite") {
 					// Overwrite the entire property with processed value
 					newFm[prop] = processedValue;
 					changed = true;
-					console.log(`Overwritten ${prop} with "${processedValue}"`);
 				} else if (actionType === "remove") {
 					// Process any date placeholders in the value before removal
 					const processedValue = this._formatText(value, file);
-					
+
 					// Handle removing from arrays or properties
 					if (Array.isArray(newFm[prop])) {
 						const valuesToRemove = processedValue.split(',').map(v => v.trim()).filter(v => v);
-						console.log(`Removing from array: ${valuesToRemove}`);
 						valuesToRemove.forEach(v => {
 							const initialLength = newFm[prop].length;
 							// Process each item in the array to handle date placeholders
@@ -324,9 +297,6 @@ class ConditionalPropertiesPlugin extends Plugin {
 							newFm[prop] = newFm[prop].filter(item => !this._valueEquals(item, processedItem));
 							if (newFm[prop].length < initialLength) {
 								changed = true;
-								console.log(`Removed "${processedItem}" from ${prop}`);
-							} else {
-								console.log(`"${processedItem}" not found in ${prop}`);
 							}
 						});
 					} else if (newFm[prop]) {
@@ -334,45 +304,25 @@ class ConditionalPropertiesPlugin extends Plugin {
 						if (this._valueEquals(newFm[prop], processedValue)) {
 							delete newFm[prop];
 							changed = true;
-							console.log(`Removed property ${prop}`);
-						} else {
-							console.log(`Value "${processedValue}" not found in ${prop}`);
 						}
 					}
 				} else if (actionType === "delete") {
-					console.log(`[DEBUG] ====== INICIANDO AÇÃO DELETE PROPERTY ======`);
-					console.log(`[DEBUG] Propriedade a ser deletada: "${prop}"`);
-					console.log(`[DEBUG] Propriedades atuais no frontmatter:`, Object.keys(newFm));
-					
 					// Encontra o nome exato da propriedade (case insensitive)
 					const propToDelete = Object.keys(newFm).find(key => {
-						const match = key.toLowerCase() === prop.toLowerCase();
-						console.log(`[DEBUG] Comparando: "${key}" com "${prop}" - ${match ? 'MATCH' : 'não'}`);
-						return match;
+						return key.toLowerCase() === prop.toLowerCase();
 					});
-					
-					console.log(`[DEBUG] Propriedade encontrada para deletar:`, propToDelete);
-					
+
 					if (propToDelete) {
-					console.log(`[DEBUG] Deletando propriedade "${propToDelete}"`);
-					// Define como undefined para garantir que será removido no _writeFrontmatter
-					newFm[propToDelete] = undefined;
-					changed = true;
-					console.log(`[DEBUG] Propriedade "${propToDelete}" marcada para deleção`);
-					console.log(`[DEBUG] Propriedades após marcação para deleção:`, Object.keys(newFm).filter(k => newFm[k] !== undefined));
-					} else {
-						console.log(`[ERRO] Não foi possível encontrar a propriedade "${prop}" para deletar`);
-						console.log(`[DEBUG] Propriedades disponíveis:`, Object.keys(newFm));
+						// Define como undefined para garantir que será removido no _writeFrontmatter
+						newFm[propToDelete] = undefined;
+						changed = true;
 					}
 				}
 			}
 		}
 
 		// Save changes if any
-		console.log(`[DEBUG] Verificando alterações - changed: ${changed}, titleChanged: ${titleChanged}`);
 		if (changed || titleChanged) {
-			console.log(`[DEBUG] Salvando alterações no arquivo: "${file.basename}" (${file.path})`);
-			console.log(`[DEBUG] Novo frontmatter:`, newFm);
 			if (titleChanged) {
 				// Update the title in the file content
 				await this._updateNoteTitle(file, newTitle);
@@ -382,7 +332,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 			return true;
 		}
-		
+
 		return false;
 	}
 
@@ -397,12 +347,12 @@ class ConditionalPropertiesPlugin extends Plugin {
 		const getMomentDate = () => {
 			try {
 				// Try to get file creation date, fallback to current date
-				return file && file.stat && file.stat.ctime 
-					? window.moment(file.stat.ctime) 
-					: window.moment();
+				return file && file.stat && file.stat.ctime
+					? moment(file.stat.ctime)
+					: moment();
 			} catch (e) {
 				console.error("Error getting file creation date:", e);
-				return window.moment();
+				return moment();
 			}
 		};
 
@@ -496,7 +446,6 @@ class ConditionalPropertiesPlugin extends Plugin {
 		}
 		const normalizedSource = this._normalizeValue(source);
 		const normalizedExpected = this._normalizeValue(expected);
-		console.log(`Comparing "${String(source || '')}" (normalized: "${normalizedSource}") with "${String(expected || '')}" (normalized: "${normalizedExpected}")`);
 		return normalizedSource === normalizedExpected;
 	}
 
@@ -505,143 +454,65 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	async _getNoteTitle(file) {
-		// Get file content
-		const content = await this.app.vault.read(file) || '';
-		
-		// Check for H1 title after YAML frontmatter
-		const lines = content.split('\n');
-		let inFrontmatter = false;
-		let foundH1 = false;
-		let h1Title = null;
-		
-		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i].trim();
-			
-			// Detect YAML frontmatter
-			if (line === '---' && !inFrontmatter && i === 0) {
-				inFrontmatter = true;
-				continue;
-			}
-			if (line === '---' && inFrontmatter) {
-				inFrontmatter = false;
-				continue;
-			}
-			
-			// Skip YAML content
-			if (inFrontmatter) continue;
-			
-			// Look for H1 title (line starting with # )
-			if (line.startsWith('# ') && !foundH1) {
-				h1Title = line.substring(2).trim(); // Remove # and trim
-				foundH1 = true;
-				break;
+		// Use MetadataCache to get heading information
+		const cache = this.app.metadataCache.getFileCache(file);
+
+		if (cache && cache.headings && cache.headings.length > 0) {
+			// Find the first level 1 heading
+			const firstH1 = cache.headings.find(heading => heading.level === 1);
+			if (firstH1) {
+				return firstH1.heading;
 			}
 		}
-		
-		// Prioritize H1 if found
-		if (h1Title) {
-			return h1Title;
-		}
-		
+
 		// Check for inline title if showInlineTitle is enabled
 		const showInlineTitle = this.app.vault.getConfig('showInlineTitle');
 		if (showInlineTitle) {
 			// Get the file's display name (which would be the inline title)
 			return file.basename;
 		}
-		
+
 		// No title available
 		return null;
 	}
 
 	async _updateNoteTitle(file, newTitle) {
-		let content = await this.app.vault.read(file);
-		
-		// Find the first heading (h1) in the content
-		const headingMatch = content.match(/^#\s+(.+)$/m);
-		
-		if (headingMatch) {
-			// Replace the existing heading
-			content = content.replace(/^#\s+.+$/m, `# ${newTitle}`);
-		} else {
-			// If no heading exists, add one at the top (after YAML if it exists)
-			if (content.startsWith('---\n')) {
-				const yamlEnd = content.indexOf('\n---\n', 4);
-				if (yamlEnd !== -1) {
-					const yaml = content.substring(0, yamlEnd + 5);
-					const rest = content.substring(yamlEnd + 5).trim();
-					content = `${yaml}\n# ${newTitle}\n\n${rest}`.trim() + '\n';
-				}
+		await this.app.vault.process(file, (content) => {
+			// Find the first heading (h1) in the content
+			const headingMatch = content.match(/^#\s+(.+)$/m);
+
+			if (headingMatch) {
+				// Replace the existing heading
+				return content.replace(/^#\s+.+$/m, `# ${newTitle}`);
 			} else {
+				// If no heading exists, add one at the top (after YAML if it exists)
+				if (content.startsWith('---\n')) {
+					const yamlEnd = content.indexOf('\n---\n', 4);
+					if (yamlEnd !== -1) {
+						const yaml = content.substring(0, yamlEnd + 5);
+						const rest = content.substring(yamlEnd + 5).trim();
+						return `${yaml}\n# ${newTitle}\n\n${rest}`.trim() + '\n';
+					}
+				}
 				// No YAML, just add the heading at the top
-				content = `# ${newTitle}\n\n${content}`.trim() + '\n';
+				return `# ${newTitle}\n\n${content}`.trim() + '\n';
 			}
-		}
-		
-		await this.app.vault.modify(file, content);
+		});
 	}
 
 	async _writeFrontmatter(file, newFrontmatter) {
-		console.log(`[DEBUG] _writeFrontmatter - Iniciando escrita do frontmatter`);
-		console.log(`[DEBUG] Novos valores do frontmatter:`, newFrontmatter);
-		
-		const content = await this.app.vault.read(file);
-		const hasYaml = content.startsWith("---\n");
-		
-		if (!hasYaml) {
-			console.log(`[DEBUG] Nenhum YAML encontrado, criando novo`);
-			// Remove propriedades nulas/indefinidas
+		await this.app.fileManager.processFrontMatter(file, (fm) => {
+			// Process the new frontmatter properties
 			Object.keys(newFrontmatter).forEach(key => {
 				if (newFrontmatter[key] === null || newFrontmatter[key] === undefined) {
-					delete newFrontmatter[key];
+					// Remove the property if marked as null/undefined
+					delete fm[key];
+				} else {
+					// Update the property value
+					fm[key] = newFrontmatter[key];
 				}
 			});
-			
-			const yamlStr = stringifyYaml(newFrontmatter).trim();
-			const newContent = `---\n${yamlStr}\n---\n${content}`;
-			await this.app.vault.modify(file, newContent);
-			console.log(`[DEBUG] Novo YAML criado com sucesso`);
-			return;
-		}
-		
-		const end = content.indexOf("\n---\n", 4);
-		if (end === -1) return;
-		
-		const yamlRaw = content.substring(4, end);
-		const body = content.substring(end + 5);
-		let fm = {};
-		try { 
-			fm = parseYaml(yamlRaw) || {}; 
-		} catch (e) { 
-			console.error("[ERRO] Erro ao fazer parse do YAML:", e);
-			fm = {}; 
-		}
-		
-		console.log(`[DEBUG] Frontmatter atual:`, fm);
-		
-		// Atualiza o frontmatter com as novas propriedades
-		const updatedFm = { ...fm };
-		
-		// Processa as propriedades do novo frontmatter
-		Object.keys(newFrontmatter).forEach(key => {
-			if (newFrontmatter[key] === null || newFrontmatter[key] === undefined) {
-				// Remove a propriedade se estiver marcada como nula/indefinida
-				delete updatedFm[key];
-			} else {
-				// Atualiza o valor da propriedade
-				updatedFm[key] = newFrontmatter[key];
-			}
 		});
-		
-		console.log(`[DEBUG] Frontmatter atualizado:`, updatedFm);
-		
-		// Gera o YAML final
-		const updatedYaml = stringifyYaml(updatedFm).trim();
-		const newContent = `---\n${updatedYaml}\n---\n${body}`;
-		
-		console.log(`[DEBUG] Salvando alterações no arquivo`);
-		await this.app.vault.modify(file, newContent);
-		console.log(`[DEBUG] Alterações salvas com sucesso`);
 	}
 }
 
@@ -713,12 +584,12 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			containerEl.empty();
 			const rootEl = containerEl.createEl("div", { attr: { id: "eis-cp-plugin" } });
 
-			// Header
-			rootEl.createEl("h1", { text: "Conditional Properties" });
 			rootEl.createEl("p", { text: "Create rules to change note properties values based in custom conditions." });
 
-			// Configurations Section
-			rootEl.createEl("h3", { text: "Configurations" });
+			// General settings section
+			new Setting(rootEl)
+				.setName("General")
+				.setHeading();
 
 			// Scan Interval Setting
 			new Setting(rootEl)
@@ -766,13 +637,13 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					});
 			}
 
-			// Add Export/Import Buttons to Configurations
+			// Add Export/Import Buttons
 			const exportImportSetting = new Setting(rootEl)
-				.setName("Backup & Restore")
+				.setName("Backup and restore")
 				.setDesc("Export or import your plugin settings");
 
 			exportImportSetting.addButton(btn => {
-				btn.setButtonText("Export Settings")
+				btn.setButtonText("Export settings")
 					.onClick(() => this.exportSettings());
 			});
 
@@ -790,7 +661,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			exportImportSetting.addButton(btn => {
-				btn.setButtonText("Import Settings").setCta();
+				btn.setButtonText("Import settings").setCta();
 				btn.buttonEl.classList.add("eis-btn-border");
 				btn.onClick(() => importInput.click());
 			});
@@ -809,20 +680,22 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 						try {
 							const result = await this.plugin.runScan();
 							new Notice(`Conditional Properties: ${result.modified} modified / ${result.scanned} scanned`);
-						} finally { 
-							btn.setDisabled(false); 
+						} finally {
+							btn.setDisabled(false);
 						}
 					});
 				});
 
 			// Rules Section
-			rootEl.createEl("h3", { text: "Rules" });
+			new Setting(rootEl)
+				.setName("Rules")
+				.setHeading();
 			this.plugin.settings.rules = this.plugin.settings.rules || [];
 
 			// Add Rule Button
 			const addWrap = rootEl.createEl("div", { cls: "setting-item" });
-			const addBtn = addWrap.createEl("button", { 
-				text: "+ Add Rule", 
+			const addBtn = addWrap.createEl("button", {
+				text: "Add rule",
 				cls: "mod-cta eis-btn"
 			});
 
@@ -863,10 +736,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			rule.ifType = "PROPERTY";
 		}
 
-		const line1 = new Setting(wrap).setName("IF");
+		const line1 = new Setting(wrap).setName("If");
 		line1.addDropdown(d => {
 			d.addOption("PROPERTY", "Property");
-			d.addOption("FIRST_LEVEL_HEADING", "First Level Heading");
+			d.addOption("FIRST_LEVEL_HEADING", "First level heading");
 			d.setValue(rule.ifType || "PROPERTY");
 			d.onChange(async (v) => {
 				rule.ifType = v;
@@ -927,22 +800,22 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		}
 
 		const thenHeader = wrap.createEl("div", { cls: "conditional-rules-header" });
-		thenHeader.createEl("strong", { text: "THEN:" });
+		thenHeader.createEl("strong", { text: "Then:" });
 
 		rule.thenActions.forEach((action, actionIdx) => {
 			this._renderThenAction(wrap, rule, action, actionIdx, idx);
 		});
 
 		const actions = wrap.createEl("div", { cls: "conditional-actions" });
-		const addActionBtn = actions.createEl("button", { text: "+ Add action", cls: "eis-btn conditional-add-action" });
+		const addActionBtn = actions.createEl("button", { text: "Add action", cls: "eis-btn conditional-add-action" });
 		addActionBtn.addEventListener("click", async (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			rule.thenActions.push({ 
+			rule.thenActions.push({
 				type: "property",
-				prop: "", 
-				value: "", 
-				action: "add" 
+				prop: "",
+				value: "",
+				action: "add"
 			});
 			await this.plugin.saveData(this.plugin.settings);
 			this.display();
@@ -1009,7 +882,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
                 inputEl.classList.remove('disabled-input');
             }
         } catch (error) {
-            console.error('Erro ao atualizar estado do campo de valor:', error);
+            console.error('Error updating value field state:', error);
         }
     }
 
@@ -1039,8 +912,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		// Action type selector (Title or Property)
 		actionSetting.addDropdown(d => {
-			d.addOption("property", "Change Property");
-			d.addOption("title", "Change Title");
+			d.addOption("property", "Change property");
+			d.addOption("title", "Change title");
 			d.setValue(action.type || "property");
 			d.onChange(async (v) => {
 				action.type = v;
@@ -1063,10 +936,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				}));
 
 			actionSetting.addDropdown(d => {
-				d.addOption("add", "ADD VALUE");
-				d.addOption("remove", "REMOVE VALUE");
-				d.addOption("overwrite", "OVERWRITE ALL VALUES WITH");
-				d.addOption("delete", "DELETE PROPERTY");
+				d.addOption("add", "Add value");
+				d.addOption("remove", "Remove value");
+				d.addOption("overwrite", "Overwrite all values with");
+				d.addOption("delete", "Delete property");
 				d.setValue(action.action || "add");
 				d.onChange(async (v) => {
 					action.action = v;
