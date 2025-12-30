@@ -44,7 +44,7 @@
 #eis-cp-plugin .conditional-rules-header {
 	padding-top: 15px;
   padding-bottom: 10px;
-  border-top: 3px solid var(--modal-border-color);
+  border-top: 2px dotted var(--background-modifier-border);
   margin-top: 10px;
 }
 
@@ -55,11 +55,8 @@
 }
 
 #eis-cp-plugin .conditional-actions {
+  border-top: 3px solid var(--modal-border-color);
   padding-top: 15px;
-}
-
-#eis-cp-plugin .conditional-then-action {
-  border-bottom: 2px dotted var(--background-modifier-border);
 }
 
 #eis-cp-plugin .conditional-then-action:hover .setting-item-name {font-weight: bold;}
@@ -88,7 +85,7 @@
 	margin: 0;
 }
 
-#eis-cp-plugin .conditional-actions button {
+#eis-cp-plugin .conditional-actions .eis-btn.conditional-add-action {
 	margin-right: 10px;
 }
 

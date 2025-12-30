@@ -584,13 +584,6 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			containerEl.empty();
 			const rootEl = containerEl.createEl("div", { attr: { id: "eis-cp-plugin" } });
 
-			rootEl.createEl("p", { text: "Create rules to change note properties values based in custom conditions." });
-
-			// General settings section
-			new Setting(rootEl)
-				.setName("General")
-				.setHeading();
-
 			// Scan Interval Setting
 			new Setting(rootEl)
 				.setName("Scan interval (minutes)")
@@ -624,8 +617,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			// Number of Notes Setting (conditionally shown)
 			if (this.plugin.settings.scanScope !== 'entireVault') {
 				new Setting(rootEl)
-					.setName("Number of notes")
-					.setDesc("Number of recent created notes to scan (1-1000)")
+					.setName("Notes to scan")
+					.setDesc("Number of notes to scan (applies to Latest Created or Latest Modified scope, 1-1000)")
 					.addText(text => {
 						text.setPlaceholder("15")
 						.setValue(String(this.plugin.settings.scanCount || 15))
