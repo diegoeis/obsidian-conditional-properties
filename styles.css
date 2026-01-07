@@ -27,7 +27,7 @@
 #eis-cp-plugin .conditional-rule .setting-item-control * {
   display: inline-block;
   width: 100%;
-  flex: 1 0 120px;
+  flex: 1;
 }
 
 #eis-cp-plugin .conditional-rule > .setting-item .setting-item-info .setting-item-name, 

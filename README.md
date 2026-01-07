@@ -1,293 +1,162 @@
-# Conditional Properties (Obsidian Plugin)
+# Conditional Properties for Obsidian
 
-Automate frontmatter property updates in your Obsidian notes using simple conditional rules. Define rules like: IF property X equals Y THEN set property Z to W. Run on the whole vault or only on the current file, manually or on a schedule.
+**Automate your frontmatter with smart IF/THEN rules.** Set properties, modify titles, and keep your vault organized—automatically.
 
-What inspired me to do this plugin was:
-My Granola meeting notes imports weren’t bringing the same name values as my people notes. So, I created this plugin to correct the names of people in my notes.
+![Plugin Interface](https://i.imgur.com/d13fhzH.jpeg)
 
-![https://i.imgur.com/xfz21us.png](https://i.imgur.com/xfz21us.png)
+## Why Use This Plugin?
 
+Stop manually updating properties across hundreds of notes. Define rules once, run everywhere. Perfect for:
+- 🏷️ Auto-tagging notes based on content
+- 📊 Maintaining consistent metadata
+- 🔄 Bulk property updates
+- ⏰ Scheduled maintenance
+- 🎯 Targeted scope (latest created/modified notes)
 
-## Features
+## Core Features
 
-- Define multiple rules with a simple IF/THEN model
-- **Property Existence Check**: Check if a property exists or not in the frontmatter
-- **Operators**: `exactly`, `contains`, `notContains`, `exists`, `notExists`, `isEmpty`
-- **Multiple THEN actions per rule**: Set multiple properties in a single rule
-- **Comma-separated values**: Set multiple values for a property (e.g., "work, apple" → properly formatted YAML array)
-- **ADD/REMOVE actions**: Choose to ADD values to a property or REMOVE specific values
-- **Smart property merging**: Add values to existing properties without duplicating
-- **Scan Scope Options**: Choose between entire vault, latest created notes, or latest modified notes
-- **Configurable scan count**: Set number of notes to scan (1-1000, default 15) for latest notes options
-- **Title-based conditions**: Use the note's title (first H1 after YAML frontmatter or inline title) as the IF condition
-- Run on the entire vault (settings button or command)
-- Run on the current file (command palette)
-- Scheduled scans with a minimum interval of 5 minutes
-- Safe updates: only frontmatter properties are modified, body content is preserved
-- Handles multi-value properties (arrays/strings): preserves existing values when adding
+### 🎯 Flexible Conditions
+- **6 operators**: `exactly`, `contains`, `notContains`, `exists`, `notExists`, `isEmpty`
+- **Property-based**: Check any frontmatter property
+- **Title-based**: Use note titles (H1 or inline) as conditions
 
-## Settings
-- Scan interval (minutes): default 5, minimum 5
-- **Scan Scope**: Choose between "Latest Created notes", "Latest Modified notes", or "Entire vault"
-- **Number of notes**: When using latest notes options, set the number of notes to scan (1-1000, default 15)
-- Rules editor: add/remove rules, pick operator, edit values
-- Run now button (executes based on selected scope)
-- Add many values in the same THEN action separated by commas
-- Add multiple THEN actions
+### ⚡ Powerful Actions
+- **ADD**: Add values without duplicating
+- **REMOVE**: Remove specific values
+- **OVERWRITE**: Replace entire property
+- **DELETE PROPERTY**: Remove property completely
+- **CHANGE TITLE**: Add prefix/suffix with dynamic dates
 
+### 🎛️ Smart Execution
+- **Run on demand**: Entire vault or current file only
+- **Scheduled scans**: Set intervals (min 5 minutes)
+- **Scoped scanning**: Latest created, latest modified, or entire vault
+- **Configurable count**: Process 1-1000 notes at once
 
-## Installation (Development)
+### 🛡️ Safe & Private
+- Only modifies frontmatter (body content preserved)
+- All processing happens locally
+- No data leaves your device
 
-1. Copy this folder into your vault at `.obsidian/plugins/obsidian-conditional-properties`.
-2. In Obsidian, go to Settings → Community Plugins → toggle this plugin.
+## Quick Examples
 
-This repository ships the compiled `main.js`. No build step is required for testing.
+**Auto-tag meetings:**
+```yaml
+IF property: type = "meeting"
+THEN ADD tags: work, important
+```
 
-## Operators
+**Archive old projects:**
+```yaml
+IF property: status = "archived"
+THEN REMOVE tags: active, wip
+```
 
-### Property Operators
-- **exactly**: Checks if the property value exactly matches the specified value
-- **contains**: Checks if the property value contains the specified text
-- **notContains**: Checks if the property value does not contain the specified text
-- **exists**: Checks if the property exists in the frontmatter (ignores the value field)
-- **notExists**: Checks if the property does not exist in the frontmatter (ignores the value field)
-- **isEmpty**: Checks if the property exists but is empty (empty string or empty array) (ignores the value field)
+**Date-stamp completed tasks:**
+```yaml
+IF property: status = "done"
+THEN Change Title: Add suffix " - {date:DD/MM/YYYY}"
+```
 
-### Example: Using exists/notExists/isEmpty
+**Clean up deprecated data:**
+```yaml
+IF property: tags = "old-project"
+THEN DELETE PROPERTY: legacy_data
+```
+
+**Title-based tagging:**
+```yaml
+IF title contains: "Meeting"
+THEN ADD tags: meeting, important
+```
+
+## Multiple Actions Per Rule
+
+Combine actions to automate complex workflows:
 
 ```yaml
-# Rule: If 'status' property exists
-IF: status exists
-THEN: set priority to 'high'
-
-# Rule: If 'reviewed' property does not exist
-IF: reviewed notExists
-THEN: set needs_review to true
-
-# Rule: If 'tags' property exists but is empty
-IF: tags isEmpty
-THEN: add tags 'untagged'
-
-# Note: isEmpty vs notExists
-# - isEmpty: property exists in frontmatter but has no value (e.g., tags: "" or tags: [])
-# - notExists: property is not present in frontmatter at all
+IF property: project_status = "completed"
+THEN:
+  - SET status [OVERWRITE]: done
+  - ADD tags: archived
+  - REMOVE tags: active, wip
+  - ADD priority: low
 ```
+
+## Scan Scopes
+
+Choose what to scan:
+- **Latest Created**: Process newest notes (default: 15)
+- **Latest Modified**: Process recently edited notes (default: 15)
+- **Entire Vault**: Process all notes
+
+Perfect for running rules only on active notes instead of your entire vault.
+
+## Operators Reference
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `exactly` | Exact match | `type = "meeting"` |
+| `contains` | Substring match | `name contains "Diego"` |
+| `notContains` | Does not contain | `tags notContains "draft"` |
+| `exists` | Property present | `status exists` |
+| `notExists` | Property absent | `reviewed notExists` |
+| `isEmpty` | Empty value | `tags isEmpty` |
+
+## Title Actions
+
+Modify note titles dynamically:
+
+- **Prefix**: `[ARCHIVED] Original Title`
+- **Suffix**: `Original Title - {date}`
+- **Date formats**:
+  - `{date}` → Default format
+  - `{date:DD-MM-YYYY}` → Custom format
+  - `{date:YYYY/MM/DD}` → Custom format
+
+## Installation
+
+### From Community Plugins (Coming Soon)
+1. Settings → Community Plugins → Browse
+2. Search "Conditional Properties"
+3. Install and enable
+
+### Manual Installation
+1. Copy folder to `.obsidian/plugins/obsidian-conditional-properties`
+2. Settings → Community Plugins → Enable "Conditional Properties"
 
 ## Usage
 
-### Run now
-- Settings → Conditional Properties → "Run now" button (executes based on selected scan scope).
-- Command palette: "Run conditional rules on vault".
+### Run Manually
+- **Settings**: Conditional Properties → "Run now" button
+- **Command Palette**: "Run conditional rules on vault"
+- **Current file**: "Run conditional rules on current file"
 
-### Run on current file
-- Command palette: "Run conditional rules on current file".
+### Schedule Execution
+Settings → Scan interval (minutes) → Set interval (minimum 5)
 
-### Scheduled execution
-- Settings → set "Scan interval (minutes)" (minimum 5). The plugin runs automatically using a timer.
-
-## Scan Scope Options
-
-Choose which notes the plugin will scan when running rules:
-
-- **Latest Created notes**: Scan the most recently created notes (configurable count, default 15)
-- **Latest Modified notes**: Scan the most recently modified notes (configurable count, default 15)
-- **Entire vault**: Scan all notes in the vault
-
-The scan scope can be configured in Settings → Conditional Properties → "Scan Scope".
-
-## Action Types
-
-### Property Actions
-
-When setting properties in THEN actions, you can choose between different modes:
-
-### ADD (Default)
-- Adds the specified values to the property
-- Does NOT duplicate values if they already exist
-- Preserves existing values in the property
-- **Preserves the IF condition value** - will not remove it when adding new values
-
-### REMOVE
-- Removes the specified values from the property
-- Only removes values that exist
-- Preserves all other values in the property
-- Safe: does nothing if the value doesn't exist
-
-### OVERWRITE
-- Completely replaces the property value with the specified new value
-- Removes all existing values and sets only the new ones
-- Useful for resetting or fully updating a property
-- Warning: This will erase any existing data in the property
-
-### DELETE PROPERTY
-- Completely removes the property from the frontmatter
-- The property and all its values are deleted permanently
-- Warning: This action is irreversible and will permanently delete the property
-- No value field is required, as nothing is being set
-
-### How to use Property Actions
-In the rules editor, each THEN action has a dropdown between the property name and value field:
-- Select **ADD** to add values (default behavior)
-- Select **REMOVE** to remove values
-- Select **OVERWRITE** to replace the entire property value
-- Select **DELETE PROPERTY** to remove the property entirely
-
-### Title Modification Actions
-
-You can now modify note titles based on conditions. When adding a new action, select **Change Title** from the action type dropdown.
-
-#### Features:
-- **Add prefix**: Add text at the beginning of the title
-- **Add suffix**: Add text at the end of the title
-- **Date formatting**: Use `{date}` for default date format or `{date:FORMAT}` for custom formats (e.g., `{date:DD-MM-YYYY}`)
-
-#### How to use:
-1. In the rules editor, click "+ Add action"
-2. Select "Change Title" from the action type dropdown
-3. Choose between "Add prefix" or "Add suffix"
-4. Enter the text to add (use `{date}` or `{date:FORMAT}` for dynamic dates)
-
-#### Examples:
-- Add today's date as a prefix: `{date} - `
-- Add a custom formatted date as a suffix: ` - {date:DD/MM/YYYY}`
-- Add a fixed prefix: `[ARCHIVED] `
-
-### Examples
-
-**Add tags without duplicating (exact match):**
-```
-IF property: type, op: exactly, value: meeting
-THEN set property: tags [ADD] work, important
-```
-Result: Adds "work" and "important" tags only if they don't already exist.
-
-**Remove old tags (exact match):**
-```
-IF property: status, op: exactly, value: archived
-THEN set property: tags [REMOVE] draft, wip
-```
-Result: Removes "draft" and "wip" tags if they exist.
-
-**Overwrite property value (exact match):**
-```
-IF property: status, op: exactly, value: old
-THEN set property: status [OVERWRITE] new
-```
-Result: Replaces the entire "status" property with "new", removing any previous values.
-
-**Delete a property (exact match):**
-```
-IF property: tags, op: exactly, value: deprecated
-THEN set property: old_tags [DELETE PROPERTY]
-```
-Result: Completely removes the "old_tags" property from the frontmatter.
-
-**Combine ADD and REMOVE (exact match):**
-```
-IF property: tags, op: exactly, value: old-project
-THEN set properties:
-  - tags [REMOVE] old-project, legacy
-  - tags [ADD] new-project, active
-  - status [ADD] migrated
-```
-Result: Removes old tags, adds new ones, and sets status.
-
-**Substring containment:**
-```
-IF property: name, op: contains, value: iago
-THEN set property: tags [ADD] review
-```
-Result: Matches any value where the normalized text contains "iago" (e.g. `"[[Diago Silva]]"`).
-
-## Rules
-
-Each rule has:
-- `ifProp`: source property name (ignored for heading-based rules)
-- `op`: operator (`exactly`, `contains`, `notContains`)
-- `ifValue`: value to test (substring for `contains`/`notContains`)
-- `thenActions`: array of actions to execute, each with `prop`, `value`, and `action` (add/remove/overwrite/delete)
-
-### Examples
-
-1) Rename a person mention in a multi-value property
-```yaml
----
-related_people: ["[[steve_works]]", "[[John Doe]]"]
----
-```
-Rule:
-```
-IF property: related_people, op: exactly, value: [[steve_works]]
-THEN set property: related_people to [[Steve Jobs]]
-```
-Result:
-```yaml
----
-related_people: ["[[Steve Jobs]]", "[[John Doe]]"]
----
-```
-
-2) Set a status if a tag contains a keyword
-```
-IF property: tags, op: exactly, value: meeting
-THEN set property: status to processed
-```
-
-3) Ensure a property does not contain a value
-```
-IF property: source, op: notContains, value: transcript-auto
-THEN set property: verified to true
-```
-
-4) Set multiple properties when a condition is met (NEW!)
-```
-IF property: tags, op: exactly, value: meeting
-THEN set properties:
-  - status to processed
-  - priority to high
-```
-
-5) Update multiple related properties
-```
-IF property: project_status, op: exactly, value: completed
-THEN set properties:
-  - "status to done
-  - "priority to low
-  - "archived to true
-```
-
-6) Set multiple tags at once
-```
-IF property: type, op: exactly, value: note
-THEN set properties:
-  - tags to work, apple, important
-```
-
-7) Use heading-based condition
-```
-IF first level heading, op: contains, value: Meeting
-THEN set properties:
-  - tags to meeting, important
-```
-*Note: The title is the first H1 heading after the YAML frontmatter, or the inline title if enabled. Rules are skipped for notes without a title.*
+The plugin runs automatically based on your selected scope.
 
 ## Roadmap
-  - [x] Conditional IF/THEN rules engine
-  - [x] Property operators (`exactly`, `contains`, `notContains`, `exists`, `notExists`, `isEmpty`)
-  - [x] Multiple actions per rule
-  - [x] Export/import settings UI
-  - [x] Title prefix/suffix modifications with `{date}` placeholders
-  - [x] Scheduled scans and scoped run options
-  - [x] Run on current file
-  - [x] Verify if property is empty
-  - [ ] Rename property
-  - [ ] Execute changes in the note content, not only properties or titles
-  - [ ] Advanced operators (regex, greater/less than)
-  - [ ] Compound conditions (AND/OR/NOT)
-  - [ ] Folder/tag scoping and new-note filters
+
+- [x] IF/THEN rules engine
+- [x] 6 property operators
+- [x] Multiple actions per rule
+- [x] Title modifications with date placeholders
+- [x] Scheduled scans
+- [x] Scoped execution (latest/entire vault)
+- [x] Current file execution
+- [x] Property existence checks
+- [ ] Rename property action
+- [ ] Modify note content (beyond frontmatter)
+- [ ] Advanced operators (regex, comparison)
+- [ ] Compound conditions (AND/OR/NOT)
+- [ ] Folder/tag-based scoping
 
 ## Privacy
-All processing happens locally in your vault. No data leaves your device.
+
+All processing happens locally. No data collection, no external requests.
 
 ## License
+
 MIT

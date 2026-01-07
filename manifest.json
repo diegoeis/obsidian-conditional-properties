@@ -1,9 +1,9 @@
 {
   "id": "conditional-properties",
   "name": "Conditional Properties",
-  "version": "0.14.5",
+  "version": "0.14.6",
   "minAppVersion": "1.5.0",
-  "description": "Automate frontmatter updates using conditional rules (IF/THEN).",
+  "description": "Automate your frontmatter with smart IF/THEN rules. Set properties, modify titles, and keep your vault organized—automatically.",
   "author": "Diego Eis",
   "authorUrl": "https://diegoeis.com",
   "isDesktopOnly": false
