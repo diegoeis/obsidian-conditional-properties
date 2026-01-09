@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.15.0 - 2026-01-08
+### New Features
+- **OVERWRITE TO option for title modification**: Completely replace note titles instead of just adding prefix/suffix
+- **{filename} placeholder**: New placeholder that inserts the file's basename (without .md extension)
+- **Combined placeholders**: Mix {date}, {date:FORMAT}, and {filename} in any order (e.g., `{date:YYYY-MM-DD} - {filename}`)
+- **Auto-create H1 headings**: When using `notExists` or `isEmpty` operators with FIRST LEVEL HEADING, the plugin now creates H1 headings automatically
+- **Improved UI**: Text input field now hides automatically when using `exists`, `notExists`, or `isEmpty` operators
+
+### Bug Fixes
+- Fixed issue where rules with `notExists` or `isEmpty` operators on FIRST LEVEL HEADING were being skipped
+- Fixed `isEmpty` operator returning false for non-existent headings instead of true
+- Fixed OVERWRITE TO not working when H1 heading doesn't exist
+
+### Improvements
+- OVERWRITE TO now properly handles notes without H1 headings
+- Frontmatter `title` property remains untouched (plugin only modifies H1 headings)
+- Better operator handling for FIRST LEVEL HEADING conditions
+
 ## 0.1.0 - 2025-10-13
 - Initial release
 - Rules engine with operators (equals/contains/notEquals)

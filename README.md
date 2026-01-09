@@ -25,7 +25,7 @@ Stop manually updating properties across hundreds of notes. Define rules once, r
 - **REMOVE**: Remove specific values
 - **OVERWRITE**: Replace entire property
 - **DELETE PROPERTY**: Remove property completely
-- **CHANGE TITLE**: Add prefix/suffix with dynamic dates
+- **CHANGE TITLE**: Add prefix/suffix or overwrite with dynamic dates and filenames
 
 ### 🎛️ Smart Execution
 - **Run on demand**: Entire vault or current file only
@@ -57,6 +57,13 @@ THEN REMOVE tags: active, wip
 IF property: status = "done"
 THEN Change Title: Add suffix " - {date:DD/MM/YYYY}"
 ```
+
+**Standardize meeting note titles:**
+```yaml
+IF title contains: "Meeting"
+THEN Change Title: Overwrite to "{date:YYYY-MM-DD} - {filename}"
+```
+Result: `2026-01-08 - team-sync`
 
 **Clean up deprecated data:**
 ```yaml
@@ -109,10 +116,24 @@ Modify note titles dynamically:
 
 - **Prefix**: `[ARCHIVED] Original Title`
 - **Suffix**: `Original Title - {date}`
-- **Date formats**:
-  - `{date}` → Default format
-  - `{date:DD-MM-YYYY}` → Custom format
-  - `{date:YYYY/MM/DD}` → Custom format
+- **Overwrite**: Replace entire title with custom text
+
+### Available Placeholders
+
+- **{date}**: File creation date (default format)
+  - Example: `{date}` → `2026-01-08`
+- **{date:FORMAT}**: Custom date format (moment.js)
+  - Example: `{date:DD-MM-YYYY}` → `08-01-2026`
+  - Example: `{date:YYYY/MM/DD}` → `2026/01/08`
+- **{filename}**: Current file basename (without .md)
+  - Example: For file `meeting-notes.md` → `meeting-notes`
+
+### Placeholder Combinations
+
+Placeholders can be combined in any order:
+- `{date:YYYY-MM-DD} - {filename}` → `2026-01-08 - meeting-notes`
+- `Meeting {filename} - {date:DD/MM/YY}` → `Meeting meeting-notes - 08/01/26`
+- `{filename}` → `meeting-notes` (overwrite with just filename)
 
 ## Installation
 

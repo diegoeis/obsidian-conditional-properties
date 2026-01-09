@@ -199,9 +199,12 @@ class ConditionalPropertiesPlugin extends Plugin {
 			let sourceValue;
 			if (ifType === "FIRST_LEVEL_HEADING") {
 				sourceValue = await this._getNoteTitle(file);
-				// If no title available, skip rule
-				if (sourceValue === null) {
-					continue;
+
+				// Permitir null apenas para operadores que testam ausência/vazio
+				const allowsNull = op === "notExists" || op === "isEmpty";
+
+				if (sourceValue === null && !allowsNull) {
+					continue; // Pula apenas se operador NÃO permite null
 				}
 			} else {
 				sourceValue = currentFrontmatter?.[ifProp];
@@ -219,26 +222,38 @@ class ConditionalPropertiesPlugin extends Plugin {
 				if (type === 'title' && text) {
 					try {
 						const currentTitle = await this._getNoteTitle(file);
-						if (currentTitle === null) {
-							continue;
-						}
 
-						// Format the text with any date placeholders
+						// Format the text with any placeholders
 						const formattedText = this._formatText(text, file);
 
-						// Check if the title already has this modification
-						const alreadyHasModification = modificationType === 'prefix'
-							? currentTitle.startsWith(formattedText)
-							: currentTitle.endsWith(formattedText);
+						// Handle different modification types
+						if (modificationType === 'overwrite') {
+							// Se título não existe (null), sempre criar
+							// Se título existe, verificar duplicação
+							if (currentTitle !== null && currentTitle === formattedText) {
+								continue; // Skip if title is already the target value
+							}
+							newTitle = formattedText;
+						} else {
+							// Existing prefix/suffix logic
+							// Para prefix/suffix, precisamos de um título existente
+							if (currentTitle === null) {
+								continue; // Skip prefix/suffix if no title exists
+							}
 
-						if (alreadyHasModification) {
-							continue; // Skip to next action as the modification is already applied
+							const alreadyHasModification = modificationType === 'prefix'
+								? currentTitle.startsWith(formattedText)
+								: currentTitle.endsWith(formattedText);
+
+							if (alreadyHasModification) {
+								continue; // Skip to next action as the modification is already applied
+							}
+
+							// Apply prefix or suffix
+							newTitle = modificationType === 'prefix'
+								? formattedText + currentTitle
+								: currentTitle + formattedText;
 						}
-
-						// Apply prefix or suffix
-						newTitle = modificationType === 'prefix'
-							? formattedText + currentTitle
-							: currentTitle + formattedText;
 
 						titleChanged = true;
 					} catch (e) {
@@ -371,9 +386,23 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		};
 
-		// Replace {date} and {date:FORMAT} placeholders
-		// Keep the exact formatting the user typed, just replace the {date} part
-		return text.replace(/\{date(?::([^}]+))?\}/g, (match, format) => {
+		// Get filename (basename without extension)
+		const getFilename = () => {
+			try {
+				return file && file.basename ? file.basename : "[no-filename]";
+			} catch (e) {
+				console.error("Error getting filename:", e);
+				return "[filename-error]";
+			}
+		};
+
+		// Replace {date}, {date:FORMAT}, and {filename} placeholders
+		// Keep the exact formatting the user typed, just replace the placeholders
+		return text.replace(/\{(date|filename)(?::([^}]+))?\}/g, (match, type, format) => {
+			if (type === 'filename') {
+				return getFilename();
+			}
+			// type === 'date'
 			return formatDate(format);
 		});
 	}
@@ -392,7 +421,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 
 		// Para o operador 'isEmpty', verificamos se a propriedade existe mas está vazia
 		if (op === "isEmpty") {
-			// Retorna false se a propriedade não existir
+			// Para FIRST_LEVEL_HEADING: null significa que não existe (considerar como vazio)
+			if (ifType === "FIRST_LEVEL_HEADING" && (source === undefined || source === null)) {
+				return true;
+			}
+			// Para propriedades: retorna false se a propriedade não existir
 			if (source === undefined || source === null) {
 				return false;
 			}
@@ -746,16 +779,26 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			line1.addDropdown(d => {
 				this._configureOperatorDropdown(d, rule.op || "exactly", async (value) => {
 					rule.op = value;
+					// Se for 'exists', 'notExists' ou 'isEmpty', limpa o valor
+					if (value === 'exists' || value === 'notExists' || value === 'isEmpty') {
+						rule.ifValue = '';
+					}
 					await this.plugin.saveData(this.plugin.settings);
+					// Recarrega a visualização para atualizar a interface
+					this.display();
 				});
 			});
-			line1.addText(t => t
-				.setPlaceholder("heading text")
-				.setValue(rule.ifValue || "")
-				.onChange(async (v) => {
-					rule.ifValue = v;
-					await this.plugin.saveData(this.plugin.settings);
-				}));
+
+			// Adiciona o campo de texto apenas se não for 'exists', 'notExists' ou 'isEmpty'
+			if (rule.op !== 'exists' && rule.op !== 'notExists' && rule.op !== 'isEmpty') {
+				line1.addText(t => t
+					.setPlaceholder("heading text")
+					.setValue(rule.ifValue || "")
+					.onChange(async (v) => {
+						rule.ifValue = v;
+						await this.plugin.saveData(this.plugin.settings);
+					}));
+			}
 		} else {
 			// Adiciona o campo de nome da propriedade
 			const propInput = line1.addText(t => t
@@ -955,6 +998,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			actionSetting.addDropdown(d => {
 				d.addOption("prefix", "Add prefix");
 				d.addOption("suffix", "Add suffix");
+				d.addOption("overwrite", "Overwrite to");
 				d.setValue(action.modificationType || "prefix");
 				d.onChange(async (v) => {
 					action.modificationType = v;
@@ -963,7 +1007,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			actionSetting.addText(t => t
-				.setPlaceholder("Text to add (use {date} or {date:FORMAT} for dates)")
+				.setPlaceholder("Text (use {date}, {date:FORMAT}, or {filename})")
 				.setValue(action.text || "")
 				.onChange(async (v) => {
 					action.text = v;
