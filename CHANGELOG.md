@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.0 - 2026-01-12
+### New Features
+- **RENAME property action**: New action to rename properties while preserving their values. Use "Rename property to" option in THEN actions to change property names (e.g., rename `old_company` to `company`)
+
+### Improvements
+- Case-insensitive property name matching for rename operations
+- Automatic protection against overwriting existing properties during rename
+- Clean removal of old property after successful rename
+
 ## 0.15.0 - 2026-01-08
 ### New Features
 - **OVERWRITE TO option for title modification**: Completely replace note titles instead of just adding prefix/suffix
