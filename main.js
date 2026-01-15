@@ -523,14 +523,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		}
 
-		// Check for inline title if showInlineTitle is enabled
-		const showInlineTitle = this.app.vault.getConfig('showInlineTitle');
-		if (showInlineTitle) {
-			// Get the file's display name (which would be the inline title)
-			return file.basename;
-		}
-
-		// No title available
+		// No title available - ignore inline title for conditional properties
+		// Only consider real H1 headings in the file content
 		return null;
 	}
 
