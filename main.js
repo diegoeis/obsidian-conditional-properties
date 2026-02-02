@@ -523,6 +523,18 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		}
 
+		// Fallback: If cache is not ready, read file content directly
+		// This ensures we don't miss H1 headings in recently created/modified files
+		try {
+			const content = await this.app.vault.read(file);
+			const match = content.match(/^#\s+(.+)$/m);
+			if (match) {
+				return match[1];
+			}
+		} catch (e) {
+			console.error(`Error reading file content for ${file.path}:`, e);
+		}
+
 		// No title available - ignore inline title for conditional properties
 		// Only consider real H1 headings in the file content
 		return null;

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.16.2 - 2026-02-02
+### Bug Fixes
+- **Fixed first level heading detection with MetadataCache**: Added fallback to read file content directly when MetadataCache hasn't been updated yet
+- This resolves issues where `notExists` or `isEmpty` conditions on FIRST_LEVEL_HEADING were not triggering for recently created or modified files
+- The plugin now reliably detects H1 headings regardless of cache state, ensuring consistent behavior
+
+### Technical Details
+- `_getNoteTitle()` now attempts to read file content directly if cache.headings is empty or undefined
+- Uses regex pattern `/^#\s+(.+)$/m` as fallback to detect H1 headings
+- Maintains backward compatibility with existing MetadataCache-based detection for performance
+
 ## 0.16.0 - 2026-01-12
 ### New Features
 - **RENAME property action**: New action to rename properties while preserving their values. Use "Rename property to" option in THEN actions to change property names (e.g., rename `old_company` to `company`)
