@@ -512,43 +512,88 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	async _getNoteTitle(file) {
-		// Use MetadataCache to get heading information
-		const cache = this.app.metadataCache.getFileCache(file);
+		// Only check for H1 heading immediately after YAML frontmatter
+		// H1 headings elsewhere in the document are not considered the "title"
+		try {
+			const content = await this.app.vault.read(file);
 
-		if (cache && cache.headings && cache.headings.length > 0) {
-			// Find the first level 1 heading
-			const firstH1 = cache.headings.find(heading => heading.level === 1);
-			if (firstH1) {
-				return firstH1.heading;
+			// Check if file has YAML frontmatter
+			if (content.startsWith('---\n')) {
+				// Find the end of YAML frontmatter
+				const yamlEnd = content.indexOf('\n---\n', 4);
+				if (yamlEnd !== -1) {
+					// Get content after YAML (skip the closing ---)
+					const afterYaml = content.substring(yamlEnd + 5);
+
+					// Look for H1 at the start of content after YAML (allowing for whitespace)
+					// Match pattern: optional whitespace, then # heading
+					const match = afterYaml.match(/^\s*#\s+(.+)$/m);
+					if (match) {
+						// Verify this H1 is truly at the beginning (no content before it except whitespace)
+						const beforeH1 = afterYaml.substring(0, match.index);
+						if (beforeH1.trim() === '') {
+							return match[1];
+						}
+					}
+				}
+			} else {
+				// No YAML frontmatter, check if H1 is at the very beginning
+				const match = content.match(/^\s*#\s+(.+)$/m);
+				if (match) {
+					const beforeH1 = content.substring(0, match.index);
+					if (beforeH1.trim() === '') {
+						return match[1];
+					}
+				}
 			}
+		} catch (e) {
+			console.error(`Error reading file content for ${file.path}:`, e);
 		}
 
 		// No title available - ignore inline title for conditional properties
-		// Only consider real H1 headings in the file content
+		// Only consider H1 headings immediately after YAML frontmatter
 		return null;
 	}
 
 	async _updateNoteTitle(file, newTitle) {
 		await this.app.vault.process(file, (content) => {
-			// Find the first heading (h1) in the content
-			const headingMatch = content.match(/^#\s+(.+)$/m);
+			// Check if file has YAML frontmatter
+			if (content.startsWith('---\n')) {
+				const yamlEnd = content.indexOf('\n---\n', 4);
+				if (yamlEnd !== -1) {
+					const yaml = content.substring(0, yamlEnd + 5);
+					const afterYaml = content.substring(yamlEnd + 5);
 
-			if (headingMatch) {
-				// Replace the existing heading
-				return content.replace(/^#\s+.+$/m, `# ${newTitle}`);
-			} else {
-				// If no heading exists, add one at the top (after YAML if it exists)
-				if (content.startsWith('---\n')) {
-					const yamlEnd = content.indexOf('\n---\n', 4);
-					if (yamlEnd !== -1) {
-						const yaml = content.substring(0, yamlEnd + 5);
-						const rest = content.substring(yamlEnd + 5).trim();
-						return `${yaml}\n# ${newTitle}\n\n${rest}`.trim() + '\n';
+					// Check if there's an H1 immediately after YAML (allowing whitespace)
+					const match = afterYaml.match(/^\s*#\s+(.+)$/m);
+					if (match) {
+						const beforeH1 = afterYaml.substring(0, match.index);
+						// Only replace if H1 is truly at the beginning (no content before it)
+						if (beforeH1.trim() === '') {
+							// Replace the existing H1 that's immediately after YAML
+							const newAfterYaml = afterYaml.replace(/^\s*#\s+.+$/m, `# ${newTitle}`);
+							return yaml + newAfterYaml;
+						}
 					}
+
+					// No H1 immediately after YAML, add one
+					const rest = afterYaml.trim();
+					return `${yaml}\n# ${newTitle}\n\n${rest}`.trim() + '\n';
 				}
-				// No YAML, just add the heading at the top
-				return `# ${newTitle}\n\n${content}`.trim() + '\n';
 			}
+
+			// No YAML frontmatter - check if H1 is at the very beginning
+			const match = content.match(/^\s*#\s+(.+)$/m);
+			if (match) {
+				const beforeH1 = content.substring(0, match.index);
+				if (beforeH1.trim() === '') {
+					// Replace the H1 at the beginning
+					return content.replace(/^\s*#\s+.+$/m, `# ${newTitle}`);
+				}
+			}
+
+			// No H1 at the beginning, add one at the top
+			return `# ${newTitle}\n\n${content}`.trim() + '\n';
 		});
 	}
 

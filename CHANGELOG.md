@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.16.2 - 2026-02-02
+### Breaking Changes
+- **H1 detection now only considers headings immediately after YAML frontmatter**: The plugin now only checks for H1 headings that appear at the beginning of the content, right after the YAML frontmatter. H1 headings elsewhere in the document are ignored.
+- This ensures consistent behavior where the "title" of a note is always the first H1 after frontmatter, not random H1s scattered throughout the document.
+
+### Bug Fixes
+- Fixed `notExists` and `isEmpty` operators to correctly identify files without a title H1
+- Plugin no longer considers H1 headings in the middle or end of documents as the "title"
+
+### Technical Details
+- `_getNoteTitle()` now reads file content directly and checks only for H1 immediately after YAML
+- `_updateNoteTitle()` ensures H1 is always placed/updated right after YAML frontmatter
+- Removed dependency on MetadataCache.headings to avoid false positives from H1s elsewhere in the document
+
 ## 0.16.0 - 2026-01-12
 ### New Features
 - **RENAME property action**: New action to rename properties while preserving their values. Use "Rename property to" option in THEN actions to change property names (e.g., rename `old_company` to `company`)
