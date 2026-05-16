@@ -21,13 +21,15 @@ This repo ships the **compiled plugin** directly. There is no TypeScript source,
 
 1. **[.claude/rules.md](.claude/rules.md)** — project-wide rules: language, git/tag/changelog flow, "answer before implement" discipline. Always applies.
 2. **[.claude/docs/DEVELOPMENT_GUIDELINES.md](.claude/docs/DEVELOPMENT_GUIDELINES.md)** — Obsidian-specific do/don'ts: which APIs to use, lint hot-spots reviewers check, mobile compatibility, testing checklist. Consult **before writing any new Obsidian code** so the plugin keeps passing the community lint.
-3. **[.claude/docs/SUBMISSION_GUIDE.md](.claude/docs/SUBMISSION_GUIDE.md)** — community-plugin submission and release flow. Consult before every release and every PR against `obsidian-releases`.
+3. **[.claude/docs/OBSIDIAN_DEVELOPMENT_POLICIES.md](.claude/docs/OBSIDIAN_DEVELOPMENT_POLICIES.md)** — Obsidian's official **developer policies** (mirror of https://docs.obsidian.md/Developer+policies). Hard constraints: no code obfuscation, no dynamic ads, no client-side telemetry, no self-update mechanism, mandatory LICENSE, mandatory README disclosures for network use / payment / accounts / server-side telemetry, and trademark rules. Any change that touches networking, analytics, the LICENSE, or the README's disclosure sections must be checked against this file. Violations get plugins removed from the directory.
+4. **[.claude/docs/SUBMISSION_GUIDE.md](.claude/docs/SUBMISSION_GUIDE.md)** — community-plugin submission and release flow. Consult before every release and every PR against `obsidian-releases`.
 
 ### LLM operating rules
 
 When making code or documentation changes to this plugin:
 
 - **Default to the official Obsidian API.** If you're about to use `fetch`, `fs`, `innerHTML`, `localStorage`, `var`, `eval`, manual YAML parsing, or any non-registered listener — stop and consult `DEVELOPMENT_GUIDELINES.md` first. There is almost always an Obsidian-native equivalent.
+- **Respect the Obsidian Developer Policies.** Before adding any network call, telemetry, ad, update mechanism, obfuscated code, account-required feature, or anything that reads files outside the vault — check `OBSIDIAN_DEVELOPMENT_POLICIES.md`. If the policy requires a README disclosure, add it in the same change. Never insert client-side telemetry or a self-update mechanism, period.
 - **Never strip the lint-safe patterns** already in `main.js` (e.g. `createEl`/`createDiv`, `this.register*`, `requestUrl`, `parseYaml`/`stringifyYaml`, `metadataCache`).
 - **Touch the release artifacts together.** If you bump behavior, you also bump `manifest.json` version, add to `versions.json`, append `CHANGELOG.md`, update `.claude/docs/features-info.md`, and (if a spec exists) update the related PRD/FRD in `.claude/docs/product/`.
 - **No new dependencies, no build step.** This repo intentionally ships compiled JS only.
