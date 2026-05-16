@@ -74,10 +74,11 @@
   margin-bottom: 7px;
 }
 
-.eis-btn-red {
-	background-color: var(--cp-red-color) !important;
-	border-color: var(--cp-red-color) !important;
-	color: #fff !important;
+#eis-cp-plugin button.eis-btn.eis-btn-red,
+#eis-cp-plugin button.eis-btn.eis-btn-red:hover {
+	background-color: var(--cp-red-color);
+	border-color: var(--cp-red-color);
+	color: #ffffff;
 }
 
 #eis-cp-plugin .conditional-remove {
@@ -97,7 +98,7 @@
 }
 #eis-cp-plugin .eis-btn:hover {
 	opacity: .8;
-	color: #fff !important;
+	color: var(--text-on-accent);
 }
 
 

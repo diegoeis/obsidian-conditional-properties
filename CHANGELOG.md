@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.16.3 - 2026-05-16
+### Improvements
+- **README**: removed "(Coming Soon)" placeholder from the Community Plugins install section; the plugin is published, so the placeholder no longer applies.
+- **Roadmap**: marked the rename-property action and the title overwrite / `{filename}` / `{date:FORMAT}` placeholders as shipped (they landed in v0.16.0 and v0.15.0 respectively and were still showing as pending).
+- **styles.css**: removed all `!important` declarations in the active stylesheet and replaced shorthand hex `#fff` with the full 6-digit `#ffffff`. The red-button variant now wins through selector specificity (`#eis-cp-plugin button.eis-btn.eis-btn-red`) instead of `!important`, and the hover color reuses the `--text-on-accent` CSS variable. Cleared the warnings reported by the community CSS lint at `styles.css:78–80` and `styles.css:100`.
+- **Release workflow**: now uploads `main.js`, `styles.css`, `manifest.json`, `versions.json`, the zip, and `LICENSE` individually to the GitHub Release (previously only the zip and manifest were attached, which made the LICENSE file invisible to release-asset validators).
+- **Artifact attestations**: the release workflow now generates GitHub artifact attestations for `main.js`, `styles.css`, and `manifest.json` via `actions/attest-build-provenance@v2`, so users can cryptographically verify the release came from this repo. Required adding `id-token: write` and `attestations: write` to the workflow permissions.
+
+### Why
+Hygiene release driven by the community-plugin validator: the previous release was flagged for unfilled README placeholders, `!important` / 3-digit hex in `styles.css`, and missing artifact attestations. No runtime behavior changed.
+
 ## 0.16.2 - 2026-02-02
 ### Breaking Changes
 - **H1 detection now only considers headings immediately after YAML frontmatter**: The plugin now only checks for H1 headings that appear at the beginning of the content, right after the YAML frontmatter. H1 headings elsewhere in the document are ignored.

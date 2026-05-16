@@ -137,7 +137,7 @@ Placeholders can be combined in any order:
 
 ## Installation
 
-### From Community Plugins (Coming Soon)
+### From Community Plugins
 1. Settings → Community Plugins → Browse
 2. Search "Conditional Properties"
 3. Install and enable
@@ -168,7 +168,8 @@ The plugin runs automatically based on your selected scope.
 - [x] Scoped execution (latest/entire vault)
 - [x] Current file execution
 - [x] Property existence checks
-- [ ] Rename property action
+- [x] Rename property action
+- [x] Title overwrite with `{filename}` and `{date:FORMAT}` placeholders
 - [ ] Modify note content (beyond frontmatter)
 - [ ] Advanced operators (regex, comparison)
 - [ ] Compound conditions (AND/OR/NOT)

@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
@@ -15,33 +20,38 @@ jobs:
         run: |
           PLUGIN_ID="conditional-properties"
           mkdir -p dist
-          zip -j "dist/${PLUGIN_ID}.zip" manifest.json main.js styles.css || true
           cp manifest.json dist/manifest.json
+          cp main.js dist/main.js
+          cp styles.css dist/styles.css
           if [ -f versions.json ]; then cp versions.json dist/versions.json; fi
+          if [ -f LICENSE ]; then cp LICENSE dist/LICENSE; fi
+          (cd dist && zip "${PLUGIN_ID}.zip" manifest.json main.js styles.css)
 
-      - name: Upload manifest.json
+      - name: Generate artifact attestation for main.js
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/main.js
+
+      - name: Generate artifact attestation for styles.css
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/styles.css
+
+      - name: Generate artifact attestation for manifest.json
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/manifest.json
+
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/manifest.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload plugin zip
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
+            dist/main.js
+            dist/styles.css
             dist/conditional-properties.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload versions.json (optional)
-        if: exists('dist/versions.json')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
             dist/versions.json
+            dist/LICENSE
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
