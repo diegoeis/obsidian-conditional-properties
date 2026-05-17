@@ -16,6 +16,7 @@ Stop manually updating properties across hundreds of notes. Define rules once, r
 ## Core Features
 
 ### 🎯 Flexible Conditions
+- **Multiple conditions per rule (new in v0.17.0)**: combine conditions with `Match any` (OR) or `Match all` (AND) — inspired by Zotero's "match any/all of the following" UI.
 - **6 operators**: `exactly`, `contains`, `notContains`, `exists`, `notExists`, `isEmpty`
 - **Property-based**: Check any frontmatter property
 - **Title-based**: Use note titles (H1 or inline) as conditions
@@ -192,9 +193,10 @@ The plugin runs automatically based on your selected scope.
 - [x] Property existence checks
 - [x] Rename property action
 - [x] Title overwrite with `{filename}` and `{date:FORMAT}` placeholders
+- [x] Multiple conditions per rule (`match any` / `match all`)
 - [ ] Modify note content (beyond frontmatter)
 - [ ] Advanced operators (regex, comparison)
-- [ ] Compound conditions (AND/OR/NOT)
+- [ ] Nested condition groups (e.g. `(A AND B) OR C`)
 - [ ] Folder/tag-based scoping
 
 ## Privacy
