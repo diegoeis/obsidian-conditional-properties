@@ -30,6 +30,7 @@ Stop manually updating properties across hundreds of notes. Define rules once, r
 
 ### 🎛️ Smart Execution
 - **Run on demand**: Entire vault or current file only
+- **Stop button (new in v0.18.0)**: cancel a running scan; the current file finishes cleanly and remaining files are skipped
 - **Scheduled scans**: Set intervals (min 5 minutes)
 - **Scoped scanning**: Latest created, latest modified, or entire vault
 - **Configurable count**: Process 1-1000 notes at once

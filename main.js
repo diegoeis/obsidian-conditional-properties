@@ -17,9 +17,21 @@ class ConditionalPropertiesPlugin extends Plugin {
 		this.addCommand({
 			id: "run-now",
 			name: "Run conditional rules on vault",
-			callback: async () => {
-				const result = await this.runScan();
-				new Notice(`Conditional Properties: ${result.modified} modified / ${result.scanned} scanned`);
+			checkCallback: (checking) => {
+				if (checking) return !this.isScanRunning();
+				this.runScan().then(result => {
+					if (result.busy) return;
+					this._notifyScanResult(result, "vault");
+				});
+			}
+		});
+		this.addCommand({
+			id: "stop-scan",
+			name: "Stop running scan",
+			checkCallback: (checking) => {
+				if (checking) return this.isScanRunning();
+				this.requestStopScan();
+				new Notice("Conditional Properties: stop requested — finishing current file");
 			}
 		});
 		this.addCommand({
@@ -193,18 +205,34 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	async runScan() {
-		const { vault, metadataCache } = this.app;
+		if (this._scanRunning) {
+			return { scanned: 0, modified: 0, stopped: false, busy: true };
+		}
+		const { metadataCache } = this.app;
 		const files = this._getFilesToScan();
 		let modifiedCount = 0;
-		for (const file of files) {
-			const cache = metadataCache.getFileCache(file) || {};
-			const frontmatter = cache.frontmatter ?? {};
-			const applied = await this.applyRulesToFrontmatter(file, frontmatter);
-			if (applied) modifiedCount++;
+		let scannedCount = 0;
+		let stopped = false;
+		this._scanRunning = true;
+		this._cancelScan = false;
+		this._emitScanStateChange();
+		try {
+			for (const file of files) {
+				if (this._cancelScan) { stopped = true; break; }
+				const cache = metadataCache.getFileCache(file) || {};
+				const frontmatter = cache.frontmatter ?? {};
+				const applied = await this.applyRulesToFrontmatter(file, frontmatter);
+				if (applied) modifiedCount++;
+				scannedCount++;
+			}
+			this.settings.lastRun = new Date().toISOString();
+			await this.saveData(this.settings);
+		} finally {
+			this._scanRunning = false;
+			this._cancelScan = false;
+			this._emitScanStateChange();
 		}
-		this.settings.lastRun = new Date().toISOString();
-		await this.saveData(this.settings);
-		return { scanned: files.length, modified: modifiedCount };
+		return { scanned: scannedCount, total: files.length, modified: modifiedCount, stopped };
 	}
 
 	_getFilesToScan() {
@@ -221,16 +249,67 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	async runScanForRules(rulesSubset) {
-		const { vault, metadataCache } = this.app;
+		if (this._scanRunning) {
+			return { scanned: 0, modified: 0, stopped: false, busy: true };
+		}
+		const { metadataCache } = this.app;
 		const files = this._getFilesToScan();
 		let modifiedCount = 0;
-		for (const file of files) {
-			const cache = metadataCache.getFileCache(file) || {};
-			const frontmatter = cache.frontmatter ?? {};
-			const applied = await this.applyRulesToFrontmatter(file, frontmatter, rulesSubset);
-			if (applied) modifiedCount++;
+		let scannedCount = 0;
+		let stopped = false;
+		this._scanRunning = true;
+		this._cancelScan = false;
+		this._emitScanStateChange();
+		try {
+			for (const file of files) {
+				if (this._cancelScan) { stopped = true; break; }
+				const cache = metadataCache.getFileCache(file) || {};
+				const frontmatter = cache.frontmatter ?? {};
+				const applied = await this.applyRulesToFrontmatter(file, frontmatter, rulesSubset);
+				if (applied) modifiedCount++;
+				scannedCount++;
+			}
+		} finally {
+			this._scanRunning = false;
+			this._cancelScan = false;
+			this._emitScanStateChange();
 		}
-		return { scanned: files.length, modified: modifiedCount };
+		return { scanned: scannedCount, total: files.length, modified: modifiedCount, stopped };
+	}
+
+	_notifyScanResult(result, label) {
+		const base = `Conditional Properties: ${result.modified} modified / ${result.scanned} scanned`;
+		if (result.stopped) {
+			const skipped = (result.total || 0) - (result.scanned || 0);
+			new Notice(`${base} — stopped (skipped ${skipped} of ${result.total})`);
+		} else {
+			new Notice(label === "rule" ? `${base} (single rule)` : base);
+		}
+	}
+
+	requestStopScan() {
+		if (this._scanRunning) {
+			this._cancelScan = true;
+		}
+	}
+
+	isScanRunning() {
+		return !!this._scanRunning;
+	}
+
+	onScanStateChange(callback) {
+		// Lightweight pub/sub so the settings tab can react without polling.
+		// Returns an unsubscribe function.
+		if (!this._scanStateListeners) this._scanStateListeners = new Set();
+		this._scanStateListeners.add(callback);
+		return () => this._scanStateListeners.delete(callback);
+	}
+
+	_emitScanStateChange() {
+		if (!this._scanStateListeners) return;
+		for (const cb of this._scanStateListeners) {
+			try { cb(); } catch (e) { console.error("ConditionalProperties: listener error", e); }
+		}
 	}
 
 	async runScanOnFile(file) {
@@ -759,8 +838,22 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		}
 	}
 
+	hide() {
+		this._teardownScanSubscriptions();
+	}
+
+	_teardownScanSubscriptions() {
+		if (this._scanStateUnsubscribers) {
+			for (const unsub of this._scanStateUnsubscribers) {
+				try { unsub(); } catch (e) { /* noop */ }
+			}
+			this._scanStateUnsubscribers = [];
+		}
+	}
+
 	display() {
 		try {
+			this._teardownScanSubscriptions();
 			const { containerEl } = this;
 			containerEl.empty();
 			const rootEl = containerEl.createEl("div", { attr: { id: "eis-cp-plugin" } });
@@ -842,23 +935,55 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			rootEl.appendChild(importInput);
 
-			// Run Now Button
-			const runNow = new Setting(rootEl)
+			// Run Now Button — with Stop button next to it while scan is running
+			let runNowBtnRef = null;
+			let stopBtnRef = null;
+			const runNowSetting = new Setting(rootEl)
 				.setName("Run now")
-				.setDesc("Execute all rules across selected scope")
-				.addButton(btn => {
-					btn.setButtonText("Run now");
-					btn.buttonEl.classList.add("run-now-button", "eis-btn");
-					btn.onClick(async () => {
-						btn.setDisabled(true);
-						try {
-							const result = await this.plugin.runScan();
-							new Notice(`Conditional Properties: ${result.modified} modified / ${result.scanned} scanned`);
-						} finally {
-							btn.setDisabled(false);
-						}
-					});
+				.setDesc("Execute all rules across selected scope");
+
+			runNowSetting.addButton(btn => {
+				runNowBtnRef = btn;
+				btn.setButtonText("Run now");
+				btn.buttonEl.classList.add("run-now-button");
+				btn.onClick(async () => {
+					if (this.plugin.isScanRunning()) return;
+					try {
+						const result = await this.plugin.runScan();
+						if (result.busy) return;
+						this.plugin._notifyScanResult(result, "vault");
+					} catch (e) {
+						console.error("ConditionalProperties: runScan error", e);
+						new Notice("Conditional Properties: error during scan — see console");
+					}
 				});
+			});
+
+			runNowSetting.addButton(btn => {
+				stopBtnRef = btn;
+				btn.setButtonText("Stop");
+				btn.setWarning();
+				btn.buttonEl.classList.add("conditional-stop");
+				btn.onClick(() => {
+					this.plugin.requestStopScan();
+					new Notice("Conditional Properties: stop requested — finishing current file");
+				});
+			});
+
+			const syncRunNowState = () => {
+				const running = this.plugin.isScanRunning();
+				if (runNowBtnRef) {
+					runNowBtnRef.setDisabled(running);
+					runNowBtnRef.buttonEl.classList.toggle("is-loading", running);
+				}
+				if (stopBtnRef) {
+					stopBtnRef.buttonEl.style.display = running ? "" : "none";
+				}
+			};
+			syncRunNowState();
+			const unsubscribeRunNow = this.plugin.onScanStateChange(syncRunNowState);
+			this._scanStateUnsubscribers = this._scanStateUnsubscribers || [];
+			this._scanStateUnsubscribers.push(unsubscribeRunNow);
 
 			// Rules Section
 			new Setting(rootEl)
@@ -986,14 +1111,36 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.setButtonText("Run this rule")
 			.setClass("conditional-run-one")
 			.onClick(async () => {
-				runBtn.setDisabled(true);
+				if (this.plugin.isScanRunning()) return;
 				try {
 					const result = await this.plugin.runScanForRules([this.plugin.settings.rules[idx]]);
-					new Notice(`Conditional Properties: ${result.modified} modified / ${result.scanned} scanned (single rule)`);
-				} finally {
-					runBtn.setDisabled(false);
+					if (result.busy) return;
+					this.plugin._notifyScanResult(result, "rule");
+				} catch (e) {
+					console.error("ConditionalProperties: runScanForRules error", e);
+					new Notice("Conditional Properties: error during scan — see console");
 				}
 			});
+
+		const ruleStopBtn = new ButtonComponent(actions)
+			.setButtonText("Stop")
+			.setWarning()
+			.setClass("conditional-stop-rule")
+			.onClick(() => {
+				this.plugin.requestStopScan();
+				new Notice("Conditional Properties: stop requested — finishing current file");
+			});
+
+		const syncRuleRunState = () => {
+			const running = this.plugin.isScanRunning();
+			runBtn.setDisabled(running);
+			runBtn.buttonEl.classList.toggle("is-loading", running);
+			ruleStopBtn.buttonEl.style.display = running ? "" : "none";
+		};
+		syncRuleRunState();
+		const unsubRule = this.plugin.onScanStateChange(syncRuleRunState);
+		this._scanStateUnsubscribers = this._scanStateUnsubscribers || [];
+		this._scanStateUnsubscribers.push(unsubRule);
 
 		new ButtonComponent(actions)
 			.setButtonText("Remove")

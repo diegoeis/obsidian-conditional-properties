@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.18.0 - 2026-05-17
+### New Features
+- **Stop button for running scans**: clicking "Run now" or "Run this rule" now keeps the original button visible (in a disabled / loading state) and reveals a red **Stop** button next to it. Clicking Stop finishes the file currently being processed (so frontmatter is never left in a half-written state) and skips every remaining file in the queue.
+- **`Stop running scan` command in the command palette**: hidden when idle, visible only while a scan is in progress. Same semantics as the in-UI Stop button.
+- The completion notice now reports `stopped` runs explicitly, e.g. `Conditional Properties: 5 modified / 6 scanned — stopped (skipped 94 of 100)`.
+
+### Internal
+- New plugin-level flags `_scanRunning` / `_cancelScan` and helper methods `isScanRunning()`, `requestStopScan()`, `onScanStateChange(cb)`. Each scan iteration in `runScan` / `runScanForRules` checks `_cancelScan` before starting the next file and breaks out cleanly if requested.
+- Settings tab subscribes to `onScanStateChange` so both Run buttons (vault-wide and per-rule) flip between idle/running automatically without re-rendering the whole tab.
+- A lightweight pub/sub (`_scanStateListeners`) replaces relying on Obsidian's `Plugin.trigger` to avoid colliding with the framework's own event names.
+
+### Out of Scope
+- Scheduler runs (automatic every-N-minutes) are still unstoppable from the UI — they have no surface to show a Stop button. If a scheduler run is in progress and the user triggers a manual run, the manual run is rejected with a "busy" notice (no double execution).
+- The `Run conditional rules on current file` command remains uninterruptible because a single-file run is effectively atomic already.
+
 ## 0.17.0 - 2026-05-16
 ### New Features
 - **Multiple conditions per rule (any/all)**: each rule now supports a flat list of conditions and a `Match any of the following` / `Match all of the following` selector at the top of the IF block. Replaces the old workaround of using temporary properties to simulate AND/OR. Inspired by Zotero's "match any/all of the following" UI. Tracked in FRD-001 v2.0.

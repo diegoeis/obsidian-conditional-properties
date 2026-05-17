@@ -106,3 +106,19 @@
   float: right;
   margin: 0;
 }
+
+/* Loading state for any button currently running a scan */
+#eis-cp-plugin button.is-loading {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+#eis-cp-plugin button.is-loading::after {
+  content: " …";
+}
+
+/* Stop buttons sit immediately to the right of their Run counterpart */
+#eis-cp-plugin .conditional-stop,
+#eis-cp-plugin .conditional-stop-rule {
+  margin-left: 8px;
+}
