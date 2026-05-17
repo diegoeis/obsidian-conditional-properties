@@ -1,20 +1,18 @@
 /* eslint-disable */
-const { Plugin, Notice, Setting, PluginSettingTab, parseYaml, stringifyYaml, moment } = require("obsidian");
+const { Plugin, Notice, Setting, PluginSettingTab, ButtonComponent, DropdownComponent, parseYaml, stringifyYaml, moment } = require("obsidian");
 
 class ConditionalPropertiesPlugin extends Plugin {
 	async onload() {
-		await this.loadData().then(settings => {
-			this.settings = Object.assign({
-				rules: [],
-				scanIntervalMinutes: 5,
-				lastRun: null,
-				scanScope: "latestCreated",
-				scanCount: 15,
-				operatorMigrationVersion: 0
-			}, settings);
-
-			this._migrateRules();
-		});
+		const loaded = await this.loadData();
+		this.settings = Object.assign({
+			rules: [],
+			scanIntervalMinutes: 5,
+			lastRun: null,
+			scanScope: "latestCreated",
+			scanCount: 15,
+			operatorMigrationVersion: 0
+		}, loaded);
+		await this._migrateRules();
 		this.registerInterval(this._setupScheduler());
 		this.addCommand({
 			id: "run-now",
@@ -54,10 +52,27 @@ class ConditionalPropertiesPlugin extends Plugin {
 		}, minutes * 60 * 1000);
 	}
 
-	_migrateRules() {
+	async _writeMigrationBackup() {
+		try {
+			const adapter = this.app.vault.adapter;
+			const pluginDir = this.manifest && this.manifest.dir
+				? this.manifest.dir
+				: `${this.app.vault.configDir}/plugins/${this.manifest ? this.manifest.id : "conditional-properties"}`;
+			const dataPath = `${pluginDir}/data.json`;
+			const backupPath = `${pluginDir}/data.backup.json`;
+			const exists = await adapter.exists(dataPath);
+			if (!exists) return;
+			const raw = await adapter.read(dataPath);
+			await adapter.write(backupPath, raw);
+		} catch (e) {
+			console.error("ConditionalProperties: failed to write migration backup", e);
+		}
+	}
+
+	async _migrateRules() {
 		if (!this.settings) return;
 		const migrationVersion = this.settings.operatorMigrationVersion || 0;
-		if (migrationVersion >= 2) return;
+		if (migrationVersion >= 3) return;
 
 		let hasChanges = false;
 		const ensureRuleArray = Array.isArray(this.settings.rules) ? this.settings.rules : [];
@@ -128,8 +143,51 @@ class ConditionalPropertiesPlugin extends Plugin {
 			return migratedRule;
 		});
 
-		this.settings.operatorMigrationVersion = 2;
-		if (hasChanges || migrationVersion !== 2) {
+		// v3 migration — flatten single-condition legacy rules into conditions[] + match
+		const needsV3Migration = this.settings.rules.some(rule =>
+			rule && !Array.isArray(rule.conditions) && (
+				rule.ifType !== undefined ||
+				rule.ifProp !== undefined ||
+				rule.ifValue !== undefined ||
+				rule.op !== undefined
+			)
+		);
+
+		if (needsV3Migration && migrationVersion < 3) {
+			// Backup BEFORE any mutation so user can recover the pre-v3 data.json
+			await this._writeMigrationBackup();
+
+			this.settings.rules = this.settings.rules.map(rule => {
+				if (!rule) return rule;
+				if (Array.isArray(rule.conditions)) return rule;
+
+				const condition = {
+					ifType: rule.ifType || "PROPERTY",
+					ifProp: rule.ifProp || "",
+					ifValue: rule.ifValue || "",
+					op: rule.op || "exactly"
+				};
+				const migrated = {
+					match: "any",
+					conditions: [condition],
+					thenActions: Array.isArray(rule.thenActions) ? rule.thenActions : []
+				};
+				return migrated;
+			});
+			hasChanges = true;
+		}
+
+		// Also ensure rules already in the new shape have a sane match value
+		this.settings.rules = this.settings.rules.map(rule => {
+			if (!rule || !Array.isArray(rule.conditions)) return rule;
+			if (rule.match !== "any" && rule.match !== "all") {
+				return { ...rule, match: "any" };
+			}
+			return rule;
+		});
+
+		this.settings.operatorMigrationVersion = 3;
+		if (hasChanges || migrationVersion !== 3) {
 			this.saveData(this.settings);
 		}
 	}
@@ -185,34 +243,60 @@ class ConditionalPropertiesPlugin extends Plugin {
 		const rules = rulesOverride || this.settings.rules || [];
 		if (!rules.length) return false;
 
-		// Create a copy to avoid modifying the original
-		const newFm = { ...(currentFrontmatter || {}) };
+		// Deep-clone the frontmatter snapshot so we never mutate the array/object
+		// references that live inside Obsidian's metadataCache. A shallow `{...}`
+		// copy still shares array references (e.g. tags), which caused mutations
+		// to leak into the cache and made subsequent runs see stale "already
+		// applied" state.
+		const newFm = JSON.parse(JSON.stringify(currentFrontmatter || {}));
 		let changed = false;
 		let titleChanged = false;
 		let newTitle = null;
 
-		for (const rule of rules) {
-			const { ifType, ifProp, ifValue, thenActions } = rule || {};
-			const op = (rule?.op || "exactly"); // Default operator for new rules
+		for (let ruleIdx = 0; ruleIdx < rules.length; ruleIdx++) {
+			const rule = rules[ruleIdx];
+			const { thenActions } = rule || {};
 			if (!Array.isArray(thenActions) || thenActions.length === 0) continue;
 
-			let sourceValue;
-			if (ifType === "FIRST_LEVEL_HEADING") {
-				sourceValue = await this._getNoteTitle(file);
+			const conditions = Array.isArray(rule.conditions) ? rule.conditions : [];
+			if (conditions.length === 0) continue;
 
-				// Permitir null apenas para operadores que testam ausência/vazio
-				const allowsNull = op === "notExists" || op === "isEmpty";
+			const matchMode = rule.match === "all" ? "all" : "any";
 
-				if (sourceValue === null && !allowsNull) {
-					continue; // Pula apenas se operador NÃO permite null
+			const evaluateCondition = async (cond) => {
+				try {
+					const cType = cond.ifType || "PROPERTY";
+					const cOp = cond.op || "exactly";
+					let sourceValue;
+					if (cType === "FIRST_LEVEL_HEADING") {
+						sourceValue = await this._getNoteTitle(file);
+						const allowsNull = cOp === "notExists" || cOp === "isEmpty";
+						if (sourceValue === null && !allowsNull) return false;
+					} else {
+						if (!cond.ifProp) return false;
+						sourceValue = currentFrontmatter?.[cond.ifProp];
+					}
+					return this._matchesCondition(sourceValue, cond.ifValue, cOp, cType);
+				} catch (e) {
+					console.error(`ConditionalProperties: condition error in rule ${ruleIdx}`, e);
+					return false;
+				}
+			};
+
+			let matched;
+			if (matchMode === "all") {
+				matched = true;
+				for (const cond of conditions) {
+					if (!(await evaluateCondition(cond))) { matched = false; break; }
 				}
 			} else {
-				sourceValue = currentFrontmatter?.[ifProp];
-				if (!ifProp) continue;
+				matched = false;
+				for (const cond of conditions) {
+					if (await evaluateCondition(cond)) { matched = true; break; }
+				}
 			}
 
-			const match = this._matchesCondition(sourceValue, ifValue, op, ifType);
-			if (!match) continue;
+			if (!matched) continue;
 
 			// Process THEN actions
 			for (const action of thenActions) {
@@ -784,26 +868,27 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			// Add Rule Button
 			const addWrap = rootEl.createEl("div", { cls: "setting-item" });
-			const addBtn = addWrap.createEl("button", {
-				text: "Add rule",
-				cls: "mod-cta eis-btn"
-			});
-
-			addBtn.onclick = async () => {
-				this.plugin.settings.rules.push({ 
-					ifType: "PROPERTY", 
-					ifProp: "", 
-					ifValue: "", 
-					op: "exactly", 
-					thenActions: [{ 
-						prop: "", 
-						value: "", 
-						action: "add" 
-					}] 
+			new ButtonComponent(addWrap)
+				.setButtonText("Add rule")
+				.setCta()
+				.onClick(async () => {
+					this.plugin.settings.rules.push({
+						match: "any",
+						conditions: [{
+							ifType: "PROPERTY",
+							ifProp: "",
+							ifValue: "",
+							op: "exactly"
+						}],
+						thenActions: [{
+							prop: "",
+							value: "",
+							action: "add"
+						}]
+					});
+					await this.plugin.saveData(this.plugin.settings);
+					this.display();
 				});
-				await this.plugin.saveData(this.plugin.settings);
-				this.display();
-			};
 
 			// Render Rules
 			this.plugin.settings.rules.slice().reverse().forEach((rule, idxReversed) => {
@@ -822,82 +907,57 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		if (!Array.isArray(rule.thenActions)) {
 			rule.thenActions = [{ prop: "", value: "", action: "add" }];
 		}
-		if (!rule.ifType) {
-			rule.ifType = "PROPERTY";
+		if (!Array.isArray(rule.conditions) || rule.conditions.length === 0) {
+			rule.conditions = [{
+				ifType: rule.ifType || "PROPERTY",
+				ifProp: rule.ifProp || "",
+				ifValue: rule.ifValue || "",
+				op: rule.op || "exactly"
+			}];
+			delete rule.ifType;
+			delete rule.ifProp;
+			delete rule.ifValue;
+			delete rule.op;
+		}
+		if (rule.match !== "any" && rule.match !== "all") {
+			rule.match = "any";
 		}
 
-		const line1 = new Setting(wrap).setName("If");
-		line1.addDropdown(d => {
-			d.addOption("PROPERTY", "Property");
-			d.addOption("FIRST_LEVEL_HEADING", "First level heading");
-			d.setValue(rule.ifType || "PROPERTY");
-			d.onChange(async (v) => {
-				rule.ifType = v;
+		const ifHeader = wrap.createEl("div", { cls: "conditional-rules-header conditional-if-header" });
+		ifHeader.createEl("strong", { text: "If:" });
+
+		if (rule.conditions.length > 1) {
+			const matchWrap = ifHeader.createEl("div", { cls: "conditional-match" });
+			matchWrap.createEl("span", { text: "Match", cls: "conditional-match-label" });
+			new DropdownComponent(matchWrap)
+				.addOption("any", "any of the following")
+				.addOption("all", "all of the following")
+				.setValue(rule.match)
+				.onChange(async (v) => {
+					rule.match = v === "all" ? "all" : "any";
+					await this.plugin.saveData(this.plugin.settings);
+					this.display();
+				});
+		}
+
+		rule.conditions.forEach((cond, condIdx) => {
+			this._renderCondition(wrap, rule, cond, condIdx);
+		});
+
+		const addCondWrap = wrap.createEl("div", { cls: "conditional-add-condition" });
+		new ButtonComponent(addCondWrap)
+			.setButtonText("+ Add condition")
+			.setCta()
+			.onClick(async () => {
+				rule.conditions.push({
+					ifType: "PROPERTY",
+					ifProp: "",
+					ifValue: "",
+					op: "exactly"
+				});
 				await this.plugin.saveData(this.plugin.settings);
 				this.display();
 			});
-		});
-
-		if (rule.ifType === "FIRST_LEVEL_HEADING") {
-			// For TITLE: show operator and value (check is done during execution)
-			line1.addDropdown(d => {
-				this._configureOperatorDropdown(d, rule.op || "exactly", async (value) => {
-					rule.op = value;
-					// Se for 'exists', 'notExists' ou 'isEmpty', limpa o valor
-					if (value === 'exists' || value === 'notExists' || value === 'isEmpty') {
-						rule.ifValue = '';
-					}
-					await this.plugin.saveData(this.plugin.settings);
-					// Recarrega a visualização para atualizar a interface
-					this.display();
-				});
-			});
-
-			// Adiciona o campo de texto apenas se não for 'exists', 'notExists' ou 'isEmpty'
-			if (rule.op !== 'exists' && rule.op !== 'notExists' && rule.op !== 'isEmpty') {
-				line1.addText(t => t
-					.setPlaceholder("heading text")
-					.setValue(rule.ifValue || "")
-					.onChange(async (v) => {
-						rule.ifValue = v;
-						await this.plugin.saveData(this.plugin.settings);
-					}));
-			}
-		} else {
-			// Adiciona o campo de nome da propriedade
-			const propInput = line1.addText(t => t
-				.setPlaceholder("property")
-				.setValue(rule.ifProp || "")
-				.onChange(async (v) => {
-					rule.ifProp = v;
-					await this.plugin.saveData(this.plugin.settings);
-				}));
-			
-			// Adiciona o dropdown de operadores
-			const dropdown = line1.addDropdown(d => {
-				this._configureOperatorDropdown(d, rule.op || "exactly", async (value) => {
-					rule.op = value;
-					// Se for 'exists', 'notExists' ou 'isEmpty', limpa o valor
-					if (value === 'exists' || value === 'notExists' || value === 'isEmpty') {
-						rule.ifValue = '';
-					}
-					await this.plugin.saveData(this.plugin.settings);
-					// Recarrega a visualização para atualizar a interface
-					this.display();
-				});
-			});
-
-			// Adiciona o campo de valor apenas se não for 'exists', 'notExists' ou 'isEmpty'
-			if (rule.op !== 'exists' && rule.op !== 'notExists' && rule.op !== 'isEmpty') {
-				line1.addText(t => t
-					.setPlaceholder("value")
-					.setValue(rule.ifValue || "")
-					.onChange(async (v) => {
-						rule.ifValue = v;
-						await this.plugin.saveData(this.plugin.settings);
-					}));
-			}
-		}
 
 		const thenHeader = wrap.createEl("div", { cls: "conditional-rules-header" });
 		thenHeader.createEl("strong", { text: "Then:" });
@@ -906,42 +966,128 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			this._renderThenAction(wrap, rule, action, actionIdx, idx);
 		});
 
-		const actions = wrap.createEl("div", { cls: "conditional-actions" });
-		const addActionBtn = actions.createEl("button", { text: "Add action", cls: "eis-btn conditional-add-action" });
-		addActionBtn.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			rule.thenActions.push({
-				type: "property",
-				prop: "",
-				value: "",
-				action: "add"
+		const addActionWrap = wrap.createEl("div", { cls: "conditional-add-action-wrap" });
+		new ButtonComponent(addActionWrap)
+			.setButtonText("+ Add action")
+			.setCta()
+			.onClick(async () => {
+				rule.thenActions.push({
+					type: "property",
+					prop: "",
+					value: "",
+					action: "add"
+				});
+				await this.plugin.saveData(this.plugin.settings);
+				this.display();
 			});
-			await this.plugin.saveData(this.plugin.settings);
-			this.display();
-		}, true);
 
-		const runOne = actions.createEl("button", { text: "Run this rule", cls: "eis-btn-border conditional-run-one" });
-		runOne.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			runOne.setAttribute('disabled', 'true');
-			try {
-				const result = await this.plugin.runScanForRules([this.plugin.settings.rules[idx]]);
-				new Notice(`Conditional Properties: ${result.modified} modified / ${result.scanned} scanned (single rule)`);
-			} finally {
-				runOne.removeAttribute('disabled');
+		const actions = wrap.createEl("div", { cls: "conditional-actions" });
+		const runBtn = new ButtonComponent(actions)
+			.setButtonText("Run this rule")
+			.setClass("conditional-run-one")
+			.onClick(async () => {
+				runBtn.setDisabled(true);
+				try {
+					const result = await this.plugin.runScanForRules([this.plugin.settings.rules[idx]]);
+					new Notice(`Conditional Properties: ${result.modified} modified / ${result.scanned} scanned (single rule)`);
+				} finally {
+					runBtn.setDisabled(false);
+				}
+			});
+
+		new ButtonComponent(actions)
+			.setButtonText("Remove")
+			.setWarning()
+			.setClass("conditional-remove")
+			.onClick(async () => {
+				this.plugin.settings.rules.splice(idx, 1);
+				await this.plugin.saveData(this.plugin.settings);
+				this.display();
+			});
+	}
+
+	_renderCondition(containerEl, rule, cond, condIdx) {
+		if (!cond.ifType) cond.ifType = "PROPERTY";
+		if (!cond.op) cond.op = "exactly";
+
+		const isMulti = rule.conditions.length > 1;
+		const line = new Setting(containerEl).setName(`Condition ${condIdx + 1}`);
+		line.settingEl.addClass("conditional-condition");
+		line.settingEl.addClass("conditional-then-action");
+
+		line.addDropdown(d => {
+			d.addOption("PROPERTY", "Property");
+			d.addOption("FIRST_LEVEL_HEADING", "First level heading");
+			d.setValue(cond.ifType);
+			d.onChange(async (v) => {
+				cond.ifType = v;
+				await this.plugin.saveData(this.plugin.settings);
+				this.display();
+			});
+		});
+
+		if (cond.ifType === "FIRST_LEVEL_HEADING") {
+			line.addDropdown(d => {
+				this._configureOperatorDropdown(d, cond.op, async (value) => {
+					cond.op = value;
+					if (value === 'exists' || value === 'notExists' || value === 'isEmpty') {
+						cond.ifValue = '';
+					}
+					await this.plugin.saveData(this.plugin.settings);
+					this.display();
+				});
+			});
+
+			if (cond.op !== 'exists' && cond.op !== 'notExists' && cond.op !== 'isEmpty') {
+				line.addText(t => t
+					.setPlaceholder("heading text")
+					.setValue(cond.ifValue || "")
+					.onChange(async (v) => {
+						cond.ifValue = v;
+						await this.plugin.saveData(this.plugin.settings);
+					}));
 			}
-		}, true);
+		} else {
+			line.addText(t => t
+				.setPlaceholder("property")
+				.setValue(cond.ifProp || "")
+				.onChange(async (v) => {
+					cond.ifProp = v;
+					await this.plugin.saveData(this.plugin.settings);
+				}));
 
-		const del = actions.createEl("button", { text: "Remove", cls: "conditional-remove eis-btn-red eis-btn-border" });
-		del.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			this.plugin.settings.rules.splice(idx, 1);
-			await this.plugin.saveData(this.plugin.settings);
-			this.display();
-		}, true);
+			line.addDropdown(d => {
+				this._configureOperatorDropdown(d, cond.op, async (value) => {
+					cond.op = value;
+					if (value === 'exists' || value === 'notExists' || value === 'isEmpty') {
+						cond.ifValue = '';
+					}
+					await this.plugin.saveData(this.plugin.settings);
+					this.display();
+				});
+			});
+
+			if (cond.op !== 'exists' && cond.op !== 'notExists' && cond.op !== 'isEmpty') {
+				line.addText(t => t
+					.setPlaceholder("value")
+					.setValue(cond.ifValue || "")
+					.onChange(async (v) => {
+						cond.ifValue = v;
+						await this.plugin.saveData(this.plugin.settings);
+					}));
+			}
+		}
+
+		if (isMulti) {
+			line.addExtraButton(b => b
+				.setIcon("cross")
+				.setTooltip("Remove this condition")
+				.onClick(async () => {
+					rule.conditions.splice(condIdx, 1);
+					await this.plugin.saveData(this.plugin.settings);
+					this.display();
+				}));
+		}
 	}
 
 	_configureOperatorDropdown(dropdown, currentValue, onChange) {
@@ -997,18 +1143,6 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		if (!action.action && action.type === "property") {
 			action.action = "add";
 		}
-
-		const settingItem = actionSetting.settingEl;
-		const removeActionBtn = document.createElement("button");
-		removeActionBtn.textContent = "×";
-		removeActionBtn.className = "conditional-remove-action eis-btn eis-btn-red";
-		removeActionBtn.addEventListener("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			rule.thenActions.splice(actionIdx, 1);
-			await this.plugin.saveData(this.plugin.settings);
-			this.display();
-		}, true);
 
 		// Action type selector (Title or Property)
 		actionSetting.addDropdown(d => {
@@ -1088,13 +1222,14 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				}));
 		}
 
-		// Append remove button after other controls so it renders last
-		const controlEl = actionSetting.controlEl || settingItem.querySelector(".setting-item-control");
-		if (controlEl) {
-			controlEl.appendChild(removeActionBtn);
-		} else {
-			settingItem.appendChild(removeActionBtn);
-		}
+		actionSetting.addExtraButton(b => b
+			.setIcon("cross")
+			.setTooltip("Remove this action")
+			.onClick(async () => {
+				rule.thenActions.splice(actionIdx, 1);
+				await this.plugin.saveData(this.plugin.settings);
+				this.display();
+			}));
 	}
 }
 

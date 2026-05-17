@@ -77,6 +77,28 @@ IF title contains: "Meeting"
 THEN ADD tags: meeting, important
 ```
 
+## Multiple Conditions Per Rule
+
+Combine conditions inside a single rule using **Match any / Match all of the following** (inspired by Zotero).
+
+**AND example — match all of the following:**
+```yaml
+Match all of the following:
+  - property: status = "done"
+  - property: priority = "high"
+THEN ADD tags: urgent-completed
+```
+
+**OR example — match any of the following:**
+```yaml
+Match any of the following:
+  - property: status = "archived"
+  - property: deleted = "true"
+THEN REMOVE tags: active
+```
+
+Click **+ Add condition** below the IF block to add more conditions, and the dropdown to switch between `any` and `all`. Existing rules from previous plugin versions are auto-migrated and keep their behavior unchanged.
+
 ## Multiple Actions Per Rule
 
 Combine actions to automate complex workflows:

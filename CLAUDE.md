@@ -17,12 +17,24 @@ This repo ships the **compiled plugin** directly. There is no TypeScript source,
 
 ## Project rules (must follow)
 
-**Read these three files before changing anything non-trivial. They are the source of truth — these summaries are convenience only.**
+**Read these files before changing anything non-trivial. They are the source of truth — these summaries are convenience only.**
 
-1. **[.claude/rules.md](.claude/rules.md)** — project-wide rules: language, git/tag/changelog flow, "answer before implement" discipline. Always applies.
-2. **[.claude/docs/DEVELOPMENT_GUIDELINES.md](.claude/docs/DEVELOPMENT_GUIDELINES.md)** — Obsidian-specific do/don'ts: which APIs to use, lint hot-spots reviewers check, mobile compatibility, testing checklist. Consult **before writing any new Obsidian code** so the plugin keeps passing the community lint.
-3. **[.claude/docs/OBSIDIAN_DEVELOPMENT_POLICIES.md](.claude/docs/OBSIDIAN_DEVELOPMENT_POLICIES.md)** — Obsidian's official **developer policies** (mirror of https://docs.obsidian.md/Developer+policies). Hard constraints: no code obfuscation, no dynamic ads, no client-side telemetry, no self-update mechanism, mandatory LICENSE, mandatory README disclosures for network use / payment / accounts / server-side telemetry, and trademark rules. Any change that touches networking, analytics, the LICENSE, or the README's disclosure sections must be checked against this file. Violations get plugins removed from the directory.
-4. **[.claude/docs/SUBMISSION_GUIDE.md](.claude/docs/SUBMISSION_GUIDE.md)** — community-plugin submission and release flow. Consult before every release and every PR against `obsidian-releases`.
+### Always applicable
+
+1. **[.claude/rules.md](.claude/rules.md)** — project-wide rules: language, git/tag/changelog flow, "answer before implement" discipline.
+2. **[.claude/docs/OBSIDIAN_DEVELOPMENT_POLICIES.md](.claude/docs/OBSIDIAN_DEVELOPMENT_POLICIES.md)** — Obsidian's official **developer policies** (mirror of https://docs.obsidian.md/Developer+policies). Hard constraints that apply to **both plugins and themes**: no code obfuscation, no dynamic ads, no client-side telemetry, no self-update mechanism, mandatory LICENSE, mandatory README disclosures for network use / payment / accounts / server-side telemetry, and trademark rules. Any change that touches networking, analytics, the LICENSE, or the README's disclosure sections must be checked against this file. Violations get the project removed from the directory.
+
+### Plugin development (this repo)
+
+3. **[.claude/docs/DEVELOPMENT_GUIDELINES.md](.claude/docs/DEVELOPMENT_GUIDELINES.md)** — Obsidian plugin do/don'ts: which APIs to use, lint hot-spots reviewers check, mobile compatibility, testing checklist. Consult **before writing any new Obsidian plugin code** so the plugin keeps passing the community lint.
+4. **[.claude/docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md](.claude/docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md)** — community-plugin submission and release flow. Consult before every release and every PR against `obsidian-releases`.
+
+### Theme development (other repos using this CLAUDE.md as a template)
+
+These files don't apply to *this* plugin repo, but the workspace ships them so the same CLAUDE.md skeleton can be reused on Obsidian theme repos. Ignore them when working on the conditional-properties plugin; pull them in when bootstrapping a theme.
+
+5. **[.claude/docs/OBSIDIAN_THEME_GUIDELINES.md](.claude/docs/OBSIDIAN_THEME_GUIDELINES.md)** — Obsidian theme authoring guidelines (mirror of https://docs.obsidian.md/Themes/App+themes/Theme+guidelines): use CSS variables, override under `body` / `.theme-light` / `.theme-dark`, accessibility and forward-compatibility expectations.
+6. **[.claude/docs/OBSIDIAN_THEME_SUBMIT.md](.claude/docs/OBSIDIAN_THEME_SUBMIT.md)** — theme submission flow (mirror of https://docs.obsidian.md/Themes/App+themes/Submit+your+theme): required files (`manifest.json`, `theme.css`, `README.md`, `LICENSE`), screenshot requirements, and the PR against `obsidianmd/obsidian-releases`.
 
 ### LLM operating rules
 
@@ -40,7 +52,7 @@ When making code or documentation changes to this plugin:
 - **Language**: always English (code, commits, docs).
 - **Git/release flow**: create the tag only on push; bump `manifest.json` + `versions.json`; tag is `X.Y.Z` (no `v`). For PR conflicts, force-push (don't recreate the branch).
 - **Always update on a release-bearing push**: `CHANGELOG.md`, `.claude/docs/features-info.md`, and any relevant PRD/FRD under `.claude/docs/product/`.
-- **Submission**: follow `.claude/docs/SUBMISSION_GUIDE.md` end-to-end before opening the `obsidian-releases` PR.
+- **Submission**: follow `.claude/docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md` end-to-end before opening the `obsidian-releases` PR.
 
 ## Architecture (where things live in `main.js`)
 
@@ -85,7 +97,32 @@ thenActions: Array<
 
 ## Development workflow
 
-No build. Edit `main.js` / `styles.css` and reload the plugin in Obsidian (toggle off/on, or use the developer reload flow).
+No build. Edit `main.js` / `styles.css` and reload the plugin in Obsidian.
+
+### Live-test loop via Obsidian CLI
+
+The user keeps the plugin installed in their active vault at `/Users/diegoeis/obs-notes`. To make a code change land in Obsidian without manual clicking, **run the sync script**:
+
+```sh
+./scripts/sync.sh
+```
+
+This is the project's "F5" — copies `main.js`, `styles.css`, and `manifest.json` into `/Users/diegoeis/obs-notes/.obsidian/plugins/conditional-properties/` and triggers `obsidian plugin:reload id=conditional-properties`. The script lives at [`scripts/sync.sh`](scripts/sync.sh) and is the canonical way to refresh the plugin during development. Override the target with `OBSIDIAN_PLUGIN_DIR=/path/to/other/vault/.obsidian/plugins/conditional-properties ./scripts/sync.sh` when testing in a different vault.
+
+**Run it every time `main.js`, `styles.css`, or `manifest.json` changes during a feature branch.** Without the copy step, the running Obsidian still loads the previous version from the vault. Without `plugin:reload`, the copied files don't take effect until Obsidian restarts.
+
+If you need to do it by hand (e.g. the CLI is unavailable):
+```sh
+cp main.js styles.css manifest.json /Users/diegoeis/obs-notes/.obsidian/plugins/conditional-properties/
+obsidian plugin:reload id=conditional-properties
+```
+(`obsidian` resolves to `/Applications/Obsidian.app/Contents/MacOS/obsidian`. Confirm the CLI subcommand exists with `obsidian help | grep plugin:`.)
+
+Other helpful CLI commands during dev:
+- `obsidian plugins:enabled filter=community` — list enabled community plugins (sanity check).
+- `obsidian plugin id=conditional-properties` — show metadata of the currently-loaded version.
+- `obsidian dev:errors` / `obsidian dev:console` — pull recent errors / console messages out of Obsidian (use after a reload to triage runtime errors).
+- `obsidian vaults` + `obsidian vault` — discover the active vault path if it ever moves.
 
 Recent fixes worth remembering when touching title logic:
 - First-level heading detection: detect H1 **only when it appears immediately after YAML frontmatter** (see commit `29ea0bd`). Don't reintroduce broader scanning — it caused false positives.

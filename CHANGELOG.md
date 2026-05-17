@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.17.0 - 2026-05-16
+### New Features
+- **Multiple conditions per rule (any/all)**: each rule now supports a flat list of conditions and a `Match any of the following` / `Match all of the following` selector at the top of the IF block. Replaces the old workaround of using temporary properties to simulate AND/OR. Inspired by Zotero's "match any/all of the following" UI. Tracked in FRD-001 v2.0.
+- **`+ Add condition` button**: appended to the IF block, lets the user add an arbitrary number of conditions per rule. Each condition keeps the existing layout (PROPERTY / FIRST_LEVEL_HEADING + operator + value, with the value field hiding for `exists` / `notExists` / `isEmpty`).
+- **Per-condition remove (`×`)**: each condition gets a remove button when more than one is present. When the rule is back to a single condition, the match dropdown auto-hides.
+
+### Migration
+- **Automatic, one-time migration** from the legacy single-condition shape to the new `{ match, conditions: [...] }` shape. Migration version bumps from 2 to 3 inside `_migrateRules()` and is idempotent.
+- **All legacy rules default to `match: "any"`**. Because there is exactly one condition, behavior is bit-for-bit identical to v0.16.3 until the user adds a second condition.
+- **`data.backup.json` is written next to `data.json` in the plugin folder before the migration writes anything**, so the user can recover the pre-v0.17.0 settings by copying it back if needed. Only one backup is kept (overwrites the previous one).
+- **Downgrade is not supported** after the first v0.17.0 load. Older plugin versions don't understand `conditions[]` and will silently ignore the new rules.
+
+### Internal
+- New helper `_writeMigrationBackup()` uses `app.vault.adapter` to copy `data.json` to `data.backup.json` synchronously before the migration mutates `this.settings`.
+- New helper `_renderCondition()` encapsulates the condition row UI (previously inlined in `_renderRule`). `_renderRule` is now ~30 lines shorter.
+- `applyRulesToFrontmatter` now evaluates an array of conditions with short-circuit semantics (`every` for `all`, `some` for `any`). The single-condition fast-path is just `conditions.length === 1`, no special-casing.
+- THEN block (`thenActions`) is **unchanged**. No new operators, no new actions, no new placeholders.
+
+### Why
+Community demand (issue from @nanjingman with Zotero mockup, plus issue #9 from @dimayan4enko). The original FRD-001 (Jan 2026) had marked full AND/OR/NOT logic as "do not implement" because it scoped the worst case (nested groups, NOT-per-group, boolean expression parser, ~1000 lines). Cutting the scope to the Zotero "any/all of the following" model with a flat list of conditions delivers ~95% of the value in ~200 lines, with trivial migration and zero impact on the THEN block. See [.claude/docs/product/frd-001-multiple-conditions-boolean-logic.md](.claude/docs/product/frd-001-multiple-conditions-boolean-logic.md) for the full rationale.
+
 ## 0.16.3 - 2026-05-16
 ### Improvements
 - **README**: removed "(Coming Soon)" placeholder from the Community Plugins install section; the plugin is published, so the placeholder no longer applies.

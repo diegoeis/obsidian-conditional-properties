@@ -1,23 +1,19 @@
-:root {
-	--cp-red-color: #e93147;
-}
-
-
 #eis-cp-plugin .conditional-rule {
   border: 1px solid var(--background-modifier-border);
   padding: 20px;
   border-radius: 5px;
   margin-bottom: 20px;
-	transition: all .15s linear;
+  transition: all .15s linear;
 }
 
 #eis-cp-plugin .conditional-rule:hover {
-  box-shadow: 0px 0px 7px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 7px rgba(0, 0, 0, 0.2);
 }
 
 #eis-cp-plugin .conditional-rule .setting-item {
   display: block;
 }
+
 #eis-cp-plugin .conditional-rule .setting-item-control {
   display: flex;
   text-align: left;
@@ -30,43 +26,61 @@
   flex: 1;
 }
 
-#eis-cp-plugin .conditional-rule > .setting-item .setting-item-info .setting-item-name, 
+/* Section headers (If: and Then:) */
 #eis-cp-plugin .conditional-rules-header {
   font-size: 0.9rem;
-	font-weight: bold;
-}
-
-#eis-cp-plugin .conditional-then-action .setting-item-info .setting-item-name {
-	font-size: .7rem; 
-	font-weight: normal;
-}
-
-#eis-cp-plugin .conditional-rules-header {
-	padding-top: 15px;
+  font-weight: bold;
+  padding-top: 15px;
   padding-bottom: 10px;
-  border-top: 2px dotted var(--background-modifier-border);
+  border-top: 4px solid var(--background-modifier-border);
   margin-top: 10px;
 }
 
-#eis-cp-plugin button.conditional-remove-action {
-	max-width: 30px;
-  padding: 0;
-  font-size: 1.2rem;
+#eis-cp-plugin .conditional-if-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
 }
 
-#eis-cp-plugin .conditional-actions {
-  border-top: 3px solid var(--modal-border-color);
-  padding-top: 15px;
+#eis-cp-plugin .conditional-if-header strong {
+  font-size: 0.9rem;
 }
 
-#eis-cp-plugin .conditional-then-action:hover .setting-item-name {font-weight: bold;}
+/* Match any/all dropdown inside the If header */
+#eis-cp-plugin .conditional-match {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#eis-cp-plugin .conditional-match-label {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+#eis-cp-plugin .conditional-match-select {
+  font-size: 0.8rem;
+}
+
+/* Condition / Action row label tweaks */
+#eis-cp-plugin .conditional-rule .setting-item-name {
+  font-size: .7rem;
+  font-weight: normal;
+}
+
+#eis-cp-plugin .conditional-rule .setting-item:hover .setting-item-name {
+  font-weight: bold;
+}
 
 #eis-cp-plugin .conditional-then-action:last-child {
   border-bottom-style: solid;
 }
 
 #eis-cp-plugin .conditional-then-action .setting-item-info {
-	padding-bottom: 5px;
+  padding-bottom: 5px;
 }
 
 #eis-cp-plugin .conditional-then-action .setting-item {
@@ -74,159 +88,21 @@
   margin-bottom: 7px;
 }
 
-#eis-cp-plugin button.eis-btn.eis-btn-red,
-#eis-cp-plugin button.eis-btn.eis-btn-red:hover {
-	background-color: var(--cp-red-color);
-	border-color: var(--cp-red-color);
-	color: #ffffff;
+#eis-cp-plugin .setting-item .extra-setting-button {
+  background-color: var(--color-red);
+	color: #fff;
+	max-width: 30px;
+	cursor: pointer;
+}
+
+/* Rule-level action row (Run this rule + Remove) */
+#eis-cp-plugin .conditional-actions {
+  border-top: 3px dotted var(--modal-border-color);
+  padding-top: 15px;
+  margin-top: 15px;
 }
 
 #eis-cp-plugin .conditional-remove {
-	float: right;
-	margin: 0;
+  float: right;
+  margin: 0;
 }
-
-#eis-cp-plugin .conditional-actions .eis-btn.conditional-add-action {
-	margin-right: 10px;
-}
-
-#eis-cp-plugin .eis-btn,
-#eis-cp-plugin button.eis-btn:not(.clickable-icon) {
-	background: var(--color-accent);
-	color: var(--text-on-accent);
-	cursor: pointer;
-}
-#eis-cp-plugin .eis-btn:hover {
-	opacity: .8;
-	color: var(--text-on-accent);
-}
-
-
-/*
-#eis-cp-plugin .conditional-rules-header {
-	font-weight: 600;
-	margin-top: 12px;
-	display: flex;
-	align-items: center;
-}
-#eis-cp-plugin .conditional-rules-header * {flex: 1;}
-
-
-#eis-cp-plugin .conditional-add-wrap {
-	margin: 8px 0 12px 0;
-}
-
-#eis-cp-plugin .conditional-to-label { margin: 0 6px; opacity: 0.8; }
-
-#eis-cp-plugin .conditional-actions {
-	display: flex;
-	gap: 8px;
-	margin-top: 6px;
-	align-items: center;
-	margin: 0;
-}
-
-#eis-cp-plugin .conditional-add-action {
-	margin: 8px 0;
-	margin-left: auto;
-	order: 3;
-}
-
-#eis-cp-plugin .eis-message {
-	font-size: .8rem;
-    padding: 7px 0 0;
-}
-
-#eis-cp-plugin .eis-message-error {color: var(--cp-red-color);}
-
-#eis-cp-plugin .setting-item-control {
-	flex-wrap: wrap !important;
-}
-#eis-cp-plugin .eis-btn,
-#eis-cp-plugin button.eis-btn:not(.clickable-icon) {
-	background: var(--color-accent);
-	color: var(--text-on-accent);
-	border-radius: 4px;
-	padding: 4px 8px;
-	font-size: 0.8rem;
-	cursor: pointer;
-}
-#eis-cp-plugin .eis-btn:hover {
-	background: var(--interactive-accent) !important;
-	color: #fff !important;
-}
-
-#eis-cp-plugin .eis-btn-border {
-	background: transparent !important;
-	color: var(--color-accent) !important;
-	border: 1px solid var(--interactive-accent);
-	box-shadow: none !important;
-}
-
-#eis-cp-plugin .eis-btn-border:hover {
-	background: var(--interactive-accent) !important;
-	color: #fff !important;
-}
-
-#eis-cp-plugin .eis-btn-red,
-#eis-cp-plugin button.eis-btn-red:not(.clickable-icon),
-#eis-cp-plugin .eis-btn-red:not(.eis-btn-border) {
-	background: var(--cp-red-color);
-	border-color: var(--cp-red-color);
-}
-
-#eis-cp-plugin .eis-btn-red:hover {
-	background: #fff !important;
-	color: var(--cp-red-color) !important;
-}
-
-#eis-cp-plugin .disabled-input {
-    opacity: 0.5;
-    background-color: var(--background-modifier-form-field);
-    cursor: not-allowed;
-}
-
-#eis-cp-plugin [title] {
-    position: relative;
-}
-
-#eis-cp-plugin [title]:hover::after {
-    content: attr(title);
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 4px 8px;
-    background-color: var(--background-modifier-form-field);
-    color: var(--text-normal);
-    border-radius: 4px;
-    font-size: 0.8em;
-    white-space: nowrap;
-    z-index: 1000;
-    margin-bottom: 5px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-}
-
-#eis-cp-plugin .eis-btn-red.eis-btn-border {
-	color: var(--cp-red-color) !important;
-}
-#eis-cp-plugin .eis-btn-red.eis-btn-border:hover {
-	background: var(--cp-red-color) !important;
-	color: #fff !important;
-}
-
-
-#eis-cp-plugin .conditional-remove-action {
-	border: none;
-	width: 20px;
-	height: 20px;
-	font-size: 12px;
-	font-weight: bold;
-	cursor: pointer;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	margin-left: 8px;
-}
-
-#eis-cp-plugin .setting-item-info {min-width: 50px;} */
