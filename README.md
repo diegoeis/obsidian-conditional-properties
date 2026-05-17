@@ -27,6 +27,7 @@ Stop manually updating properties across hundreds of notes. Define rules once, r
 - **OVERWRITE**: Replace entire property
 - **DELETE PROPERTY**: Remove property completely
 - **CHANGE TITLE**: Add prefix/suffix or overwrite with dynamic dates and filenames
+- **Typed property awareness (new in v0.19.0)**: when the target property is registered as `checkbox`, `date`, or `datetime`, values are written with the right YAML type instead of as plain strings — so `whatsapp: true` lands as a real boolean (renders as a checked checkbox), and `created_at: 08-08-2025` is parsed and stored as `2025-08-08` (renders in the Obsidian date widget).
 
 ### 🎛️ Smart Execution
 - **Run on demand**: Entire vault or current file only
@@ -78,6 +79,45 @@ THEN DELETE PROPERTY: legacy_data
 IF title contains: "Meeting"
 THEN ADD tags: meeting, important
 ```
+
+## Typed Properties (Checkbox / Date / Datetime)
+
+Some Obsidian property types have native widgets (the checkmark for `checkbox`, the calendar for `date`, the calendar+clock for `datetime`). For the widget to render correctly, the YAML must store the value with the right type — boolean for checkbox, ISO date for date/datetime. Strings won't trigger the widgets, even if the property is registered with the right type.
+
+Since v0.19.0, the plugin detects when the target property is one of these types and converts the rule's value automatically. You can keep writing rules with plain text and the plugin handles the rest.
+
+### Checkbox
+
+```yaml
+IF property: status = "done"
+THEN OVERWRITE property: completed = "true"
+```
+Result on disk: `completed: true` (boolean). Obsidian renders a checked checkbox.
+
+Rules:
+- `"true"` (any casing) → `true`
+- Anything else (`"false"`, empty, `"sim"`, etc.) → `false`
+
+### Date / Datetime
+
+```yaml
+IF property: status = "done"
+THEN OVERWRITE property: created_at = "08-08-2025"
+```
+Result on disk: `created_at: 2025-08-08` (ISO date). Obsidian renders the date widget.
+
+How the date parsing works:
+1. If your input is already in `YYYY-MM-DD`, it's stored as-is.
+2. Otherwise, the plugin tries to parse it using the Daily Notes core plugin's date format (if enabled), then the Templates core plugin's date format (if enabled), then a few common civilian formats (`DD-MM-YYYY`, `DD/MM/YYYY`, `YYYY/MM/DD`).
+3. The first format that parses successfully wins — the value is converted to `YYYY-MM-DD` before being written to the YAML.
+4. If nothing parses (you typed garbage), the input is written as-is and the property won't render in the date widget. The plugin doesn't validate format beyond that — garbage in, garbage out.
+
+Datetime properties (`YYYY-MM-DDTHH:mm:ss`) are not parsed and are written exactly as typed. The Obsidian datetime widget will render them when the input is already in the expected ISO datetime form.
+
+### Notes
+
+- This applies to both `ADD value` and `OVERWRITE all values with` actions on typed properties. For these types `ADD` behaves as `OVERWRITE` because the underlying types are scalar (you can't have a checkbox holding `[true, false]`).
+- Properties without a registered type (or registered as `text`, `number`, `multitext`, `tags`, etc.) keep the original string-based behavior. Nothing changes for those.
 
 ## Multiple Conditions Per Rule
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.19.0 - 2026-05-17
+### New Features
+- **Typed-property awareness for `checkbox`, `date`, and `datetime`**: when a rule's target property is registered with one of these widgets in the Obsidian property type system, the plugin now writes the value with the correct YAML type so the native widgets render. Closes part of issue #11.
+- **Checkbox**: rule values like `"true"` are written as the boolean `true` (no quotes) — Obsidian renders a real checkbox instead of plain text. `"true"` is matched case-insensitive; anything else (including empty) writes `false`.
+- **Date**: rule values are normalized to `YYYY-MM-DD` before being written. If the input is already ISO, it's used directly. Otherwise the plugin tries the Daily Notes core plugin's date format (if enabled), then the Templates core plugin's date format (if enabled), then `DD-MM-YYYY`, `DD/MM/YYYY`, and `YYYY/MM/DD` in that order. `MM-DD-YYYY` is intentionally excluded to avoid silently mis-parsing non-US date inputs. The first strict match wins.
+- **Datetime**: input is trimmed and written as-is. No format conversion since Daily Notes and Templates only expose date formats.
+- **`add` collapses into `overwrite` for typed scalar properties** (checkbox / date / datetime). You can't meaningfully `add` to a scalar field, so the action transparently overwrites instead of turning the value into a `[a, b]` array.
+
+### Bug Fixes
+- The internal `_writeFrontmatter` helper used to treat both `null` and `undefined` as "delete this property". It now only deletes on `undefined` (the sentinel used by the `delete` and `rename` actions). `null` is preserved as-is. No user-facing behavior changes today, but the contract is now safe for future code paths that legitimately want to write a `null` value.
+
+### Internal
+- New helpers `_getPropertyType(name)`, `_coerceValueForProperty(name, raw, type)`, `_getDateFormatCandidates()`, and `_normalizeDateInput(raw)`. Property type lookup prefers `getPropertyInfo(name).widget` over `getAssignedWidget(name)` because the former includes inferred types (used when the property exists in the vault but the user never explicitly set a type in Settings → Properties).
+
+### Why
+Issue #11 from @KenCrandall asked how to write checkbox and date property values, observing that whatever value he typed ended up as a string in the YAML. The plugin was writing everything as a string regardless of the property's registered widget, which broke the native renderers. This release fixes the checkbox half of that issue and the date half; datetime is supported as a passthrough (no format inference).
+
 ## 0.18.0 - 2026-05-17
 ### New Features
 - **Stop button for running scans**: clicking "Run now" or "Run this rule" now keeps the original button visible (in a disabled / loading state) and reveals a red **Stop** button next to it. Clicking Stop finishes the file currently being processed (so frontmatter is never left in a half-written state) and skips every remaining file in the queue.

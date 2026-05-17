@@ -429,10 +429,17 @@ class ConditionalPropertiesPlugin extends Plugin {
 				if (!prop) continue;
 				// Process any date placeholders in the value
 				const processedValue = this._formatText(value, file);
+				const propType = this._getPropertyType(prop);
+				const isScalarTyped = propType === "checkbox" || propType === "date" || propType === "datetime";
 
 				if (actionType === "add") {
-					// Handle adding to arrays or creating new properties
-					if (Array.isArray(newFm[prop])) {
+					if (isScalarTyped) {
+						// Checkbox / date / datetime are scalar by nature — `add` collapses
+						// into `overwrite` so users never end up with `[true, false]` arrays
+						// or two ISO dates in a field meant to hold one value.
+						newFm[prop] = this._coerceValueForProperty(prop, processedValue, propType);
+						changed = true;
+					} else if (Array.isArray(newFm[prop])) {
 						// If it's already an array, add unique values
 						const valuesToAdd = processedValue.split(',').map(v => v.trim()).filter(v => v);
 						valuesToAdd.forEach(v => {
@@ -458,8 +465,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 						changed = true;
 					}
 				} else if (actionType === "overwrite") {
-					// Overwrite the entire property with processed value
-					newFm[prop] = processedValue;
+					// Overwrite the entire property with processed value (typed when applicable)
+					newFm[prop] = this._coerceValueForProperty(prop, processedValue, propType);
 					changed = true;
 				} else if (actionType === "remove") {
 					// Process any date placeholders in the value before removal
@@ -760,15 +767,142 @@ class ConditionalPropertiesPlugin extends Plugin {
 		});
 	}
 
+	/**
+	 * Returns the Obsidian-registered type for a frontmatter property name, or
+	 * `undefined` when the property has no explicit type assignment. Used to
+	 * decide when to coerce a raw string value into a typed scalar (boolean for
+	 * checkbox, normalized string for date / datetime).
+	 */
+	_getPropertyType(propName) {
+		try {
+			if (!propName) return undefined;
+			const mtm = this.app && this.app.metadataTypeManager;
+			if (!mtm) return undefined;
+			// Obsidian models property types as "widgets". `getPropertyInfo(name)`
+			// returns the effective widget regardless of whether it was assigned
+			// explicitly by the user (Settings → Properties) or inferred from the
+			// existing values across the vault. `getAssignedWidget` only returns
+			// the explicit assignment, so it misses inferred date / datetime /
+			// checkbox properties — we prefer `getPropertyInfo` first.
+			if (typeof mtm.getPropertyInfo === "function") {
+				const info = mtm.getPropertyInfo(propName);
+				const widget = info && info.widget;
+				if (widget) return widget;
+			}
+			if (typeof mtm.getAssignedWidget === "function") {
+				return mtm.getAssignedWidget(propName) || undefined;
+			}
+			return undefined;
+		} catch (e) {
+			console.error("ConditionalProperties: property type lookup error", e);
+			return undefined;
+		}
+	}
+
+	/**
+	 * Coerces a raw user-entered string into the right runtime type for the
+	 * given property, based on the property's Obsidian-registered type.
+	 *   checkbox → boolean (true when trimmed lowercase equals "true", else false)
+	 *   date     → string in `YYYY-MM-DD` (ISO, what the Obsidian date widget
+	 *              requires). If the input is already ISO, it is used as-is. If
+	 *              the Daily Notes core plugin (or Templates as fallback) is
+	 *              enabled, the input is parsed using its configured date format
+	 *              and converted to ISO. If neither is enabled, or parsing fails,
+	 *              the input is written as-typed (lixo entra, lixo sai).
+	 *   datetime → trimmed only. The widget needs `YYYY-MM-DDTHH:mm:ss`; we do
+	 *              not attempt to convert datetime inputs because Daily Notes /
+	 *              Templates formats describe dates, not datetimes.
+	 *   anything else / unknown → raw value, untouched.
+	 * Pass `propType` when you already looked it up to avoid a second lookup.
+	 */
+	_coerceValueForProperty(propName, rawValue, propType) {
+		const type = propType !== undefined ? propType : this._getPropertyType(propName);
+		if (type === "checkbox") {
+			return String(rawValue ?? "").trim().toLowerCase() === "true";
+		}
+		if (type === "date") {
+			return this._normalizeDateInput(rawValue);
+		}
+		if (type === "datetime") {
+			return String(rawValue ?? "").trim();
+		}
+		return rawValue;
+	}
+
+	/**
+	 * Returns the user-configured date format from the Daily Notes core plugin
+	 * if enabled; otherwise from Templates; otherwise `undefined`.
+	 */
+	/**
+	 * Builds an ordered list of date formats to try when parsing a user-typed
+	 * date that is not already in ISO. Order matters — the first format that
+	 * matches wins.
+	 *   1. Daily Notes format (if the core plugin is enabled) — strongest signal
+	 *      about how this user writes dates.
+	 *   2. Templates format (if the core plugin is enabled) — secondary signal.
+	 *   3. Common fallbacks: DD-MM-YYYY, DD/MM/YYYY, YYYY/MM/DD. MM-DD-YYYY is
+	 *      deliberately excluded to keep DD-vs-MM disambiguation predictable for
+	 *      non-US users.
+	 * Duplicates are removed so the same format is never tried twice.
+	 */
+	_getDateFormatCandidates() {
+		const formats = [];
+		try {
+			const internal = this.app && this.app.internalPlugins;
+			if (internal && internal.plugins) {
+				const readFormat = (pluginId, fieldName) => {
+					const entry = internal.plugins[pluginId];
+					if (!entry || !entry.enabled || !entry.instance) return undefined;
+					const value = entry.instance.options && entry.instance.options[fieldName];
+					return value || undefined;
+				};
+				const daily = readFormat("daily-notes", "format");
+				if (daily) formats.push(daily);
+				const tmpl = readFormat("templates", "dateFormat");
+				if (tmpl) formats.push(tmpl);
+			}
+		} catch (e) {
+			console.error("ConditionalProperties: date format lookup error", e);
+		}
+		// Common civilian formats. MM-DD-YYYY intentionally omitted to avoid
+		// silently mis-parsing DD-MM-YYYY input from non-US users.
+		formats.push("DD-MM-YYYY", "DD/MM/YYYY", "YYYY/MM/DD");
+		// Dedup while preserving order.
+		return Array.from(new Set(formats));
+	}
+
+	/**
+	 * Parses a user-typed date string into ISO (`YYYY-MM-DD`). If the input is
+	 * already ISO, returns it as-is. Otherwise, tries each configured / fallback
+	 * format in order and returns the first successful strict parse. If nothing
+	 * parses cleanly, returns the trimmed input untouched (lixo entra, lixo sai).
+	 */
+	_normalizeDateInput(rawValue) {
+		const trimmed = String(rawValue ?? "").trim();
+		if (trimmed === "") return trimmed;
+		// Already in ISO — leave it alone.
+		if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+		const candidates = this._getDateFormatCandidates();
+		for (const fmt of candidates) {
+			try {
+				const parsed = moment(trimmed, fmt, true);
+				if (parsed && parsed.isValid()) return parsed.format("YYYY-MM-DD");
+			} catch (e) {
+				console.error("ConditionalProperties: date parse error", e);
+			}
+		}
+		return trimmed;
+	}
+
 	async _writeFrontmatter(file, newFrontmatter) {
 		await this.app.fileManager.processFrontMatter(file, (fm) => {
-			// Process the new frontmatter properties
+			// `undefined` is the sentinel for "delete this property" (used by the
+			// `delete` and `rename` actions). `null` is preserved as-is — it means
+			// "property exists with an empty value" in YAML, not "delete it".
 			Object.keys(newFrontmatter).forEach(key => {
-				if (newFrontmatter[key] === null || newFrontmatter[key] === undefined) {
-					// Remove the property if marked as null/undefined
+				if (newFrontmatter[key] === undefined) {
 					delete fm[key];
 				} else {
-					// Update the property value
 					fm[key] = newFrontmatter[key];
 				}
 			});
