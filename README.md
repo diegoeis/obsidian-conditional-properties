@@ -119,6 +119,16 @@ Datetime properties (`YYYY-MM-DDTHH:mm:ss`) are not parsed and are written exact
 - This applies to both `ADD value` and `OVERWRITE all values with` actions on typed properties. For these types `ADD` behaves as `OVERWRITE` because the underlying types are scalar (you can't have a checkbox holding `[true, false]`).
 - Properties without a registered type (or registered as `text`, `number`, `multitext`, `tags`, etc.) keep the original string-based behavior. Nothing changes for those.
 
+### Typed properties also work on the IF side (since v0.19.1)
+
+The same type-aware coercion now happens when matching conditions, not just when writing actions. You can author IF rules using whatever date format you prefer and the plugin will normalize before comparing against the ISO value stored in YAML.
+
+```yaml
+IF property: created_at exactly "08-08-2025"
+THEN ...
+```
+matches a note whose YAML stores `created_at: 2025-08-08`. The same applies to `contains` and `notContains`. For checkbox properties, `IF property: done exactly "true"` matches a note with `done: true` (boolean) regardless of how the user typed `true` (case-insensitive).
+
 ## Multiple Conditions Per Rule
 
 Combine conditions inside a single rule using **Match any / Match all of the following** (inspired by Zotero).

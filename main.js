@@ -355,7 +355,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 						if (!cond.ifProp) return false;
 						sourceValue = currentFrontmatter?.[cond.ifProp];
 					}
-					return this._matchesCondition(sourceValue, cond.ifValue, cOp, cType);
+					return this._matchesCondition(sourceValue, cond.ifValue, cOp, cType, cond.ifProp);
 				} catch (e) {
 					console.error(`ConditionalProperties: condition error in rule ${ruleIdx}`, e);
 					return false;
@@ -602,7 +602,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 		});
 	}
 
-	_matchesCondition(source, expected, op, ifType) {
+	_matchesCondition(source, expected, op, ifType, propName) {
 		// Para os operadores 'exists' e 'notExists', verificamos apenas a existência da propriedade
 		if (op === "exists") {
 			// Retorna true se a propriedade existir (não for undefined ou null)
@@ -633,8 +633,23 @@ class ConditionalPropertiesPlugin extends Plugin {
 			return normalizedSource === "";
 		}
 
+		// Typed-property awareness in IF: when the property is registered as
+		// checkbox / date / datetime in Obsidian's metadata type manager,
+		// coerce the user-entered `expected` value through the same pipeline
+		// the THEN side uses. This lets the user type `08-08-2025` against a
+		// `date` property that stores `2025-08-08`, or `true` against a
+		// `checkbox` property that stores boolean `true`, and have the
+		// comparison succeed.
+		let comparableExpected = expected;
+		if (ifType === "PROPERTY" && propName) {
+			const propType = this._getPropertyType(propName);
+			if (propType === "checkbox" || propType === "date" || propType === "datetime") {
+				comparableExpected = this._coerceValueForProperty(propName, expected, propType);
+			}
+		}
+
 		// Para os outros operadores, mantemos a lógica existente
-		const normalizedExpected = this._normalizeValue(expected);
+		const normalizedExpected = this._normalizeValue(comparableExpected);
 		const evaluate = (value) => {
 			const normalizedSource = this._normalizeValue(value);
 			switch (op) {

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.19.1 - 2026-05-17
+### New Features
+- **Typed-property coercion now also runs on the IF side.** Previously, the type-aware normalization shipped in v0.19.0 only applied to THEN actions (writing the YAML). It now also runs when matching IF conditions against `checkbox`, `date`, and `datetime` properties, for the `exactly`, `contains`, and `notContains` operators.
+- You can now author rules like `IF property: created_at exactly "08-08-2025"` and have them match a note storing `created_at: 2025-08-08`. The plugin normalizes the user-typed value through the same Daily Notes / Templates / common-fallbacks pipeline used by the THEN side, then compares against the ISO value in YAML.
+- Checkbox conditions like `IF property: done exactly "true"` match a note with the boolean `done: true` (case-insensitive on the typed value).
+
+### Internal
+- `_matchesCondition` gained a fifth parameter `propName`. When `ifType` is `"PROPERTY"` and the property's widget is `checkbox`/`date`/`datetime`, the helper coerces `expected` through `_coerceValueForProperty` before normalization. All other operators and property types pass through unchanged.
+- No new helpers — `_getPropertyType`, `_coerceValueForProperty`, `_normalizeDateInput`, and `_getDateFormatCandidates` are reused verbatim from v0.19.0. The IF and THEN sides share the same source of truth.
+
+### Why
+A natural follow-up to v0.19.0: typing on the THEN side was already type-aware, but the IF side was still doing literal string comparison. Author rules in whatever date format you prefer; the plugin handles the conversion.
+
 ## 0.19.0 - 2026-05-17
 ### New Features
 - **Typed-property awareness for `checkbox`, `date`, and `datetime`**: when a rule's target property is registered with one of these widgets in the Obsidian property type system, the plugin now writes the value with the correct YAML type so the native widgets render. Closes part of issue #11.
