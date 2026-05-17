@@ -1293,8 +1293,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		// Action type selector (Title or Property)
 		actionSetting.addDropdown(d => {
-			d.addOption("property", "Change property");
-			d.addOption("title", "Change title");
+			d.addOption("property", "Property");
+			d.addOption("title", "First heading");
 			d.setValue(action.type || "property");
 			d.onChange(async (v) => {
 				action.type = v;
