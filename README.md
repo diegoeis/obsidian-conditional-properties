@@ -26,7 +26,8 @@ Stop manually updating properties across hundreds of notes. Define rules once, r
 - **REMOVE**: Remove specific values
 - **OVERWRITE**: Replace entire property
 - **DELETE PROPERTY**: Remove property completely
-- **CHANGE TITLE**: Add prefix/suffix or overwrite with dynamic dates and filenames
+- **CHANGE TITLE**: Add prefix/suffix or overwrite with dynamic dates, filenames, or other property values
+- **Placeholders in action values (new in v0.20.0)**: reference any frontmatter property inline as `{propertyName}`, alongside the existing `{date}`, `{date:FORMAT}`, and `{filename}` placeholders. Works in property values and in title text.
 - **Typed property awareness (new in v0.19.0)**: when the target property is registered as `checkbox`, `date`, or `datetime`, values are written with the right YAML type instead of as plain strings — so `whatsapp: true` lands as a real boolean (renders as a checked checkbox), and `created_at: 08-08-2025` is parsed and stored as `2025-08-08` (renders in the Obsidian date widget).
 
 ### 🎛️ Smart Execution
@@ -192,22 +193,39 @@ Modify note titles dynamically:
 - **Suffix**: `Original Title - {date}`
 - **Overwrite**: Replace entire title with custom text
 
-### Available Placeholders
+## Placeholders
 
-- **{date}**: File creation date (default format)
-  - Example: `{date}` → `2026-01-08`
-- **{date:FORMAT}**: Custom date format (moment.js)
-  - Example: `{date:DD-MM-YYYY}` → `08-01-2026`
-  - Example: `{date:YYYY/MM/DD}` → `2026/01/08`
-- **{filename}**: Current file basename (without .md)
-  - Example: For file `meeting-notes.md` → `meeting-notes`
+Placeholders work inside **any THEN action value** — property `Add value` / `Overwrite all values with`, and title `Prefix` / `Suffix` / `Overwrite`. They're expanded at the moment the rule runs, against the file being processed.
 
-### Placeholder Combinations
+| Placeholder         | Result                                                                                  |
+|---------------------|-----------------------------------------------------------------------------------------|
+| `{date}`            | File creation date in the default format (`YYYY-MM-DD`). Example: `2026-01-08`.        |
+| `{date:FORMAT}`     | File creation date in a custom moment.js format. Example: `{date:DD-MM-YYYY}` → `08-01-2026`. |
+| `{filename}`        | File basename without `.md`. Example: `meeting-notes`.                                  |
+| `{propertyName}`    | Live value of that frontmatter property on the current note (new in v0.20.0).           |
 
-Placeholders can be combined in any order:
+### Property placeholders (v0.20.0)
+
+Any token that isn't `date` / `filename` and doesn't contain `:` or whitespace is treated as a frontmatter property lookup. So `{g_excerpt}`, `{summary}`, `{kebab-case-prop}` all work.
+
+**Copy a value from one property to another:**
+```yaml
+IF property: g_excerpt exists
+THEN ADD property excerpt: "{g_excerpt}"
+```
+
+Behavior:
+- **Missing property → empty string.** No errors, no literal `{name}` left behind in your YAML.
+- **Arrays are joined with `, `.** A source like `tags: [a, b, c]` becomes `a, b, c` in the expanded string.
+- **Earlier actions in the same rule are visible to later ones.** The expansion reads from the in-progress frontmatter, so if action #1 sets `excerpt`, action #2 can reference `{excerpt}`.
+- **Reserved names win.** `{date}` and `{filename}` are resolved first; a property literally named `date` or `filename` won't shadow them.
+
+### Combinations
+
+Placeholders mix freely in the same value:
 - `{date:YYYY-MM-DD} - {filename}` → `2026-01-08 - meeting-notes`
 - `Meeting {filename} - {date:DD/MM/YY}` → `Meeting meeting-notes - 08/01/26`
-- `{filename}` → `meeting-notes` (overwrite with just filename)
+- `{g_title} ({date:YYYY})` → `My Post (2026)`
 
 ## Installation
 
@@ -245,6 +263,7 @@ The plugin runs automatically based on your selected scope.
 - [x] Rename property action
 - [x] Title overwrite with `{filename}` and `{date:FORMAT}` placeholders
 - [x] Multiple conditions per rule (`match any` / `match all`)
+- [x] Frontmatter property placeholders (`{propertyName}`) in action values
 - [ ] Modify note content (beyond frontmatter)
 - [ ] Advanced operators (regex, comparison)
 - [ ] Nested condition groups (e.g. `(A AND B) OR C`)

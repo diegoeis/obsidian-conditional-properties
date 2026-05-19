@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.20.0 - 2026-05-19
+### New Features
+- **Frontmatter property placeholders in THEN values.** Any `{propertyName}` reference inside a THEN action's value (property add/overwrite/remove, title prefix/suffix/overwrite) is now expanded to the live value of that frontmatter property on the note being processed. Example: an action `Property excerpt = Add value {g_excerpt}` copies the contents of `g_excerpt` into `excerpt`.
+- **Missing properties expand to an empty string** — no error, no literal `{name}` left behind.
+- **Array values are joined with `, `** so a multi-valued source like `tags` produces a readable string.
+- The reserved placeholders `{date}`, `{date:FORMAT}`, and `{filename}` keep their existing meaning; they're resolved first and never collide with property lookups.
+
+### Internal
+- `_formatText(text, file)` now takes an optional third argument `fm` (the in-progress frontmatter snapshot). All four call sites inside `applyRulesToFrontmatter` pass `newFm`, so a later action in the same rule sees the writes performed by earlier actions. When `fm` is omitted, the helper falls back to `metadataCache.getFileCache(file).frontmatter`.
+- Placeholder resolution is now a two-pass replace: pass 1 handles `{date}`/`{filename}`; pass 2 treats any other `{name}` token as a frontmatter lookup. The pass-2 regex excludes `:` and whitespace, so a malformed `{date:FORMAT}` survivor would not be mistaken for a property name.
+
+### Why
+Users storing canonical content in one property (`g_excerpt`, `g_title`, `summary`, ...) and needing to project it onto another (`excerpt`, `description`, ...) previously had to copy by hand. This closes that gap without inventing a new action type — the existing add/overwrite/title actions just gained a richer expansion grammar.
+
 ## 0.19.1 - 2026-05-17
 ### New Features
 - **Typed-property coercion now also runs on the IF side.** Previously, the type-aware normalization shipped in v0.19.0 only applied to THEN actions (writing the YAML). It now also runs when matching IF conditions against `checkbox`, `date`, and `datetime` properties, for the `exactly`, `contains`, and `notContains` operators.

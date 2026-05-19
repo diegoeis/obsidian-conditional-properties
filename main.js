@@ -387,7 +387,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 						const currentTitle = await this._getNoteTitle(file);
 
 						// Format the text with any placeholders
-						const formattedText = this._formatText(text, file);
+						const formattedText = this._formatText(text, file, newFm);
 
 						// Handle different modification types
 						if (modificationType === 'overwrite') {
@@ -428,7 +428,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 				// Handle property modifications (original functionality)
 				if (!prop) continue;
 				// Process any date placeholders in the value
-				const processedValue = this._formatText(value, file);
+				const processedValue = this._formatText(value, file, newFm);
 				const propType = this._getPropertyType(prop);
 				const isScalarTyped = propType === "checkbox" || propType === "date" || propType === "datetime";
 
@@ -470,7 +470,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 					changed = true;
 				} else if (actionType === "remove") {
 					// Process any date placeholders in the value before removal
-					const processedValue = this._formatText(value, file);
+					const processedValue = this._formatText(value, file, newFm);
 
 					// Handle removing from arrays or properties
 					if (Array.isArray(newFm[prop])) {
@@ -478,7 +478,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 						valuesToRemove.forEach(v => {
 							const initialLength = newFm[prop].length;
 							// Process each item in the array to handle date placeholders
-							const processedItem = this._formatText(v, file);
+							const processedItem = this._formatText(v, file, newFm);
 							newFm[prop] = newFm[prop].filter(item => !this._valueEquals(item, processedItem));
 							if (newFm[prop].length < initialLength) {
 								changed = true;
@@ -552,7 +552,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 * @param {TFile} file - The file to get creation date from
 	 * @returns {string} The formatted text with placeholders replaced
 	 */
-	_formatText(text, file) {
+	_formatText(text, file, fm) {
 		// Get file creation date or use current date as fallback
 		const getMomentDate = () => {
 			try {
@@ -591,15 +591,48 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		};
 
-		// Replace {date}, {date:FORMAT}, and {filename} placeholders
-		// Keep the exact formatting the user typed, just replace the placeholders
-		return text.replace(/\{(date|filename)(?::([^}]+))?\}/g, (match, type, format) => {
+		// Resolve a frontmatter property reference to a string. Missing /
+		// null / undefined collapses to "". Arrays join with ", ". Other
+		// scalars stringify via String(). Falls back to the live metadata
+		// cache when `fm` is not supplied (defensive — all in-tree callers
+		// now pass the in-progress newFm).
+		const getProperty = (name) => {
+			try {
+				const key = (name || "").trim();
+				if (!key) return "";
+				let source = fm;
+				if (!source && file) {
+					const cache = this.app.metadataCache.getFileCache(file);
+					source = cache && cache.frontmatter ? cache.frontmatter : null;
+				}
+				if (!source) return "";
+				const value = source[key];
+				if (value === undefined || value === null) return "";
+				if (Array.isArray(value)) return value.join(", ");
+				return String(value);
+			} catch (e) {
+				console.error("Error resolving property placeholder:", e);
+				return "";
+			}
+		};
+
+		// Two-pass replace so {date}/{date:FORMAT}/{filename} keep their
+		// existing semantics and never get mistaken for a property lookup.
+		// Pass 1 — reserved placeholders.
+		let out = text.replace(/\{(date|filename)(?::([^}]+))?\}/g, (match, type, format) => {
 			if (type === 'filename') {
 				return getFilename();
 			}
-			// type === 'date'
 			return formatDate(format);
 		});
+
+		// Pass 2 — any other {name} reference is treated as a frontmatter
+		// property lookup. The `[^}:\s]` class excludes ':' (so a stray
+		// {date:FORMAT} survivor wouldn't match) and whitespace, while
+		// still allowing g_excerpt, kebab-case, dotted, etc.
+		out = out.replace(/\{([^}:\s][^}:]*)\}/g, (match, name) => getProperty(name));
+
+		return out;
 	}
 
 	_matchesCondition(source, expected, op, ifType, propName) {
@@ -1489,7 +1522,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					}));
 			} else if (action.action !== "delete") {
 				actionSetting.addText(t => t
-					.setPlaceholder("value (use commas to separate multiple values)")
+					.setPlaceholder("value (use commas; supports {propertyName}, {date}, {filename})")
 					.setValue(action.value || "")
 					.onChange(async (v) => {
 						action.value = v;
@@ -1510,7 +1543,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			actionSetting.addText(t => t
-				.setPlaceholder("Text (use {date}, {date:FORMAT}, or {filename})")
+				.setPlaceholder("Text (use {date}, {date:FORMAT}, {filename}, or {propertyName})")
 				.setValue(action.text || "")
 				.onChange(async (v) => {
 					action.text = v;
