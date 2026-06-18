@@ -122,3 +122,8 @@
 #eis-cp-plugin .conditional-stop-rule {
   margin-left: 8px;
 }
+
+/* Utility: hide an element without removing it from the DOM */
+#eis-cp-plugin .is-hidden {
+  display: none !important;
+}

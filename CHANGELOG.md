@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.20.4 - 2026-06-18
+### Fixes
+- **No more scroll-to-top or lag on any settings interaction.** Every remaining `this.display()` call inside the settings UI has been replaced by a localized DOM mutation:
+  - Changing the **Scan scope** no longer rebuilds the page — the "Notes to scan" row is now created once and toggled via an `is-hidden` class.
+  - **Add rule** appends the new rule's `wrap` right after the Add button instead of re-rendering all rules.
+  - Changing a condition's **Property / First level heading** type, or its **operator**, rebuilds only that single condition row in place.
+  - Changing an action's **Property / First heading** type, or its **action** (add / overwrite / delete / rename / …), rebuilds only that single action row in place.
+
+  The only `display()` left in the settings UI is on **Import settings**, where rebuilding the whole tab is the right thing to do (every field potentially changed).
+
+### Internal
+- Eliminated dead code (`_updateValueInputState`, never called).
+- Removed the unused `ruleIdx` parameter from `_renderThenAction` and call sites.
+- Translated lingering Portuguese comments to English (or removed them when they only restated the code).
+- Replaced fragile class-based DOM lookups (`.extra-setting-button`, `.conditional-match`, `.setting-item-name`) with explicit references on `ruleCtx`:
+  - `ruleCtx.matchWrapEl` — the Match dropdown element, `null` when absent.
+  - `ruleCtx.removeBtnByCondition` — `WeakMap<Setting, HTMLElement>` mapping each condition's `Setting` instance to its ✕ button element.
+  - `ruleCtx.actionEntries` — array of `{ el, setting }` per action row, so reindexing and rebuilds use the `Setting` instance directly instead of querying the DOM by class.
+- Added `_rebuildCondition(ruleCtx, cond)` and `_rebuildAction(ruleCtx, action)` to encapsulate the "this row's shape changed, redraw just this row" path that used to be a full `display()`.
+- Added an `is-hidden` utility class in `styles.css` so visibility toggles stay in CSS instead of being scattered as inline `style.display = '…'` assignments.
+
 ## 0.20.3 - 2026-06-18
 ### Fixes
 - **The rule-level Remove button no longer scrolls or lags either.** The same `display()` call that 0.20.1 and 0.20.2 eliminated for rows was still firing when an entire rule was removed. The rule's `wrap` element is now detached in place; the other rules stay exactly where they were on screen.
