@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.2 - 2026-06-18
+### Fixes
+- **Removing a condition or action no longer scrolls or lags.** Same root cause as 0.20.1 — the per-row Remove (✕) button still called `display()`, which destroyed and rebuilt the entire settings tab. Now the removed row's DOM is detached in place; the remaining rows are reindexed (`Condition 1`, `Condition 2`, …) via the `Setting` instance, and when a rule drops back to a single condition the `Match (any/all)` dropdown and the last Remove ✕ are stripped without re-rendering.
+
+### Internal
+- Introduced a per-rule `ruleCtx` object (`{ wrap, ifHeader, rule, conditionSettings, actionWraps }`) shared between `_renderRule`, `_renderCondition`, `_renderThenAction`, `_addConditionRemoveButton`, and `_ensureMatchDropdown`. Remove handlers mutate this context instead of falling back to a full re-render.
+- Condition rows are tracked as `Setting` instances so `setName()` is enough to reindex; action wraps are tracked as their root elements and reindexed via a scoped `querySelector` for `.setting-item-name`.
+
 ## 0.20.1 - 2026-06-18
 ### Fixes
 - **"+ Add condition" and "+ Add action" no longer scroll the settings tab to the top.** Previously each click re-rendered the entire settings UI via `display()`, which destroyed and recreated every rule and reset the scroll position — making it impossible to keep your eyes on the rule you were editing. The new condition/action is now appended in place, right above its "Add" button.

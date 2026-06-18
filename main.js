@@ -1233,13 +1233,16 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const ifHeader = wrap.createEl("div", { cls: "conditional-rules-header conditional-if-header" });
 		ifHeader.createEl("strong", { text: "If:" });
 
+		const conditionSettings = [];
+		const ruleCtx = { wrap, ifHeader, rule, conditionSettings };
+
 		if (rule.conditions.length > 1) {
 			this._ensureMatchDropdown(ifHeader, rule);
 		}
 
-		const conditionSettings = rule.conditions.map((cond, condIdx) =>
-			this._renderCondition(wrap, rule, cond, condIdx)
-		);
+		rule.conditions.forEach((cond, condIdx) => {
+			conditionSettings.push(this._renderCondition(wrap, ruleCtx, cond, condIdx));
+		});
 
 		const addCondWrap = wrap.createEl("div", { cls: "conditional-add-condition" });
 		new ButtonComponent(addCondWrap)
@@ -1257,7 +1260,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 				const wasSingle = rule.conditions.length === 2;
 				const newCondIdx = rule.conditions.length - 1;
-				const newLine = this._renderCondition(wrap, rule, newCond, newCondIdx);
+				const newLine = this._renderCondition(wrap, ruleCtx, newCond, newCondIdx);
 				wrap.insertBefore(newLine.settingEl, addCondWrap);
 				conditionSettings.push(newLine);
 
@@ -1265,7 +1268,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					this._ensureMatchDropdown(ifHeader, rule);
 					const firstLine = conditionSettings[0];
 					if (firstLine && !firstLine.settingEl.querySelector(".extra-setting-button")) {
-						this._addConditionRemoveButton(firstLine, rule, rule.conditions[0]);
+						this._addConditionRemoveButton(firstLine, ruleCtx, rule.conditions[0]);
 					}
 				}
 			});
@@ -1273,8 +1276,11 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const thenHeader = wrap.createEl("div", { cls: "conditional-rules-header" });
 		thenHeader.createEl("strong", { text: "Then:" });
 
+		const actionWraps = [];
+		ruleCtx.actionWraps = actionWraps;
+
 		rule.thenActions.forEach((action, actionIdx) => {
-			this._renderThenAction(wrap, rule, action, actionIdx, idx);
+			actionWraps.push(this._renderThenAction(wrap, ruleCtx, action, actionIdx, idx));
 		});
 
 		const addActionWrap = wrap.createEl("div", { cls: "conditional-add-action-wrap" });
@@ -1292,8 +1298,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				await this.plugin.saveData(this.plugin.settings);
 
 				const newActionIdx = rule.thenActions.length - 1;
-				const newActionEl = this._renderThenAction(wrap, rule, newAction, newActionIdx, idx);
+				const newActionEl = this._renderThenAction(wrap, ruleCtx, newAction, newActionIdx, idx);
 				wrap.insertBefore(newActionEl, addActionWrap);
+				actionWraps.push(newActionEl);
 			});
 
 		const actions = wrap.createEl("div", { cls: "conditional-actions" });
@@ -1343,7 +1350,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 	}
 
-	_renderCondition(containerEl, rule, cond, condIdx) {
+	_renderCondition(containerEl, ruleCtx, cond, condIdx) {
+		const rule = ruleCtx.rule;
 		if (!cond.ifType) cond.ifType = "PROPERTY";
 		if (!cond.op) cond.op = "exactly";
 
@@ -1415,7 +1423,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		}
 
 		if (rule.conditions.length > 1) {
-			this._addConditionRemoveButton(line, rule, cond);
+			this._addConditionRemoveButton(line, ruleCtx, cond);
 		}
 
 		return line;
@@ -1435,16 +1443,34 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 	}
 
-	_addConditionRemoveButton(settingLine, rule, cond) {
+	_addConditionRemoveButton(settingLine, ruleCtx, cond) {
 		settingLine.addExtraButton(b => b
 			.setIcon("cross")
 			.setTooltip("Remove this condition")
 			.onClick(async () => {
+				const { rule, conditionSettings, ifHeader } = ruleCtx;
 				const currentIdx = rule.conditions.indexOf(cond);
 				if (currentIdx === -1) return;
+
 				rule.conditions.splice(currentIdx, 1);
+				const [removedLine] = conditionSettings.splice(currentIdx, 1);
+				if (removedLine) removedLine.settingEl.remove();
+
 				await this.plugin.saveData(this.plugin.settings);
-				this.display();
+
+				conditionSettings.forEach((line, i) => {
+					line.setName(`Condition ${i + 1}`);
+				});
+
+				if (rule.conditions.length === 1) {
+					const matchEl = ifHeader.querySelector(".conditional-match");
+					if (matchEl) matchEl.remove();
+					const last = conditionSettings[0];
+					if (last) {
+						const removeBtn = last.settingEl.querySelector(".extra-setting-button");
+						if (removeBtn) removeBtn.remove();
+					}
+				}
 			}));
 	}
 
@@ -1490,7 +1516,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
         }
     }
 
-	_renderThenAction(containerEl, rule, action, actionIdx, ruleIdx) {
+	_renderThenAction(containerEl, ruleCtx, action, actionIdx, ruleIdx) {
+		const rule = ruleCtx.rule;
 		const actionWrap = containerEl.createEl("div", { cls: "conditional-then-action" });
 		const actionSetting = new Setting(actionWrap).setName(`Action ${actionIdx + 1}`);
 		
@@ -1586,9 +1613,19 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.onClick(async () => {
 				const currentIdx = rule.thenActions.indexOf(action);
 				if (currentIdx === -1) return;
+
 				rule.thenActions.splice(currentIdx, 1);
+				const actionWraps = ruleCtx.actionWraps || [];
+				const wrapIdx = actionWraps.indexOf(actionWrap);
+				if (wrapIdx !== -1) actionWraps.splice(wrapIdx, 1);
+				actionWrap.remove();
+
 				await this.plugin.saveData(this.plugin.settings);
-				this.display();
+
+				actionWraps.forEach((w, i) => {
+					const nameEl = w.querySelector(".setting-item-info .setting-item-name");
+					if (nameEl) nameEl.setText(`Action ${i + 1}`);
+				});
 			}));
 
 		return actionWrap;
