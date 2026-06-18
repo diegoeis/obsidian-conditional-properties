@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.3 - 2026-06-18
+### Fixes
+- **The rule-level Remove button no longer scrolls or lags either.** The same `display()` call that 0.20.1 and 0.20.2 eliminated for rows was still firing when an entire rule was removed. The rule's `wrap` element is now detached in place; the other rules stay exactly where they were on screen.
+
+### Internal
+- The Remove handler unsubscribes the rule's `onScanStateChange` listener and prunes it from `_scanStateUnsubscribers` before detaching the DOM, so removed rules don't leave dangling subscribers behind.
+- Both `Run this rule` and `Remove` resolve the rule's current index via `Array#indexOf(rule)` at click time instead of trusting the `idx` captured at render time. With re-renders gone, the closure-captured index would go stale after any other rule was removed and we'd run / delete the wrong one.
+
 ## 0.20.2 - 2026-06-18
 ### Fixes
 - **Removing a condition or action no longer scrolls or lags.** Same root cause as 0.20.1 — the per-row Remove (✕) button still called `display()`, which destroyed and rebuilt the entire settings tab. Now the removed row's DOM is detached in place; the remaining rows are reindexed (`Condition 1`, `Condition 2`, …) via the `Setting` instance, and when a rule drops back to a single condition the `Match (any/all)` dropdown and the last Remove ✕ are stripped without re-rendering.

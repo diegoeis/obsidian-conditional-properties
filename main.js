@@ -1310,7 +1310,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.onClick(async () => {
 				if (this.plugin.isScanRunning()) return;
 				try {
-					const result = await this.plugin.runScanForRules([this.plugin.settings.rules[idx]]);
+					const currentIdx = this.plugin.settings.rules.indexOf(rule);
+					if (currentIdx === -1) return;
+					const result = await this.plugin.runScanForRules([this.plugin.settings.rules[currentIdx]]);
 					if (result.busy) return;
 					this.plugin._notifyScanResult(result, "rule");
 				} catch (e) {
@@ -1344,9 +1346,19 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.setWarning()
 			.setClass("conditional-remove")
 			.onClick(async () => {
-				this.plugin.settings.rules.splice(idx, 1);
+				const currentIdx = this.plugin.settings.rules.indexOf(rule);
+				if (currentIdx === -1) return;
+				this.plugin.settings.rules.splice(currentIdx, 1);
 				await this.plugin.saveData(this.plugin.settings);
-				this.display();
+
+				const subs = this._scanStateUnsubscribers || [];
+				const subIdx = subs.indexOf(unsubRule);
+				if (subIdx !== -1) {
+					try { unsubRule(); } catch (e) { console.error("ConditionalProperties: unsubscribe error", e); }
+					subs.splice(subIdx, 1);
+				}
+
+				wrap.remove();
 			});
 	}
 
