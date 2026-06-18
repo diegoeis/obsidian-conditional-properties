@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.20.1 - 2026-06-18
+### Fixes
+- **"+ Add condition" and "+ Add action" no longer scroll the settings tab to the top.** Previously each click re-rendered the entire settings UI via `display()`, which destroyed and recreated every rule and reset the scroll position — making it impossible to keep your eyes on the rule you were editing. The new condition/action is now appended in place, right above its "Add" button.
+- **New conditions/actions appear instantly.** The full re-render was also responsible for the lag — every existing rule, condition and action was being rebuilt on each click. Only the new row is created now.
+- The `Match (any/all)` dropdown is materialized on the fly the first time a rule gets a second condition, and the per-condition Remove button is wired into the previously-single condition at the same moment — no element is destroyed and recreated.
+
+### Internal
+- `_renderCondition()` and `_renderThenAction()` now return the elements they create (the `Setting` and the wrap `div`), so callers can insert them at a precise position without resorting to `lastElementChild` or DOM scraping.
+- New helpers `_ensureMatchDropdown(ifHeader, rule)` and `_addConditionRemoveButton(settingLine, rule, cond)` extract the dynamic-mutation logic. The Remove handler looks up the condition's current index via `Array#indexOf` instead of capturing it in a closure, so removals stay correct after subsequent additions.
+- Remove handler for actions does the same `indexOf` lookup, fixing a latent off-by-one when an action is deleted after another was appended.
+- All DOM lookups remain scoped to elements the plugin owns (`settingEl.querySelector(...)`, `ifHeader.querySelector(...)`); no global `document.querySelector` was introduced. No `innerHTML`, `var`, or unregistered listeners were added — Obsidian's `createEl` / `createDiv` and the `Setting` / `DropdownComponent` / `ButtonComponent` APIs are used throughout, in line with the project's plugin guidelines.
+
 ## 0.20.0 - 2026-05-19
 ### New Features
 - **Frontmatter property placeholders in THEN values.** Any `{propertyName}` reference inside a THEN action's value (property add/overwrite/remove, title prefix/suffix/overwrite) is now expanded to the live value of that frontmatter property on the note being processed. Example: an action `Property excerpt = Add value {g_excerpt}` copies the contents of `g_excerpt` into `excerpt`.

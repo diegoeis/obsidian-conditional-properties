@@ -1234,36 +1234,40 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		ifHeader.createEl("strong", { text: "If:" });
 
 		if (rule.conditions.length > 1) {
-			const matchWrap = ifHeader.createEl("div", { cls: "conditional-match" });
-			matchWrap.createEl("span", { text: "Match", cls: "conditional-match-label" });
-			new DropdownComponent(matchWrap)
-				.addOption("any", "any of the following")
-				.addOption("all", "all of the following")
-				.setValue(rule.match)
-				.onChange(async (v) => {
-					rule.match = v === "all" ? "all" : "any";
-					await this.plugin.saveData(this.plugin.settings);
-					this.display();
-				});
+			this._ensureMatchDropdown(ifHeader, rule);
 		}
 
-		rule.conditions.forEach((cond, condIdx) => {
-			this._renderCondition(wrap, rule, cond, condIdx);
-		});
+		const conditionSettings = rule.conditions.map((cond, condIdx) =>
+			this._renderCondition(wrap, rule, cond, condIdx)
+		);
 
 		const addCondWrap = wrap.createEl("div", { cls: "conditional-add-condition" });
 		new ButtonComponent(addCondWrap)
 			.setButtonText("+ Add condition")
 			.setCta()
 			.onClick(async () => {
-				rule.conditions.push({
+				const newCond = {
 					ifType: "PROPERTY",
 					ifProp: "",
 					ifValue: "",
 					op: "exactly"
-				});
+				};
+				rule.conditions.push(newCond);
 				await this.plugin.saveData(this.plugin.settings);
-				this.display();
+
+				const wasSingle = rule.conditions.length === 2;
+				const newCondIdx = rule.conditions.length - 1;
+				const newLine = this._renderCondition(wrap, rule, newCond, newCondIdx);
+				wrap.insertBefore(newLine.settingEl, addCondWrap);
+				conditionSettings.push(newLine);
+
+				if (wasSingle) {
+					this._ensureMatchDropdown(ifHeader, rule);
+					const firstLine = conditionSettings[0];
+					if (firstLine && !firstLine.settingEl.querySelector(".extra-setting-button")) {
+						this._addConditionRemoveButton(firstLine, rule, rule.conditions[0]);
+					}
+				}
 			});
 
 		const thenHeader = wrap.createEl("div", { cls: "conditional-rules-header" });
@@ -1278,14 +1282,18 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.setButtonText("+ Add action")
 			.setCta()
 			.onClick(async () => {
-				rule.thenActions.push({
+				const newAction = {
 					type: "property",
 					prop: "",
 					value: "",
 					action: "add"
-				});
+				};
+				rule.thenActions.push(newAction);
 				await this.plugin.saveData(this.plugin.settings);
-				this.display();
+
+				const newActionIdx = rule.thenActions.length - 1;
+				const newActionEl = this._renderThenAction(wrap, rule, newAction, newActionIdx, idx);
+				wrap.insertBefore(newActionEl, addActionWrap);
 			});
 
 		const actions = wrap.createEl("div", { cls: "conditional-actions" });
@@ -1339,7 +1347,6 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		if (!cond.ifType) cond.ifType = "PROPERTY";
 		if (!cond.op) cond.op = "exactly";
 
-		const isMulti = rule.conditions.length > 1;
 		const line = new Setting(containerEl).setName(`Condition ${condIdx + 1}`);
 		line.settingEl.addClass("conditional-condition");
 		line.settingEl.addClass("conditional-then-action");
@@ -1407,16 +1414,38 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			}
 		}
 
-		if (isMulti) {
-			line.addExtraButton(b => b
-				.setIcon("cross")
-				.setTooltip("Remove this condition")
-				.onClick(async () => {
-					rule.conditions.splice(condIdx, 1);
-					await this.plugin.saveData(this.plugin.settings);
-					this.display();
-				}));
+		if (rule.conditions.length > 1) {
+			this._addConditionRemoveButton(line, rule, cond);
 		}
+
+		return line;
+	}
+
+	_ensureMatchDropdown(ifHeader, rule) {
+		if (ifHeader.querySelector(".conditional-match")) return;
+		const matchWrap = ifHeader.createEl("div", { cls: "conditional-match" });
+		matchWrap.createEl("span", { text: "Match", cls: "conditional-match-label" });
+		new DropdownComponent(matchWrap)
+			.addOption("any", "any of the following")
+			.addOption("all", "all of the following")
+			.setValue(rule.match || "any")
+			.onChange(async (v) => {
+				rule.match = v === "all" ? "all" : "any";
+				await this.plugin.saveData(this.plugin.settings);
+			});
+	}
+
+	_addConditionRemoveButton(settingLine, rule, cond) {
+		settingLine.addExtraButton(b => b
+			.setIcon("cross")
+			.setTooltip("Remove this condition")
+			.onClick(async () => {
+				const currentIdx = rule.conditions.indexOf(cond);
+				if (currentIdx === -1) return;
+				rule.conditions.splice(currentIdx, 1);
+				await this.plugin.saveData(this.plugin.settings);
+				this.display();
+			}));
 	}
 
 	_configureOperatorDropdown(dropdown, currentValue, onChange) {
@@ -1555,10 +1584,14 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.setIcon("cross")
 			.setTooltip("Remove this action")
 			.onClick(async () => {
-				rule.thenActions.splice(actionIdx, 1);
+				const currentIdx = rule.thenActions.indexOf(action);
+				if (currentIdx === -1) return;
+				rule.thenActions.splice(currentIdx, 1);
 				await this.plugin.saveData(this.plugin.settings);
 				this.display();
 			}));
+
+		return actionWrap;
 	}
 }
 
