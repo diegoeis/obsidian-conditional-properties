@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.23.2 - 2026-08-22
+### Added
+- **Local lint tooling**: `npm install && npm run lint` now runs `eslint-plugin-obsidianmd` against `main.js` — the same checks the community-plugin review bot runs on release. Dev-only `package.json`/`package-lock.json`/`eslint.config.mjs`; no build step, no runtime dependencies added.
+
+### Fixes
+- **Removed the file-level `/* eslint-disable */`** that was silencing lint on the entire file. Fixed every real violation it had hidden: sentence case on 15 UI strings (dropdown options, placeholders, button labels, Notices), `element.style.display` direct assignment (now a `toggleClass('is-hidden', …)` like the rest of the settings UI), an unused `catch (e)` binding, and a dead `parseYaml`/`stringifyYaml` import (frontmatter I/O has used `fileManager.processFrontMatter` since day one). The two remaining structural findings — `require()` instead of `import`, and destructuring a variable named `Plugin` that collides with a legacy browser global — are inherent to this repo's hand-written-CommonJS-no-build architecture; they're now suppressed with a scoped, documented `eslint-disable-next-line` instead of hiding everything.
+- **Documented three internal/undocumented Obsidian API usages** (`vault.config.dateFormat`, `metadataTypeManager`, `internalPlugins`) as known tech debt with inline comments — no public alternative exists today, but the file previously gave no signal that these could silently break on an Obsidian update. All three were already wrapped in try/catch with safe fallbacks.
+- **Export settings no longer relies on a synthetic `<a download>` click on a Blob URL** — that pattern isn't reliable in mobile WebViews (the manifest declares `isDesktopOnly: false`). It now writes directly into the vault via `vault.adapter.write` and shows a `Notice` with the file's path.
+- **A rule's `PROPERTY` condition now sees property changes made by earlier rules in the same scan**, not just the frontmatter snapshot from before the scan started — matching how THEN actions already read from the in-progress frontmatter. Lets rules chain in a single pass (see the new "Rule Chaining Within a Scan" section in the README) instead of needing a second scheduled run to pick up an earlier rule's change.
+- Corrected two stale CLAUDE.md references to `parseYaml`/`stringifyYaml` as the frontmatter-writing mechanism — it's been `fileManager.processFrontMatter` since the rewrite; the docs just hadn't caught up.
+
 ## 0.23.1 - 2026-08-22
 ### Fixes
 - **Note file actions could escape the vault via path traversal.** `Rename file` / `Add name prefix` / `Add name suffix` did not strip `/`, `\`, or `..` from the (possibly placeholder-expanded) text, so a value like `../outside/name` could compute a path outside the file's current folder. `Move file` only trimmed leading/trailing slashes and did not reject `..` segments, so a destination like `../../outside` could resolve above or outside the vault root. Both are now sanitized before any `renameFile`/`createFolder` call: rename/prefix/suffix strip path separators and `..` entirely (filename-only, never changes folder), and Move drops `.`/`..`/empty path segments (vault-relative only, confined inside the vault).

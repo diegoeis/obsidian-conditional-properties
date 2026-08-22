@@ -72,7 +72,7 @@ Single class `ConditionalPropertiesPlugin extends Plugin` plus `ConditionalPrope
   - Title actions: `prefix` | `suffix` | `overwrite`, with `_formatText()` expanding `{date}`, `{date:FORMAT}`, `{filename}` placeholders.
 - Persistence:
   - Title changes via `_updateNoteTitle(file, newTitle)`.
-  - Frontmatter via `_writeFrontmatter(file, newFrontmatter)` — parses/stringifies with `parseYaml` / `stringifyYaml`, creates the YAML block if missing, deletes keys with `null`/`undefined`.
+  - Frontmatter via `_writeFrontmatter(file, newFrontmatter)` — uses `fileManager.processFrontMatter` (the official recommended API), creates the YAML block if missing, deletes keys with `null`/`undefined`.
 
 ### Settings shape (`loadData()`)
 ```
@@ -100,6 +100,19 @@ thenActions: Array<
 ## Development workflow
 
 No build. Edit `main.js` / `styles.css` and reload the plugin in Obsidian.
+
+### Linting
+
+This repo has dev-only tooling to run the same `eslint-plugin-obsidianmd` checks the community-plugin review bot runs on every release — no build step, no TypeScript, just a `package.json` for the lint dependencies:
+
+```sh
+npm install   # once, or after pulling a package.json change
+npm run lint
+```
+
+Config lives in `eslint.config.mjs`. Run this before every release-bearing push, and after any change that touches the settings UI (most `obsidianmd/ui/sentence-case` violations show up there) or adds a new Obsidian API call. `node_modules/` is gitignored; `package-lock.json` is committed so lint results are reproducible.
+
+If a rule flags something that's structurally unavoidable given this repo's no-build/no-TypeScript setup (e.g. `require()` instead of `import`), don't reach for a file-level `/* eslint-disable */` — it hides every other violation in the file, including future ones. Use a scoped `// eslint-disable-next-line <rule> -- <reason>` right above the line, with a comment explaining why. See the top of `main.js` for the existing example.
 
 ### Live-test loop via Obsidian CLI
 

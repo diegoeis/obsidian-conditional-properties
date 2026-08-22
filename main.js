@@ -1,5 +1,13 @@
-/* eslint-disable */
-const { Plugin, Notice, Setting, PluginSettingTab, ButtonComponent, DropdownComponent, parseYaml, stringifyYaml, moment } = require("obsidian");
+// This repo ships hand-written CommonJS main.js directly (no bundler, no
+// TypeScript source — see CLAUDE.md). eslint-plugin-obsidianmd's rules below
+// assume a bundler compiles `import` syntax down to `require()`, which is
+// what a real plugin's shipped main.js always looks like at runtime anyway —
+// so `no-require-imports` doesn't apply here, and destructuring `Plugin`
+// only trips `no-redeclare` because ESLint's browser globals still list the
+// legacy `Plugin` DOM interface (navigator.plugins), never actually used by
+// this file.
+// eslint-disable-next-line @typescript-eslint/no-require-imports, no-redeclare -- hand-written CommonJS main.js by design, see comment above
+const { Plugin, Notice, Setting, PluginSettingTab, ButtonComponent, DropdownComponent, moment } = require("obsidian");
 
 class ConditionalPropertiesPlugin extends Plugin {
 	async onload() {
@@ -31,7 +39,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 			checkCallback: (checking) => {
 				if (checking) return this.isScanRunning();
 				this.requestStopScan();
-				new Notice("Conditional Properties: stop requested — finishing current file");
+				new Notice("Conditional properties: stop requested — finishing current file");
 			}
 		});
 		this.addCommand({
@@ -359,7 +367,14 @@ class ConditionalPropertiesPlugin extends Plugin {
 						if (sourceValue === null && !allowsNull) return false;
 					} else {
 						if (!cond.ifProp) return false;
-						sourceValue = currentFrontmatter?.[cond.ifProp];
+						// Read from the in-progress `newFm`, not the original
+						// `currentFrontmatter` snapshot — so a later rule in the same
+						// scan sees property changes an earlier rule already made
+						// (mirrors how THEN actions already read from `newFm` via
+						// `_formatText`). Rules are evaluated in array order, so this
+						// is deterministic: rule N sees the cumulative effect of
+						// rules 1..N-1 from this same run, never rules after it.
+						sourceValue = newFm?.[cond.ifProp];
 					}
 					return this._matchesCondition(sourceValue, cond.ifValue, cOp, cType, cond.ifProp);
 				} catch (e) {
@@ -713,7 +728,13 @@ class ConditionalPropertiesPlugin extends Plugin {
 		// instance for {updated_date} / {today}.
 		const formatDate = (format, momentDate = getMomentDate()) => {
 			try {
-				// Use Obsidian's built-in date format if no specific format provided
+				// Use Obsidian's built-in date format if no specific format provided.
+				// KNOWN TECH DEBT: `vault.config` is undocumented/internal (not in
+				// obsidian.d.ts) — there is no public API for the user's configured
+				// default date format today. Guarded by the surrounding try/catch
+				// and the `|| 'YYYY-MM-DD'` fallback, so a breaking change here
+				// degrades to the ISO default rather than crashing. Re-check this
+				// against obsidian.d.ts when bumping minAppVersion.
 				if (!format) {
 					return momentDate.format(this.app.vault.config.dateFormat || 'YYYY-MM-DD');
 				}
@@ -1010,6 +1031,13 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 * `undefined` when the property has no explicit type assignment. Used to
 	 * decide when to coerce a raw string value into a typed scalar (boolean for
 	 * checkbox, normalized string for date / datetime).
+	 *
+	 * KNOWN TECH DEBT: `app.metadataTypeManager` is undocumented/internal (not
+	 * in obsidian.d.ts) — there is no public API for reading a property's
+	 * registered type today. Guarded by try/catch and `typeof fn === "function"`
+	 * checks below, so a breaking change degrades to "no type info" (values
+	 * written as plain strings) rather than crashing. Re-check this against
+	 * obsidian.d.ts when bumping minAppVersion.
 	 */
 	_getPropertyType(propName) {
 		try {
@@ -1082,6 +1110,13 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 *      deliberately excluded to keep DD-vs-MM disambiguation predictable for
 	 *      non-US users.
 	 * Duplicates are removed so the same format is never tried twice.
+	 *
+	 * KNOWN TECH DEBT: `app.internalPlugins` is undocumented/internal (not in
+	 * obsidian.d.ts) — there is no public API for reading a core plugin's
+	 * settings today. Guarded by try/catch and `entry.enabled`/`entry.instance`
+	 * checks below, so a breaking change degrades to the common-fallback
+	 * formats rather than crashing. Re-check this against obsidian.d.ts when
+	 * bumping minAppVersion.
 	 */
 	_getDateFormatCandidates() {
 		const formats = [];
@@ -1152,18 +1187,18 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	constructor(app, plugin) { super(app, plugin); this.plugin = plugin; }
 
 	async exportSettings() {
+		// Writes into the vault itself via vault.adapter.write instead of
+		// triggering a browser "Save As" through a synthetic <a download>
+		// click on a Blob URL. That pattern is unreliable in mobile WebViews
+		// (iOS in particular may not surface a save dialog at all) — the
+		// manifest declares isDesktopOnly: false, so this needs to work on
+		// mobile too. Writing to the vault root also means the exported file
+		// shows up in Obsidian's file explorer on every platform.
 		try {
 			const settings = JSON.stringify(this.plugin.settings, null, 2);
-			const blob = new Blob([settings], { type: 'application/json' });
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = `conditional-properties-settings-${new Date().toISOString().split('T')[0]}.json`;
-			document.body.appendChild(a);
-			a.click();
-			document.body.removeChild(a);
-			URL.revokeObjectURL(url);
-			new Notice('Settings exported successfully!');
+			const fileName = `conditional-properties-settings-${new Date().toISOString().split('T')[0]}.json`;
+			await this.app.vault.adapter.write(fileName, settings);
+			new Notice(`Settings exported to "${fileName}" in your vault's root folder.`, 6000);
 		} catch (error) {
 			console.error('Error exporting settings:', error);
 			new Notice('Failed to export settings: ' + error.message, 5000);
@@ -1217,7 +1252,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	_teardownScanSubscriptions() {
 		if (this._scanStateUnsubscribers) {
 			for (const unsub of this._scanStateUnsubscribers) {
-				try { unsub(); } catch (e) { /* noop */ }
+				try { unsub(); } catch { /* noop */ }
 			}
 			this._scanStateUnsubscribers = [];
 		}
@@ -1250,8 +1285,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				.setName("Scan scope")
 				.setDesc("Choose which notes to scan")
 				.addDropdown(dropdown => {
-					dropdown.addOption("latestCreated", "Latest Created notes");
-					dropdown.addOption("latestModified", "Latest Modified notes");
+					dropdown.addOption("latestCreated", "Latest created notes");
+					dropdown.addOption("latestModified", "Latest modified notes");
 					dropdown.addOption("entireVault", "Entire vault");
 					dropdown.setValue(this.plugin.settings.scanScope || "latestCreated");
 					dropdown.onChange(async (value) => {
@@ -1263,7 +1298,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			const notesToScanSetting = new Setting(rootEl)
 				.setName("Notes to scan")
-				.setDesc("Number of notes to scan (applies to Latest Created or Latest Modified scope, 1-1000)")
+				.setDesc("Number of notes to scan (applies to latest created or latest modified scope, 1-1000)")
 				.addText(text => {
 					text.setPlaceholder("15")
 					.setValue(String(this.plugin.settings.scanCount || 15))
@@ -1294,7 +1329,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			const importInput = document.createElement('input');
 			importInput.type = 'file';
 			importInput.accept = '.json';
-			importInput.style.display = 'none';
+			importInput.addClass('is-hidden');
 			importInput.addEventListener('change', (e) => {
 				const file = e.target.files[0];
 				if (file) {
@@ -1330,7 +1365,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 						this.plugin._notifyScanResult(result, "vault");
 					} catch (e) {
 						console.error("ConditionalProperties: runScan error", e);
-						new Notice("Conditional Properties: error during scan — see console");
+						new Notice("Conditional properties: error during scan — see console");
 					}
 				});
 			});
@@ -1342,7 +1377,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				btn.buttonEl.classList.add("conditional-stop");
 				btn.onClick(() => {
 					this.plugin.requestStopScan();
-					new Notice("Conditional Properties: stop requested — finishing current file");
+					new Notice("Conditional properties: stop requested — finishing current file");
 				});
 			});
 
@@ -1452,7 +1487,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		const addCondWrap = wrap.createEl("div", { cls: "conditional-add-condition" });
 		new ButtonComponent(addCondWrap)
-			.setButtonText("+ Add condition")
+			.setButtonText("+ add condition")
 			.setCta()
 			.onClick(async () => {
 				const newCond = {
@@ -1491,7 +1526,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		const addActionWrap = wrap.createEl("div", { cls: "conditional-add-action-wrap" });
 		new ButtonComponent(addActionWrap)
-			.setButtonText("+ Add action")
+			.setButtonText("+ add action")
 			.setCta()
 			.onClick(async () => {
 				const newAction = {
@@ -1523,7 +1558,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					this.plugin._notifyScanResult(result, "rule");
 				} catch (e) {
 					console.error("ConditionalProperties: runScanForRules error", e);
-					new Notice("Conditional Properties: error during scan — see console");
+					new Notice("Conditional properties: error during scan — see console");
 				}
 			});
 
@@ -1533,7 +1568,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.setClass("conditional-stop-rule")
 			.onClick(() => {
 				this.plugin.requestStopScan();
-				new Notice("Conditional Properties: stop requested — finishing current file");
+				new Notice("Conditional properties: stop requested — finishing current file");
 			});
 
 		const syncRuleRunState = () => {
@@ -1631,7 +1666,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			if (cond.op !== 'exists' && cond.op !== 'notExists' && cond.op !== 'isEmpty') {
 				line.addText(t => t
-					.setPlaceholder("heading text")
+					.setPlaceholder("Heading text")
 					.setValue(cond.ifValue || "")
 					.onChange(async (v) => {
 						cond.ifValue = v;
@@ -1640,7 +1675,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			}
 		} else {
 			line.addText(t => t
-				.setPlaceholder("property")
+				.setPlaceholder("Property")
 				.setValue(cond.ifProp || "")
 				.onChange(async (v) => {
 					cond.ifProp = v;
@@ -1659,7 +1694,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			if (cond.op !== 'exists' && cond.op !== 'notExists' && cond.op !== 'isEmpty') {
 				line.addText(t => t
-					.setPlaceholder("value")
+					.setPlaceholder("Value")
 					.setValue(cond.ifValue || "")
 					.onChange(async (v) => {
 						cond.ifValue = v;
@@ -1720,8 +1755,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const matchWrap = ifHeader.createEl("div", { cls: "conditional-match" });
 		matchWrap.createEl("span", { text: "Match", cls: "conditional-match-label" });
 		new DropdownComponent(matchWrap)
-			.addOption("any", "any of the following")
-			.addOption("all", "all of the following")
+			.addOption("any", "Any of the following")
+			.addOption("all", "All of the following")
 			.setValue(rule.match || "any")
 			.onChange(async (v) => {
 				rule.match = v === "all" ? "all" : "any";
@@ -1826,7 +1861,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		if (action.type === "property") {
 			actionSetting.addText(t => t
-				.setPlaceholder("property name")
+				.setPlaceholder("Property name")
 				.setValue(action.prop || "")
 				.onChange(async (v) => {
 					action.prop = v;
@@ -1848,7 +1883,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			if (action.action === "rename") {
 				actionSetting.addText(t => t
-					.setPlaceholder("new property name")
+					.setPlaceholder("New property name")
 					.setValue(action.newPropName || "")
 					.onChange(async (v) => {
 						action.newPropName = v;

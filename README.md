@@ -154,6 +154,17 @@ THEN REMOVE tags: active
 
 Click **+ Add condition** below the IF block to add more conditions, and the dropdown to switch between `any` and `all`. Existing rules from previous plugin versions are auto-migrated and keep their behavior unchanged.
 
+## Rule Chaining Within a Scan
+
+Rules run in the order they're listed. A `PROPERTY` condition in a later rule sees property changes an earlier rule already made **in the same scan** — not just the frontmatter as it was before the scan started. So this works in a single pass:
+
+```yaml
+Rule 1: IF property: status = "done"     THEN ADD tags: completed
+Rule 2: IF property: tags contains "completed"   THEN ADD priority: low
+```
+
+Rule 2 fires on the same run Rule 1 added the `completed` tag, no second scan needed. Note-file actions in an earlier rule (rename, move) are visible the same way — a later rule's `Note file` condition checks the file's *current* name/folder, including any rename/move already applied earlier in the same scan.
+
 ## Multiple Actions Per Rule
 
 Combine actions to automate complex workflows:
@@ -302,6 +313,13 @@ Placeholders mix freely in the same value:
 Settings → Scan interval (minutes) → Set interval (minimum 5)
 
 The plugin runs automatically based on your selected scope.
+
+### Backup & Restore Settings
+
+Settings → Backup and restore.
+
+- **Export settings** writes `conditional-properties-settings-YYYY-MM-DD.json` to your **vault's root folder** (not your OS's Downloads folder) and shows a `Notice` confirming the path. This works the same way on desktop and mobile — earlier versions triggered a browser download dialog, which isn't reliable in Obsidian Mobile's WebView.
+- **Import settings** opens a file picker; pick any exported JSON file to restore your rules and scan settings.
 
 ## Roadmap
 

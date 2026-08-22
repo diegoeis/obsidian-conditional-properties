@@ -1,0 +1,12 @@
+{
+  "name": "conditional-properties-lint",
+  "private": true,
+  "description": "Dev-only tooling for this plugin. No build step — main.js is shipped as-is; this package.json exists solely to run eslint-plugin-obsidianmd locally, the same check the community-plugin review bot runs on release.",
+  "scripts": {
+    "lint": "eslint main.js"
+  },
+  "devDependencies": {
+    "eslint": "^10.9.0",
+    "eslint-plugin-obsidianmd": "^0.4.1"
+  }
+}
