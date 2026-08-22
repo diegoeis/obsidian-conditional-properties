@@ -346,6 +346,9 @@ class ConditionalPropertiesPlugin extends Plugin {
 				try {
 					const cType = cond.ifType || "PROPERTY";
 					const cOp = cond.op || "exactly";
+					if (cType === "NOTE_FILE") {
+						return this._matchesNoteFileCondition(file, cond);
+					}
 					let sourceValue;
 					if (cType === "FIRST_LEVEL_HEADING") {
 						sourceValue = await this._getNoteTitle(file);
@@ -717,6 +720,50 @@ class ConditionalPropertiesPlugin extends Plugin {
 			return source.some(item => evaluate(item));
 		}
 		return evaluate(source == null ? "" : source);
+	}
+
+	/**
+	 * Evaluates a "Note file" condition — the file's name or the folders it
+	 * lives in, as opposed to a frontmatter property or the H1 title.
+	 *   filenameContains / filenameNotContains / filenameExactly — compare
+	 *     against `file.basename` (no extension). Case-insensitive.
+	 *   parentFolderIs — the user-entered value can be a single folder name
+	 *     ("ClienteA") or a partial path ("meetings/transcripts/company").
+	 *     It matches when those segments appear contiguous and in order
+	 *     anywhere in the file's folder path — not just as the immediate
+	 *     parent, and not necessarily anchored at the vault root. Case-insensitive.
+	 */
+	_matchesNoteFileCondition(file, cond) {
+		const op = cond.op || "filenameContains";
+		const normalizedExpected = this._normalizeValue(cond.ifValue).toLowerCase();
+
+		if (op === "parentFolderIs") {
+			const targetSegments = normalizedExpected.split("/").map(s => s.trim()).filter(Boolean);
+			if (targetSegments.length === 0) return false;
+			const folderPath = (file.parent && file.parent.path) ? file.parent.path : "";
+			const pathSegments = folderPath.split("/").map(s => s.trim().toLowerCase()).filter(Boolean);
+			for (let i = 0; i <= pathSegments.length - targetSegments.length; i++) {
+				let allMatch = true;
+				for (let j = 0; j < targetSegments.length; j++) {
+					if (pathSegments[i + j] !== targetSegments[j]) { allMatch = false; break; }
+				}
+				if (allMatch) return true;
+			}
+			return false;
+		}
+
+		const filename = this._normalizeValue(file.basename || "").toLowerCase();
+		switch (op) {
+			case "filenameExactly":
+				return filename === normalizedExpected;
+			case "filenameNotContains":
+				if (normalizedExpected === "") return true;
+				return !filename.includes(normalizedExpected);
+			case "filenameContains":
+			default:
+				if (normalizedExpected === "") return false;
+				return filename.includes(normalizedExpected);
+		}
 	}
 
 	_normalizeValue(value) {
@@ -1409,6 +1456,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		line.addDropdown(d => {
 			d.addOption("PROPERTY", "Property");
 			d.addOption("FIRST_LEVEL_HEADING", "First level heading");
+			d.addOption("NOTE_FILE", "Note file");
 			d.setValue(cond.ifType);
 			d.onChange(async (v) => {
 				cond.ifType = v;
@@ -1416,7 +1464,30 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 		});
 
-		if (cond.ifType === "FIRST_LEVEL_HEADING") {
+		if (cond.ifType === "NOTE_FILE") {
+			const NOTE_FILE_OPS = ["filenameContains", "filenameNotContains", "filenameExactly", "parentFolderIs"];
+			if (!NOTE_FILE_OPS.includes(cond.op)) cond.op = "filenameContains";
+
+			line.addDropdown(d => {
+				d.addOption("filenameContains", "Filename contains");
+				d.addOption("filenameNotContains", "Filename not contains");
+				d.addOption("filenameExactly", "Filename exactly match");
+				d.addOption("parentFolderIs", "Parent folder is");
+				d.setValue(cond.op);
+				d.onChange(async (value) => {
+					cond.op = value;
+					await rebuild();
+				});
+			});
+
+			line.addText(t => t
+				.setPlaceholder(cond.op === "parentFolderIs" ? "folder name or path, e.g. meetings/transcripts/company" : "text")
+				.setValue(cond.ifValue || "")
+				.onChange(async (v) => {
+					cond.ifValue = v;
+					await this.plugin.saveData(this.plugin.settings);
+				}));
+		} else if (cond.ifType === "FIRST_LEVEL_HEADING") {
 			line.addDropdown(d => {
 				this._configureOperatorDropdown(d, cond.op, async (value) => {
 					cond.op = value;

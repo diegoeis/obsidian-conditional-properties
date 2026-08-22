@@ -20,6 +20,7 @@ Stop manually updating properties across hundreds of notes. Define rules once, r
 - **6 operators**: `exactly`, `contains`, `notContains`, `exists`, `notExists`, `isEmpty`
 - **Property-based**: Check any frontmatter property
 - **Title-based**: Use note titles (H1 or inline) as conditions
+- **Note file-based (new in v0.22.0)**: check the file's own name or the folders it lives in — `Filename contains`, `Filename not contains`, `Filename exactly match`, `Parent folder is`.
 
 ### ⚡ Powerful Actions
 - **ADD**: Add values without duplicating
@@ -184,6 +185,29 @@ Perfect for running rules only on active notes instead of your entire vault.
 | `exists` | Property present | `status exists` |
 | `notExists` | Property absent | `reviewed notExists` |
 | `isEmpty` | Empty value | `tags isEmpty` |
+
+## Note File Conditions (new in v0.22.0)
+
+Select **Note file** as the condition type to check the file itself, instead of a frontmatter property or the H1 title. All comparisons are case-insensitive.
+
+| Operator | Checks against | Example |
+|----------|-----------------|---------|
+| `Filename contains` | `file.basename` (no extension) | filename contains "draft" |
+| `Filename not contains` | `file.basename` | filename not contains "template" |
+| `Filename exactly match` | `file.basename` | filename exactly "index" |
+| `Parent folder is` | the folder path the file lives in | see below |
+
+**Parent folder is** accepts either a single folder name or a partial path — enter the folder name(s) only, never a path starting with `/` from the vault root:
+
+```yaml
+IF Note file: Parent folder is → "ClienteA"
+```
+Matches any note under a folder named `ClienteA`, at any depth — `ClienteA/notes/file.md` and `Projects/ClienteA/2026/file.md` both match.
+
+```yaml
+IF Note file: Parent folder is → "meetings/transcripts/company"
+```
+Matches when those three segments appear contiguous and in that order anywhere in the file's folder path — e.g. `Work/meetings/transcripts/company/2026/file.md` matches, but `meetings/company/transcripts/file.md` does not (wrong order).
 
 ## Title Actions
 

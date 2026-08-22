@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.22.0 - 2026-08-22
+### Added
+- **New IF condition type: "Note file"** — check the file itself instead of a frontmatter property or the H1 title. Four operators:
+  - `Filename contains` / `Filename not contains` / `Filename exactly match` — compare against the file's basename (no extension), case-insensitive.
+  - `Parent folder is` — accepts a single folder name (`ClienteA`) or a partial path (`meetings/transcripts/company`). Matches when those segments appear contiguous and in order anywhere in the file's folder path, not only as the immediate parent and not anchored at the vault root. Case-insensitive.
+
 ## 0.21.0 - 2026-08-22
 ### Added
 - **New text placeholders for property values and title actions**: `{created_date}` (alias of `{date}` — the file's creation date, `file.stat.ctime`), `{updated_date}` (the file's last-modified date, `file.stat.mtime`), and `{today}` (the current date at the moment the rule runs, independent of the file). All three support the `:FORMAT` suffix, same as `{date}` (e.g. `{updated_date:DD-MM-YYYY}`).
