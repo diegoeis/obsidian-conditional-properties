@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.4 - 2026-08-22
+### Added
+- **New "Note file" IF operator: "Parent folder is not"** — the exact inverse of `Parent folder is`. Same folder-name-or-partial-path matching (contiguous, in-order segments anywhere in the file's folder path, case-insensitive), opposite result. An empty value makes it always match (and makes `Parent folder is` never match) — same convention as the `does not contain` operator elsewhere in the plugin. Useful to exclude one folder from an otherwise broad rule.
+
 ## 0.23.3 - 2026-08-22
 ### Changed
 - Renamed the THEN action **"Move file"** to **"Move file to"** for clarity.

@@ -879,29 +879,23 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 * lives in, as opposed to a frontmatter property or the H1 title.
 	 *   filenameContains / filenameNotContains / filenameExactly — compare
 	 *     against `file.basename` (no extension). Case-insensitive.
-	 *   parentFolderIs — the user-entered value can be a single folder name
-	 *     ("ClienteA") or a partial path ("meetings/transcripts/company").
-	 *     It matches when those segments appear contiguous and in order
-	 *     anywhere in the file's folder path — not just as the immediate
-	 *     parent, and not necessarily anchored at the vault root. Case-insensitive.
+	 *   parentFolderIs / parentFolderIsNot — the user-entered value can be a
+	 *     single folder name ("ClienteA") or a partial path
+	 *     ("meetings/transcripts/company"). Matches (or, for IsNot, doesn't
+	 *     match) when those segments appear contiguous and in order anywhere
+	 *     in the file's folder path — not just as the immediate parent, and
+	 *     not necessarily anchored at the vault root. Case-insensitive. An
+	 *     empty value makes `parentFolderIs` never match and `parentFolderIsNot`
+	 *     always match — same "nothing to compare against" convention as the
+	 *     `notContains` operator elsewhere in this file.
 	 */
 	_matchesNoteFileCondition(file, cond) {
 		const op = cond.op || "filenameContains";
 		const normalizedExpected = this._normalizeValue(cond.ifValue).toLowerCase();
 
-		if (op === "parentFolderIs") {
-			const targetSegments = normalizedExpected.split("/").map(s => s.trim()).filter(Boolean);
-			if (targetSegments.length === 0) return false;
-			const folderPath = (file.parent && file.parent.path) ? file.parent.path : "";
-			const pathSegments = folderPath.split("/").map(s => s.trim().toLowerCase()).filter(Boolean);
-			for (let i = 0; i <= pathSegments.length - targetSegments.length; i++) {
-				let allMatch = true;
-				for (let j = 0; j < targetSegments.length; j++) {
-					if (pathSegments[i + j] !== targetSegments[j]) { allMatch = false; break; }
-				}
-				if (allMatch) return true;
-			}
-			return false;
+		if (op === "parentFolderIs" || op === "parentFolderIsNot") {
+			const isInFolder = this._fileIsInFolderPath(file, normalizedExpected);
+			return op === "parentFolderIs" ? isInFolder : !isInFolder;
 		}
 
 		const filename = this._normalizeValue(file.basename || "").toLowerCase();
@@ -916,6 +910,27 @@ class ConditionalPropertiesPlugin extends Plugin {
 				if (normalizedExpected === "") return false;
 				return filename.includes(normalizedExpected);
 		}
+	}
+
+	/**
+	 * True when `normalizedExpected` (already lowercased/trimmed, split on
+	 * "/") appears as a contiguous, in-order run of segments anywhere in
+	 * `file`'s folder path — used by both `parentFolderIs` and its negation
+	 * `parentFolderIsNot`.
+	 */
+	_fileIsInFolderPath(file, normalizedExpected) {
+		const targetSegments = normalizedExpected.split("/").map(s => s.trim()).filter(Boolean);
+		if (targetSegments.length === 0) return false;
+		const folderPath = (file.parent && file.parent.path) ? file.parent.path : "";
+		const pathSegments = folderPath.split("/").map(s => s.trim().toLowerCase()).filter(Boolean);
+		for (let i = 0; i <= pathSegments.length - targetSegments.length; i++) {
+			let allMatch = true;
+			for (let j = 0; j < targetSegments.length; j++) {
+				if (pathSegments[i + j] !== targetSegments[j]) { allMatch = false; break; }
+			}
+			if (allMatch) return true;
+		}
+		return false;
 	}
 
 	_normalizeValue(value) {
@@ -1631,14 +1646,16 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		});
 
 		if (cond.ifType === "NOTE_FILE") {
-			const NOTE_FILE_OPS = ["filenameContains", "filenameNotContains", "filenameExactly", "parentFolderIs"];
+			const NOTE_FILE_OPS = ["filenameContains", "filenameNotContains", "filenameExactly", "parentFolderIs", "parentFolderIsNot"];
 			if (!NOTE_FILE_OPS.includes(cond.op)) cond.op = "filenameContains";
+			const isFolderOp = cond.op === "parentFolderIs" || cond.op === "parentFolderIsNot";
 
 			line.addDropdown(d => {
 				d.addOption("filenameContains", "Filename contains");
 				d.addOption("filenameNotContains", "Filename not contains");
 				d.addOption("filenameExactly", "Filename exactly match");
 				d.addOption("parentFolderIs", "Parent folder is");
+				d.addOption("parentFolderIsNot", "Parent folder is not");
 				d.setValue(cond.op);
 				d.onChange(async (value) => {
 					cond.op = value;
@@ -1647,7 +1664,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			line.addText(t => t
-				.setPlaceholder(cond.op === "parentFolderIs" ? "folder name or path, e.g. meetings/transcripts/company" : "text")
+				.setPlaceholder(isFolderOp ? "folder name or path, e.g. meetings/transcripts/company" : "text")
 				.setValue(cond.ifValue || "")
 				.onChange(async (v) => {
 					cond.ifValue = v;

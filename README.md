@@ -20,7 +20,7 @@ Stop manually updating properties across hundreds of notes. Define rules once, r
 - **6 operators**: `exactly`, `contains`, `notContains`, `exists`, `notExists`, `isEmpty`
 - **Property-based**: Check any frontmatter property
 - **Title-based**: Use note titles (H1 or inline) as conditions
-- **Note file-based (new in v0.22.0)**: check the file's own name or the folders it lives in — `Filename contains`, `Filename not contains`, `Filename exactly match`, `Parent folder is`.
+- **Note file-based**: check the file's own name or the folders it lives in — `Filename contains`, `Filename not contains`, `Filename exactly match`, `Parent folder is` (v0.22.0), `Parent folder is not` (v0.23.4).
 
 ### ⚡ Powerful Actions
 - **ADD**: Add values without duplicating
@@ -208,6 +208,7 @@ Select **Note file** as the condition type to check the file itself, instead of 
 | `Filename not contains` | `file.basename` | filename not contains "template" |
 | `Filename exactly match` | `file.basename` | filename exactly "index" |
 | `Parent folder is` | the folder path the file lives in | see below |
+| `Parent folder is not` | the folder path the file lives in (inverted) | see below |
 
 **Parent folder is** accepts either a single folder name or a partial path — enter the folder name(s) only, never a path starting with `/` from the vault root:
 
@@ -220,6 +221,14 @@ Matches any note under a folder named `ClienteA`, at any depth — `ClienteA/not
 IF Note file: Parent folder is → "meetings/transcripts/company"
 ```
 Matches when those three segments appear contiguous and in that order anywhere in the file's folder path — e.g. `Work/meetings/transcripts/company/2026/file.md` matches, but `meetings/company/transcripts/file.md` does not (wrong order).
+
+**Parent folder is not** is the exact inverse — same matching rules, opposite result. Useful to exclude a folder from a broader rule:
+
+```yaml
+IF Note file: Parent folder is not → "Archive"
+THEN Note file: Add name prefix: "[ACTIVE] "
+```
+Runs on every note **except** those under an `Archive` folder anywhere in their path. Leaving the value empty makes `Parent folder is` never match and `Parent folder is not` always match (same "nothing to compare against" convention as the `does not contain` operator elsewhere in the plugin).
 
 ## Note File Actions (new in v0.23.0)
 
