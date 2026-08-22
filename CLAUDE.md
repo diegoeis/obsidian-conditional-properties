@@ -47,7 +47,7 @@ When making code or documentation changes to this plugin:
 - **Respect the Obsidian Developer Policies and submission requirements.** Before adding any network call, telemetry, ad, update mechanism, obfuscated code, account-required feature, or anything that reads files outside the vault — check `OBSIDIAN_DEVELOPMENT_POLICIES.md` and `submission_requirements_for_plugins.md`. If the policy requires a README disclosure, add it in the same change. Never insert client-side telemetry or a self-update mechanism, period.
 - **Never strip the lint-safe patterns** already in `main.js` (e.g. `createEl`/`createDiv`, `this.register*`, `this.app` never the global `app`, `fileManager.processFrontMatter`, `metadataCache`).
 - **Touch the release artifacts together.** If you bump behavior, you also bump `manifest.json` version, add to `versions.json`, append `CHANGELOG.md`, update `.claude/docs/features-info.md`, and (if a spec exists) update the related PRD/FRD in `.claude/docs/product/`.
-- **No new dependencies, no build step.** This repo intentionally ships compiled JS only.
+- **Always confirm with the user before adding a new dependency** (runtime or dev/build tooling) — never add one silently, even if it seems obviously needed.
 - **Ask before implementing** if the request is ambiguous or the impact is non-trivial.
 
 ### Quick-reference summary
