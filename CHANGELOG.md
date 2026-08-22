@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.6 - 2026-08-22
+### Fixes
+- **Reverted the ":" stripping added in 0.23.5.** That change stripped `:` from Note file action text unconditionally, which also broke an explicitly-typed value — if you deliberately type `{today:HH:mm}` (or any literal `:`) into Rename/Prefix/Suffix/Move file to, it's now honored exactly as typed again. Only the *default* (no explicit `:FORMAT`) date placeholder is forced to `YYYY-MM-DD` — that part of 0.23.5 is unchanged. The plugin never second-guesses explicit user input, only fills in a sane default when none was given.
+
 ## 0.23.5 - 2026-08-22
 ### Fixes
 - **Note file actions (Rename / Add prefix / Add suffix / Move file to) now always resolve a bare date placeholder (`{today}`, `{date}`, `{created_date}`, `{updated_date}`) to `YYYY-MM-DD`**, ignoring the vault's configured default date format. File and folder names can't contain a time component (`:` is invalid on Windows, reserved on macOS), so these fields no longer inherit whatever format is configured for properties/titles elsewhere. An explicit `{today:FORMAT}` is still honored as typed.

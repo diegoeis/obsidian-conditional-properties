@@ -664,27 +664,30 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 * text is stripped rather than honored. This keeps the resulting path
 	 * confined to the file's current folder and prevents a formatted value
 	 * from smuggling a path (e.g. "../outside/name") into the new filename.
-	 * Also strips ":" — not a valid filename character on Windows and
-	 * reserved on macOS — as defense-in-depth against a placeholder resolving
-	 * to a value with a time component (e.g. an explicit `{today:HH:mm}`, or
-	 * a vault-configured date format that happens to include time).
+	 * Does NOT strip ":" or other characters that are merely OS-specific —
+	 * an explicit value the user typed (including via an explicit
+	 * `{today:FORMAT}`) is honored as-is; only the *default*, no-format date
+	 * placeholder is forced date-only (see `_formatText`'s `dateOnly` param).
+	 * If the result isn't a valid filename on the user's OS, Obsidian's own
+	 * rename call surfaces that error — this function only guards against
+	 * escaping the current folder.
 	 */
 	_sanitizeFilenameComponent(text) {
-		return String(text ?? "").replace(/[/\\:]/g, '').split('..').join('');
+		return String(text ?? "").replace(/[/\\]/g, '').split('..').join('');
 	}
 
 	/**
 	 * Sanitizes a vault-relative folder path (used by Move file to). Splits
-	 * on "/", drops empty / "." / ".." segments, strips ":" from each segment
-	 * (same defense-in-depth as `_sanitizeFilenameComponent` — see there),
-	 * and rejoins — this keeps the destination confined inside the vault
-	 * even if the formatted value contains traversal segments like
-	 * "../../outside" or a leading "/".
+	 * on "/", drops empty / "." / ".." segments, and rejoins — this keeps the
+	 * destination confined inside the vault even if the formatted value
+	 * contains traversal segments like "../../outside" or a leading "/".
+	 * Does not otherwise touch each segment's characters — an explicit value
+	 * the user typed is honored as-is (see `_sanitizeFilenameComponent`).
 	 */
 	_sanitizeVaultFolderPath(text) {
 		return String(text ?? "")
 			.split('/')
-			.map(segment => segment.trim().replace(/:/g, ''))
+			.map(segment => segment.trim())
 			.filter(segment => segment !== '' && segment !== '.' && segment !== '..')
 			.join('/');
 	}
