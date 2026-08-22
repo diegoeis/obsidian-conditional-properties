@@ -222,6 +222,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 		let scannedCount = 0;
 		let stopped = false;
 		this._scanRunning = true;
+		this._runningRuleRef = null; // vault-wide run, not tied to one rule's button
 		this._cancelScan = false;
 		this._emitScanStateChange();
 		try {
@@ -237,6 +238,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 			await this.saveData(this.settings);
 		} finally {
 			this._scanRunning = false;
+			this._runningRuleRef = null;
 			this._cancelScan = false;
 			this._emitScanStateChange();
 		}
@@ -266,6 +268,13 @@ class ConditionalPropertiesPlugin extends Plugin {
 		let scannedCount = 0;
 		let stopped = false;
 		this._scanRunning = true;
+		// Tracks exactly which rule's "Run this rule" button triggered this
+		// run, so only that button's row shows the loading/Stop state — the
+		// other rules' conditions/actions are never touched by this call
+		// (only `rulesSubset` is passed to applyRulesToFrontmatter below),
+		// but every row shares the same `_scanRunning` flag for the "only
+		// one scan at a time" lock, so without this they'd all light up too.
+		this._runningRuleRef = (Array.isArray(rulesSubset) && rulesSubset.length === 1) ? rulesSubset[0] : null;
 		this._cancelScan = false;
 		this._emitScanStateChange();
 		try {
@@ -279,6 +288,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		} finally {
 			this._scanRunning = false;
+			this._runningRuleRef = null;
 			this._cancelScan = false;
 			this._emitScanStateChange();
 		}
@@ -303,6 +313,22 @@ class ConditionalPropertiesPlugin extends Plugin {
 
 	isScanRunning() {
 		return !!this._scanRunning;
+	}
+
+	/**
+	 * True only when the running scan was triggered by this exact rule's
+	 * "Run this rule" button — never true for any other rule, and never
+	 * true for a vault-wide "Run now" scan. Used by the settings UI so only
+	 * the button actually clicked shows the loading/Stop state; every other
+	 * row just shows disabled (see `isScanRunning()`) while a scan is busy.
+	 */
+	isRuleRunning(rule) {
+		return !!this._scanRunning && this._runningRuleRef === rule;
+	}
+
+	/** True only when the running scan is the vault-wide "Run now", not a single-rule run. */
+	isVaultRunRunning() {
+		return !!this._scanRunning && this._runningRuleRef === null;
 	}
 
 	onScanStateChange(callback) {
@@ -769,6 +795,28 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		};
 
+		// Handle time formatting. Always "now" — Obsidian's own {{time}}
+		// template placeholder means the current time when inserted, not
+		// anything tied to the file.
+		const formatTime = (format) => {
+			try {
+				// KNOWN TECH DEBT: `vault.config` is undocumented/internal (not in
+				// obsidian.d.ts) — there is no public API for the user's configured
+				// default time format today. Guarded by try/catch and the
+				// `|| 'HH:mm'` fallback, so a breaking change degrades to that
+				// default rather than crashing. Re-check against obsidian.d.ts
+				// when bumping minAppVersion.
+				if (!format) {
+					if (dateOnly) return moment().format('HH:mm');
+					return moment().format(this.app.vault.config.timeFormat || 'HH:mm');
+				}
+				return moment().format(format);
+			} catch (e) {
+				console.error("Error formatting time:", e);
+				return "[time-format-error]";
+			}
+		};
+
 		// Get filename (basename without extension)
 		const getFilename = () => {
 			try {
@@ -804,28 +852,55 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		};
 
-		// Two-pass replace so {date}/{date:FORMAT}/{filename}/{created_date}/
-		// {updated_date}/{today} keep their existing semantics and never get
-		// mistaken for a property lookup.
-		// Pass 1 — reserved placeholders.
-		// {date} and {created_date} are aliases for the file's creation date
-		// (kept both for backward compatibility — {date} shipped first).
-		let out = text.replace(/\{(date|created_date|updated_date|today|filename)(?::([^}]+))?\}/g, (match, type, format) => {
-			if (type === 'filename') {
-				return getFilename();
-			}
-			if (type === 'updated_date') {
-				return formatDate(format, getUpdatedMomentDate());
-			}
-			if (type === 'today') {
-				return formatDate(format, moment());
-			}
-			return formatDate(format);
-		});
+		// Resolves one reserved placeholder name to its value. Shared between
+		// the Obsidian-style {{name}} pass and the legacy {name} pass below —
+		// same names resolve the same way in both, EXCEPT `date`: Obsidian's
+		// own {{date}} template placeholder means "today", but our original
+		// {date} (which shipped before {{}} support existed) means the
+		// file's creation date. `isDoubleBrace` is how this one divergence
+		// is threaded through without duplicating the whole dispatch table.
+		const resolveReserved = (type, format, isDoubleBrace) => {
+			if (type === 'filename' || type === 'title') return getFilename();
+			if (type === 'time') return formatTime(format);
+			if (type === 'updated_date') return formatDate(format, getUpdatedMomentDate());
+			if (type === 'today') return formatDate(format, moment());
+			if (type === 'date' && isDoubleBrace) return formatDate(format, moment()); // {{date}} = today, matches Obsidian's Templates plugin
+			return formatDate(format); // {date} / {created_date} / {{created_date}} = file creation date
+		};
 
-		// Pass 2 — any other {name} reference is treated as a frontmatter
-		// property lookup. The `[^}:\s]` class excludes ':' (so a stray
-		// {date:FORMAT} survivor wouldn't match) and whitespace, while
+		// Four-pass replace, in this order, so nothing is mistaken for the
+		// wrong kind of reference and {{...}} is always fully consumed
+		// before any single-brace pass runs (otherwise a single-brace pass
+		// could match the inner {name} of an unrecognized {{name}} and leave
+		// a stray brace behind, or resolve it as the wrong reserved name).
+		// Pass 1 — Obsidian Templates-style double braces, reserved names:
+		// {{date}}, {{date:FORMAT}}, {{time}}, {{time:FORMAT}}, {{title}},
+		// plus this plugin's own reserved names for consistency:
+		// {{created_date}}, {{updated_date}}, {{today}}, {{filename}} — all
+		// with the same meaning as their {name} counterpart (see
+		// `resolveReserved` above for the one exception, {{date}} vs {date}).
+		let out = text.replace(/\{\{(date|created_date|updated_date|today|time|title|filename)(?::([^}]+))?\}\}/g,
+			(match, type, format) => resolveReserved(type, format, true));
+
+		// Pass 2 — legacy single braces, reserved names: {date}, {date:FORMAT},
+		// {filename}, {created_date}, {updated_date}, {today}, {time}, {title}.
+		// {date} and {created_date} are aliases for the file's creation date
+		// (kept both for backward compatibility — {date} shipped first, before
+		// {{}} support existed).
+		out = out.replace(/\{(date|created_date|updated_date|today|time|title|filename)(?::([^}]+))?\}/g,
+			(match, type, format) => resolveReserved(type, format, false));
+
+		// Pass 3 — {{propertyName}}: any other double-brace reference is a
+		// frontmatter property lookup, Obsidian Templates-style. Must run
+		// after pass 1 (so a reserved name is never treated as a property)
+		// but before pass 4, since pass 4's single-brace pattern would
+		// otherwise match just the inner "{name}" of an unrecognized
+		// "{{name}}" and capture the wrong (brace-prefixed) key.
+		out = out.replace(/\{\{([^}:\s][^}:]*)\}\}/g, (match, name) => getProperty(name));
+
+		// Pass 4 — {propertyName}: any other single-brace reference is a
+		// frontmatter property lookup. The `[^}:\s]` class excludes ':' (so a
+		// stray {date:FORMAT} survivor wouldn't match) and whitespace, while
 		// still allowing g_excerpt, kebab-case, dotted, etc.
 		out = out.replace(/\{([^}:\s][^}:]*)\}/g, (match, name) => getProperty(name));
 
@@ -1421,13 +1496,18 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			const syncRunNowState = () => {
-				const running = this.plugin.isScanRunning();
+				// `anyRunning` disables the button whenever ANY scan is busy (only
+				// one can run at a time) — but the spinner and Stop button only
+				// show when THIS "Run now" is the one actually running, not when
+				// some rule's "Run this rule" is running instead.
+				const anyRunning = this.plugin.isScanRunning();
+				const thisIsRunning = this.plugin.isVaultRunRunning();
 				if (runNowBtnRef) {
-					runNowBtnRef.setDisabled(running);
-					runNowBtnRef.buttonEl.classList.toggle("is-loading", running);
+					runNowBtnRef.setDisabled(anyRunning);
+					runNowBtnRef.buttonEl.classList.toggle("is-loading", thisIsRunning);
 				}
 				if (stopBtnRef) {
-					stopBtnRef.buttonEl.style.display = running ? "" : "none";
+					stopBtnRef.buttonEl.style.display = thisIsRunning ? "" : "none";
 				}
 			};
 			syncRunNowState();
@@ -1611,10 +1691,17 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 		const syncRuleRunState = () => {
-			const running = this.plugin.isScanRunning();
-			runBtn.setDisabled(running);
-			runBtn.buttonEl.classList.toggle("is-loading", running);
-			ruleStopBtn.buttonEl.style.display = running ? "" : "none";
+			// `anyRunning` disables this row's button whenever ANY scan is busy
+			// (only one can run at a time) — but the spinner and Stop button
+			// only show when THIS rule is the one actually running. Without
+			// this distinction every rule's row would light up together
+			// whenever any single rule (or "Run now") was running, even though
+			// only that one rule's conditions/actions are actually evaluated.
+			const anyRunning = this.plugin.isScanRunning();
+			const thisIsRunning = this.plugin.isRuleRunning(rule);
+			runBtn.setDisabled(anyRunning);
+			runBtn.buttonEl.classList.toggle("is-loading", thisIsRunning);
+			ruleStopBtn.buttonEl.style.display = thisIsRunning ? "" : "none";
 		};
 		syncRuleRunState();
 		const unsubRule = this.plugin.onScanStateChange(syncRuleRunState);
@@ -1932,7 +2019,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					}));
 			} else if (action.action !== "delete") {
 				actionSetting.addText(t => t
-					.setPlaceholder("value (use commas; supports {propertyName}, {date}, {created_date}, {updated_date}, {today}, {filename})")
+					.setPlaceholder("value (use commas; supports {propertyName}, {{date}}, {{time}}, {{title}}, {date}, {created_date}, {updated_date}, {today}, {filename})")
 					.setValue(action.value || "")
 					.onChange(async (v) => {
 						action.value = v;
@@ -1958,10 +2045,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			if (action.action !== "delete") {
 				const FILE_ACTION_PLACEHOLDERS = {
-					rename: "new file name, without extension (supports {date}, {filename}, {propertyName}...)",
+					rename: "new file name, without extension (supports {{date}}, {{time}}, {{title}}, {date}, {filename}, {propertyName}...)",
 					addPrefix: "prefix text (supports placeholders)",
 					addSuffix: "suffix text (supports placeholders)",
-					move: "destination folder inside the vault, created if missing — e.g. Archive/{today}",
+					move: "destination folder inside the vault, created if missing — e.g. Archive/{{date}}",
 				};
 				actionSetting.addText(t => t
 					.setPlaceholder(FILE_ACTION_PLACEHOLDERS[action.action] || "value")
@@ -1985,7 +2072,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			actionSetting.addText(t => t
-				.setPlaceholder("Text (use {date}, {created_date}, {updated_date}, {today}, {filename}, or {propertyName})")
+				.setPlaceholder("Text (use {{date}}, {{time}}, {{title}}, {date}, {created_date}, {updated_date}, {today}, {filename}, or {propertyName})")
 				.setValue(action.text || "")
 				.onChange(async (v) => {
 					action.text = v;

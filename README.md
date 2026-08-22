@@ -277,39 +277,57 @@ Modify note titles dynamically:
 
 ## Placeholders
 
-Placeholders work inside **any THEN action value** — property `Add value` / `Overwrite all values with`, and title `Prefix` / `Suffix` / `Overwrite`. They're expanded at the moment the rule runs, against the file being processed.
+Placeholders work inside **any THEN action value** — property `Add value` / `Overwrite all values with`, title `Prefix` / `Suffix` / `Overwrite`, and Note file `Rename` / `Add name prefix` / `Add name suffix` / `Move file to`. They're expanded at the moment the rule runs, against the file being processed.
 
-| Placeholder            | Result                                                                                  |
-|------------------------|-----------------------------------------------------------------------------------------|
-| `{date}`               | File creation date in the default format (`YYYY-MM-DD`). Example: `2026-01-08`.        |
-| `{created_date}`       | Alias of `{date}` — same value, more explicit name (new in v0.21.0).                    |
-| `{updated_date}`       | File's last-modified date (`YYYY-MM-DD`), new in v0.21.0.                               |
-| `{today}`              | Current date when the rule runs (`YYYY-MM-DD`), new in v0.21.0 — independent of the file. |
-| `{date:FORMAT}`        | Any of the above with a custom moment.js format, e.g. `{date:DD-MM-YYYY}` → `08-01-2026`, `{updated_date:DD-MM-YYYY}`, `{today:YYYY}`. |
-| `{filename}`           | File basename without `.md`. Example: `meeting-notes`.                                  |
-| `{propertyName}`       | Live value of that frontmatter property on the current note (new in v0.20.0).           |
+### Two syntaxes, same placeholders (new in v0.24.0)
+
+You can write placeholders with **single braces** (`{date}`, this plugin's original syntax) or **double braces** (`{{date}}`, matching [Obsidian's own Templates syntax](https://obsidian.md/help/plugins/templates)). Both work everywhere, and you can mix them freely in the same value. There is exactly **one** deliberate difference between the two:
+
+| | `{date}` (single brace) | `{{date}}` (double brace) |
+|---|---|---|
+| Meaning | The file's **creation date** | **Today's date** — matches Obsidian's real `{{date}}` |
+
+This is not a bug — `{date}` shipped before double-brace support existed and already meant "creation date" for existing users, so it keeps that meaning forever for backward compatibility. `{{date}}` was added later specifically to match what `{{date}}` means in every other part of Obsidian (today), so plugin users who already know Obsidian's template syntax get what they expect. Every other placeholder name means the exact same thing in both syntaxes — this divergence is unique to `date`.
+
+| Placeholder | Result |
+|---|---|
+| `{date}` | File's creation date, default format (`YYYY-MM-DD`). Example: `2026-01-08`. |
+| `{{date}}` | **Today's date** (not the file's), default format (`YYYY-MM-DD`) — matches Obsidian's Templates `{{date}}`. |
+| `{created_date}` / `{{created_date}}` | File's creation date — explicit alias of `{date}`, same meaning in both syntaxes (v0.21.0). |
+| `{updated_date}` / `{{updated_date}}` | File's last-modified date (v0.21.0). |
+| `{today}` / `{{today}}` | Today's date, independent of the file (v0.21.0) — same value as `{{date}}`. |
+| `{time}` / `{{time}}` | Current time, default format (`HH:mm`) — matches Obsidian's Templates `{{time}}` (new in v0.24.0). |
+| `{filename}` / `{{filename}}` | File basename without `.md`. Example: `meeting-notes`. |
+| `{title}` / `{{title}}` | Same as `{filename}` — matches Obsidian's Templates `{{title}}` (new in v0.24.0). |
+| `{propertyName}` / `{{propertyName}}` | Live value of that frontmatter property on the current note (v0.20.0). |
+| `:FORMAT` suffix | Any of the above with a custom [moment.js](https://momentjs.com/docs/#/displaying/format/) format — works with either brace style: `{date:DD-MM-YYYY}` → `08-01-2026`, `{{date:MM}}` → just today's month, `{{time:HH:mm:ss}}`, `{updated_date:YYYY}`. |
 
 ### Property placeholders (v0.20.0)
 
-Any token that isn't `date` / `created_date` / `updated_date` / `today` / `filename` and doesn't contain `:` or whitespace is treated as a frontmatter property lookup. So `{g_excerpt}`, `{summary}`, `{kebab-case-prop}` all work.
+Any token that isn't one of the reserved names above and doesn't contain `:` or whitespace is treated as a frontmatter property lookup — in either brace style. So `{g_excerpt}`, `{{g_excerpt}}`, `{summary}`, `{kebab-case-prop}` all work.
 
 **Copy a value from one property to another:**
 ```yaml
 IF property: g_excerpt exists
-THEN ADD property excerpt: "{g_excerpt}"
+THEN ADD property excerpt: "{{g_excerpt}}"
 ```
 
 Behavior:
-- **Missing property → empty string.** No errors, no literal `{name}` left behind in your YAML.
+- **Missing property → empty string.** No errors, no literal `{name}` or `{{name}}` left behind in your YAML.
 - **Arrays are joined with `, `.** A source like `tags: [a, b, c]` becomes `a, b, c` in the expanded string.
-- **Earlier actions in the same rule are visible to later ones.** The expansion reads from the in-progress frontmatter, so if action #1 sets `excerpt`, action #2 can reference `{excerpt}`.
-- **Reserved names win.** `{date}`, `{created_date}`, `{updated_date}`, `{today}`, and `{filename}` are resolved first; a property with one of those names won't shadow them.
+- **Earlier actions in the same rule are visible to later ones.** The expansion reads from the in-progress frontmatter, so if action #1 sets `excerpt`, action #2 can reference `{excerpt}` or `{{excerpt}}`.
+- **Reserved names win.** `date`, `created_date`, `updated_date`, `today`, `time`, `title`, and `filename` are resolved as reserved placeholders first (in both brace styles); a property with one of those names won't shadow them.
+
+### Note file actions: dates are always date-only
+
+Inside `Rename` / `Add name prefix` / `Add name suffix` / `Move file to`, a **bare** date placeholder (`{{date}}`, `{date}`, `{created_date}`, `{updated_date}`, `{today}` — no explicit `:FORMAT`) always resolves to `YYYY-MM-DD`, never a time component, regardless of your vault's configured default date format. File and folder names elsewhere in the OS can't contain certain characters depending on platform, so these fields don't inherit a format that might not have been meant for filenames. An explicit format is always honored exactly as typed, including one with `:` in it — the plugin never rewrites what you explicitly typed, it only picks a safe default when you didn't specify one.
 
 ### Combinations
 
-Placeholders mix freely in the same value:
-- `{date:YYYY-MM-DD} - {filename}` → `2026-01-08 - meeting-notes`
+Placeholders mix freely in the same value, and the two brace styles combine freely too:
+- `{{date:YYYY-MM-DD}} - {{title}}` → `2026-08-22 - meeting-notes`
 - `Meeting {filename} - {date:DD/MM/YY}` → `Meeting meeting-notes - 08/01/26`
+- `{{date}}/{{title}}` as a Move file to destination → `2026-08-22/meeting-notes` (folder auto-created)
 - `{g_title} ({date:YYYY})` → `My Post (2026)`
 
 ## Installation

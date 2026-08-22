@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.24.0 - 2026-08-22
+### Added
+- **Double-brace placeholder syntax, matching [Obsidian's own Templates plugin](https://obsidian.md/help/plugins/templates)**: `{{date}}`, `{{date:FORMAT}}`, `{{time}}`, `{{time:FORMAT}}`, `{{title}}` now work everywhere placeholders do, alongside the existing single-brace syntax (`{date}`, `{filename}`, etc). Both styles are fully interchangeable and can be mixed in the same value.
+- **New placeholder: `{time}` / `{{time}}`** — current time, default format `HH:mm` (or the vault's configured time format), with `:FORMAT` support (e.g. `{{time:HH:mm:ss}}`).
+- **New placeholder: `{title}` / `{{title}}`** — alias of `{filename}`, matching Obsidian's own `{{title}}` meaning (the note's name).
+- **One deliberate semantic difference, clearly documented**: `{date}` (single brace) keeps its original meaning — the file's **creation date** — for backward compatibility, since it shipped before double-brace support existed. `{{date}}` (double brace) means **today's date**, matching what `{{date}}` means everywhere else in Obsidian. Every other reserved name (`created_date`, `updated_date`, `today`, `time`, `title`, `filename`) means the same thing in both syntaxes — this divergence is unique to `date`.
+- `{{propertyName}}` (double-brace frontmatter property lookup) also works now, same behavior as the existing `{propertyName}`.
+
+### Fixes
+- **"Run this rule" no longer makes every other rule's row look like it's running too.** Each row's "Run this rule" button and its Stop button were reacting to the same global scan-in-progress flag every other row also shares (needed so only one scan runs at a time) — so clicking one rule's button lit up the spinner and Stop button on every rule, and on the top "Run now" button, even though only the clicked rule's conditions/actions were actually being evaluated. Every other row now shows correctly as disabled (can't start a second scan) but no longer shows a spinner or a Stop button it doesn't control.
+
 ## 0.23.6 - 2026-08-22
 ### Fixes
 - **Reverted the ":" stripping added in 0.23.5.** That change stripped `:` from Note file action text unconditionally, which also broke an explicitly-typed value — if you deliberately type `{today:HH:mm}` (or any literal `:`) into Rename/Prefix/Suffix/Move file to, it's now honored exactly as typed again. Only the *default* (no explicit `:FORMAT`) date placeholder is forced to `YYYY-MM-DD` — that part of 0.23.5 is unchanged. The plugin never second-guesses explicit user input, only fills in a sane default when none was given.
