@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.23.5 - 2026-08-22
+### Fixes
+- **Note file actions (Rename / Add prefix / Add suffix / Move file to) now always resolve a bare date placeholder (`{today}`, `{date}`, `{created_date}`, `{updated_date}`) to `YYYY-MM-DD`**, ignoring the vault's configured default date format. File and folder names can't contain a time component (`:` is invalid on Windows, reserved on macOS), so these fields no longer inherit whatever format is configured for properties/titles elsewhere. An explicit `{today:FORMAT}` is still honored as typed.
+- Defense-in-depth: the filename/folder-path sanitizers now also strip `:` from the formatted text, so even an explicit user-typed format containing time (e.g. `{today:HH:mm}`) can't produce an invalid path.
+
 ## 0.23.4 - 2026-08-22
 ### Added
 - **New "Note file" IF operator: "Parent folder is not"** — the exact inverse of `Parent folder is`. Same folder-name-or-partial-path matching (contiguous, in-order segments anywhere in the file's folder path, case-insensitive), opposite result. An empty value makes it always match (and makes `Parent folder is` never match) — same convention as the `does not contain` operator elsewhere in the plugin. Useful to exclude one folder from an otherwise broad rule.

@@ -608,7 +608,10 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		}
 
-		const rawFormattedText = this._formatText(rawText || '', file, newFm);
+		// dateOnly: file/folder names can never contain a time component, so a
+		// bare {today}/{date}/etc. here always resolves to YYYY-MM-DD, never
+		// whatever date format the vault has configured elsewhere.
+		const rawFormattedText = this._formatText(rawText || '', file, newFm, true);
 		const ext = file.extension ? `.${file.extension}` : '';
 		const folder = (file.parent && file.parent.path && file.parent.path !== '/') ? file.parent.path : '';
 
@@ -661,21 +664,27 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 * text is stripped rather than honored. This keeps the resulting path
 	 * confined to the file's current folder and prevents a formatted value
 	 * from smuggling a path (e.g. "../outside/name") into the new filename.
+	 * Also strips ":" — not a valid filename character on Windows and
+	 * reserved on macOS — as defense-in-depth against a placeholder resolving
+	 * to a value with a time component (e.g. an explicit `{today:HH:mm}`, or
+	 * a vault-configured date format that happens to include time).
 	 */
 	_sanitizeFilenameComponent(text) {
-		return String(text ?? "").replace(/[/\\]/g, '').split('..').join('');
+		return String(text ?? "").replace(/[/\\:]/g, '').split('..').join('');
 	}
 
 	/**
-	 * Sanitizes a vault-relative folder path (used by Move file). Splits on
-	 * "/", drops empty / "." / ".." segments, and rejoins — this keeps the
-	 * destination confined inside the vault even if the formatted value
-	 * contains traversal segments like "../../outside" or a leading "/".
+	 * Sanitizes a vault-relative folder path (used by Move file to). Splits
+	 * on "/", drops empty / "." / ".." segments, strips ":" from each segment
+	 * (same defense-in-depth as `_sanitizeFilenameComponent` — see there),
+	 * and rejoins — this keeps the destination confined inside the vault
+	 * even if the formatted value contains traversal segments like
+	 * "../../outside" or a leading "/".
 	 */
 	_sanitizeVaultFolderPath(text) {
 		return String(text ?? "")
 			.split('/')
-			.map(segment => segment.trim())
+			.map(segment => segment.trim().replace(/:/g, ''))
 			.filter(segment => segment !== '' && segment !== '.' && segment !== '..')
 			.join('/');
 	}
@@ -695,9 +704,20 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 * Formats text by replacing {date} placeholders with the file's creation date
 	 * @param {string} text - The text containing placeholders
 	 * @param {TFile} file - The file to get creation date from
+	 * @param {object} fm - The in-progress frontmatter, for {propertyName} lookups
+	 * @param {boolean} [dateOnly] - When true, a date placeholder used WITHOUT
+	 *   an explicit `:FORMAT` always resolves to `YYYY-MM-DD`, ignoring the
+	 *   vault's configured default date format. Used for Note file actions
+	 *   (rename / prefix / suffix / move) — a folder or file name can never
+	 *   contain a time component (`:` isn't a valid path character on
+	 *   Windows and is reserved on macOS), so these fields can't inherit
+	 *   whatever format the user has configured for properties/titles
+	 *   elsewhere, even in the unlikely case that format includes time. An
+	 *   explicit `{today:FORMAT}` is still honored as-is — this only changes
+	 *   the no-format default.
 	 * @returns {string} The formatted text with placeholders replaced
 	 */
-	_formatText(text, file, fm) {
+	_formatText(text, file, fm, dateOnly) {
 		// Get file creation date or use current date as fallback
 		const getMomentDate = () => {
 			try {
@@ -736,6 +756,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 				// degrades to the ISO default rather than crashing. Re-check this
 				// against obsidian.d.ts when bumping minAppVersion.
 				if (!format) {
+					if (dateOnly) return momentDate.format('YYYY-MM-DD');
 					return momentDate.format(this.app.vault.config.dateFormat || 'YYYY-MM-DD');
 				}
 				return momentDate.format(format);

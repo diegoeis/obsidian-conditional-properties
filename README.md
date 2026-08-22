@@ -234,6 +234,8 @@ Runs on every note **except** those under an `Archive` folder anywhere in their 
 
 Select **Note file** as the THEN action type to change the file itself instead of a frontmatter property or the H1 title. All text fields support the same placeholders as property/title actions (`{date}`, `{created_date}`, `{updated_date}`, `{today}`, `{filename}`, `{propertyName}`).
 
+**Date placeholders here are always date-only.** A bare `{today}` (or `{date}` / `{created_date}` / `{updated_date}`) with no explicit `:FORMAT` always resolves to `YYYY-MM-DD` in these fields — never a time component, even if your vault has a different default date format configured elsewhere. File and folder names can't contain `:` (invalid on Windows, reserved on macOS), so this field ignores that vault-wide setting on purpose. An explicit format like `{today:YYYY-MM}` is still honored as you typed it; if you type a format containing `:` (e.g. `{today:HH:mm}`), the `:` is stripped before the rename/move happens.
+
 | Action | Effect |
 |--------|--------|
 | **Rename file** | Replaces the entire filename (keeps the extension) with the text you enter. Left empty → skipped, the rest of the rule's actions still run. |
