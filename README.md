@@ -28,6 +28,7 @@ Stop manually updating properties across hundreds of notes. Define rules once, r
 - **OVERWRITE**: Replace entire property
 - **DELETE PROPERTY**: Remove property completely
 - **CHANGE TITLE**: Add prefix/suffix or overwrite with dynamic dates, filenames, or other property values
+- **NOTE FILE actions (new in v0.23.0)**: Rename file, Add name prefix, Add name suffix, Move file (vault-only), Delete file — via the official Obsidian API (`fileManager.renameFile` keeps links updated, `fileManager.trashFile` respects your deletion preference)
 - **Placeholders in action values**: reference any frontmatter property inline as `{propertyName}` (v0.20.0), alongside `{date}`, `{date:FORMAT}`, `{filename}`, and — new in v0.21.0 — `{created_date}` (alias of `{date}`), `{updated_date}` (file's last-modified date), and `{today}` (current date when the rule runs). Works in property values and in title text.
 - **Typed property awareness (new in v0.19.0)**: when the target property is registered as `checkbox`, `date`, or `datetime`, values are written with the right YAML type instead of as plain strings — so `whatsapp: true` lands as a real boolean (renders as a checked checkbox), and `created_at: 08-08-2025` is parsed and stored as `2025-08-08` (renders in the Obsidian date widget).
 
@@ -208,6 +209,31 @@ Matches any note under a folder named `ClienteA`, at any depth — `ClienteA/not
 IF Note file: Parent folder is → "meetings/transcripts/company"
 ```
 Matches when those three segments appear contiguous and in that order anywhere in the file's folder path — e.g. `Work/meetings/transcripts/company/2026/file.md` matches, but `meetings/company/transcripts/file.md` does not (wrong order).
+
+## Note File Actions (new in v0.23.0)
+
+Select **Note file** as the THEN action type to change the file itself instead of a frontmatter property or the H1 title. All text fields support the same placeholders as property/title actions (`{date}`, `{created_date}`, `{updated_date}`, `{today}`, `{filename}`, `{propertyName}`).
+
+| Action | Effect |
+|--------|--------|
+| **Rename file** | Replaces the entire filename (keeps the extension) with the text you enter. Left empty → skipped, the rest of the rule's actions still run. |
+| **Add name prefix** | Prepends text to the current filename. Empty text is a no-op. |
+| **Add name suffix** | Appends text to the current filename. Empty text is a no-op. |
+| **Move file** | Moves the file to a folder path inside the vault (e.g. `Archive/2026`). The folder is created if it doesn't exist. Left empty → skipped. Moving outside the vault isn't possible — Obsidian's plugin API has no access beyond the vault sandbox. |
+| **Delete file** | Sends the file to trash using your vault's configured deletion behavior (system trash, `.trash` folder, or permanent — whatever you set in Obsidian's Files & Links settings). |
+
+All file actions run through the official Obsidian API: `fileManager.renameFile` for rename/prefix/suffix/move (so links elsewhere in the vault stay intact), and `fileManager.trashFile` for delete.
+
+**Multiple file actions in the same rule compose in sequence** — each one executes immediately, so a later action sees the result of an earlier one:
+
+```yaml
+THEN:
+  - Note file → Add name prefix: "[ARCHIVED] "
+  - Note file → Move file: "Archive/{today:YYYY}"
+```
+The file is prefixed first, then the already-renamed file is moved.
+
+**Delete stops everything else for that file.** If a "Delete file" action runs — in this rule or an earlier one in the same scan — no further actions or rules execute against that file, since it no longer exists.
 
 ## Title Actions
 

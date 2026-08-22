@@ -331,8 +331,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 		let changed = false;
 		let titleChanged = false;
 		let newTitle = null;
+		let fileActionApplied = false;
+		let fileDeleted = false;
 
 		for (let ruleIdx = 0; ruleIdx < rules.length; ruleIdx++) {
+			if (fileDeleted) break;
 			const rule = rules[ruleIdx];
 			const { thenActions } = rule || {};
 			if (!Array.isArray(thenActions) || thenActions.length === 0) continue;
@@ -383,7 +386,23 @@ class ConditionalPropertiesPlugin extends Plugin {
 			// Process THEN actions
 			for (const action of thenActions) {
 				const { type = 'property', prop, value, action: actionType, modificationType, text } = action || {};
-				
+
+				// Handle note file actions (rename / prefix / suffix / move / delete).
+				// Unlike property/title actions, these execute immediately (not
+				// batched at the end) so multiple file actions in the same rule
+				// compose in sequence — e.g. "Add name prefix" then "Move file"
+				// sees the already-prefixed name.
+				if (type === 'file') {
+					const applied = await this._applyFileAction(file, actionType, text, newFm);
+					if (applied === 'deleted') {
+						fileDeleted = true;
+						fileActionApplied = true;
+						break; // stop processing remaining actions in this rule
+					}
+					if (applied) fileActionApplied = true;
+					continue;
+				}
+
 				// Handle title modification
 				if (type === 'title' && text) {
 					try {
@@ -528,7 +547,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 					}
 				}
 			}
+			if (fileDeleted) break;
 		}
+
+		// The file no longer exists — nothing left to write to it.
+		if (fileDeleted) return true;
 
 		// Save changes if any
 		if (changed || titleChanged) {
@@ -542,7 +565,79 @@ class ConditionalPropertiesPlugin extends Plugin {
 			return true;
 		}
 
+		return fileActionApplied;
+	}
+
+	/**
+	 * Executes a single "Note file" THEN action (rename / add prefix / add
+	 * suffix / move / delete) immediately against the vault, using the
+	 * official Obsidian API — `fileManager.renameFile` (keeps links updated
+	 * across the vault) and `fileManager.trashFile` (respects the user's
+	 * configured deletion behavior: system trash, `.trash` folder, or
+	 * permanent delete). Moving a file outside the vault is not supported —
+	 * the plugin API has no access outside the vault sandbox, so "Move file"
+	 * only accepts vault-relative destination folders.
+	 *
+	 * Returns `'deleted'` when the file was trashed, `true` when a rename/
+	 * move actually changed something, or `false` when the action was a
+	 * no-op (empty text, or the computed path is unchanged).
+	 */
+	async _applyFileAction(file, fileActionType, rawText, newFm) {
+		if (fileActionType === 'delete') {
+			try {
+				await this.app.fileManager.trashFile(file);
+				return 'deleted';
+			} catch (e) {
+				console.error(`ConditionalProperties: failed to delete ${file.path}`, e);
+				return false;
+			}
+		}
+
+		const formattedText = this._formatText(rawText || '', file, newFm);
+		const ext = file.extension ? `.${file.extension}` : '';
+		const folder = (file.parent && file.parent.path && file.parent.path !== '/') ? file.parent.path : '';
+
+		if (fileActionType === 'rename') {
+			if (formattedText === '') return false; // empty → skip, per spec
+			const newPath = (folder ? `${folder}/` : '') + formattedText + ext;
+			return this._renameFileIfChanged(file, newPath);
+		}
+
+		if (fileActionType === 'addPrefix' || fileActionType === 'addSuffix') {
+			if (formattedText === '') return false; // no-op
+			const newBase = fileActionType === 'addPrefix'
+				? formattedText + file.basename
+				: file.basename + formattedText;
+			const newPath = (folder ? `${folder}/` : '') + newBase + ext;
+			return this._renameFileIfChanged(file, newPath);
+		}
+
+		if (fileActionType === 'move') {
+			const destFolder = formattedText.trim().replace(/^\/+|\/+$/g, '');
+			if (destFolder === '') return false; // no destination → skip
+			try {
+				const exists = await this.app.vault.adapter.exists(destFolder);
+				if (!exists) await this.app.vault.createFolder(destFolder);
+			} catch (e) {
+				// Folder may have been created concurrently by another scan — ignore and try the move anyway.
+				console.error(`ConditionalProperties: failed to ensure destination folder "${destFolder}"`, e);
+			}
+			const newPath = `${destFolder}/${file.name}`;
+			return this._renameFileIfChanged(file, newPath);
+		}
+
 		return false;
+	}
+
+	async _renameFileIfChanged(file, newPath) {
+		if (newPath === file.path) return false;
+		try {
+			await this.app.fileManager.renameFile(file, newPath);
+			return true;
+		} catch (e) {
+			console.error(`ConditionalProperties: failed to rename "${file.path}" to "${newPath}"`, e);
+			return false;
+		}
 	}
 
 	/**
@@ -1680,11 +1775,14 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		actionSetting.addDropdown(d => {
 			d.addOption("property", "Property");
 			d.addOption("title", "First heading");
+			d.addOption("file", "Note file");
 			d.setValue(action.type || "property");
 			d.onChange(async (v) => {
 				action.type = v;
 				if (v === "title") {
 					action.action = "modify";
+				} else if (v === "file") {
+					action.action = "rename";
 				}
 				await rebuildAction();
 			});
@@ -1726,6 +1824,38 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					.setValue(action.value || "")
 					.onChange(async (v) => {
 						action.value = v;
+						await this.plugin.saveData(this.plugin.settings);
+					}));
+			}
+		} else if (action.type === "file") {
+			const FILE_ACTIONS = ["rename", "addPrefix", "addSuffix", "move", "delete"];
+			if (!FILE_ACTIONS.includes(action.action)) action.action = "rename";
+
+			actionSetting.addDropdown(d => {
+				d.addOption("rename", "Rename file");
+				d.addOption("addPrefix", "Add name prefix");
+				d.addOption("addSuffix", "Add name suffix");
+				d.addOption("move", "Move file");
+				d.addOption("delete", "Delete file");
+				d.setValue(action.action);
+				d.onChange(async (v) => {
+					action.action = v;
+					await rebuildAction();
+				});
+			});
+
+			if (action.action !== "delete") {
+				const FILE_ACTION_PLACEHOLDERS = {
+					rename: "new file name, without extension (supports {date}, {filename}, {propertyName}...)",
+					addPrefix: "prefix text (supports placeholders)",
+					addSuffix: "suffix text (supports placeholders)",
+					move: "destination folder inside the vault, e.g. Archive/2026 (supports placeholders)",
+				};
+				actionSetting.addText(t => t
+					.setPlaceholder(FILE_ACTION_PLACEHOLDERS[action.action] || "value")
+					.setValue(action.text || "")
+					.onChange(async (v) => {
+						action.text = v;
 						await this.plugin.saveData(this.plugin.settings);
 					}));
 			}

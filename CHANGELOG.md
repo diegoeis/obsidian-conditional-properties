@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.23.0 - 2026-08-22
+### Added
+- **New THEN action type: "Note file"** — change the file itself instead of a frontmatter property or the H1 title. Five actions:
+  - `Rename file` — replaces the entire filename (extension kept). Empty text → skipped, the rest of the rule's actions still run.
+  - `Add name prefix` / `Add name suffix` — prepend/append text to the current filename. Empty text is a no-op.
+  - `Move file` — moves the file to a vault-relative folder path, creating the folder if missing. Empty text → skipped. Moving outside the vault isn't supported — the plugin API has no access beyond the vault sandbox.
+  - `Delete file` — sends the file to trash via `fileManager.trashFile`, respecting the user's configured deletion behavior (system trash / `.trash` folder / permanent).
+  - All rename/prefix/suffix/move actions use `fileManager.renameFile` (not `vault.rename`), so links to the file elsewhere in the vault stay updated.
+  - All text fields support the existing placeholders (`{date}`, `{created_date}`, `{updated_date}`, `{today}`, `{filename}`, `{propertyName}`).
+  - Multiple file actions in the same rule execute immediately and compose in sequence (e.g. prefix then move sees the already-renamed file).
+  - A `Delete file` action stops all further actions/rules for that file in the current scan.
+
 ## 0.22.0 - 2026-08-22
 ### Added
 - **New IF condition type: "Note file"** — check the file itself instead of a frontmatter property or the H1 title. Four operators:
