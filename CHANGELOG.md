@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.21.0 - 2026-08-22
+### Added
+- **New text placeholders for property values and title actions**: `{created_date}` (alias of `{date}` — the file's creation date, `file.stat.ctime`), `{updated_date}` (the file's last-modified date, `file.stat.mtime`), and `{today}` (the current date at the moment the rule runs, independent of the file). All three support the `:FORMAT` suffix, same as `{date}` (e.g. `{updated_date:DD-MM-YYYY}`).
+- `{date}` keeps its existing meaning (creation date) unchanged — no behavior change for existing rules.
+
 ## 0.20.4 - 2026-06-18
 ### Fixes
 - **No more scroll-to-top or lag on any settings interaction.** Every remaining `this.display()` call inside the settings UI has been replaced by a localized DOM mutation:

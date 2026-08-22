@@ -562,10 +562,23 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		};
 
-		// Handle date formatting
-		const formatDate = (format) => {
+		// Get file modification date, or current date as fallback
+		const getUpdatedMomentDate = () => {
 			try {
-				const momentDate = getMomentDate();
+				return file && file.stat && file.stat.mtime
+					? moment(file.stat.mtime)
+					: moment();
+			} catch (e) {
+				console.error("Error getting file modification date:", e);
+				return moment();
+			}
+		};
+
+		// Handle date formatting. `momentDate` defaults to the file's creation
+		// date ({date} / {created_date} semantics) — pass a different moment
+		// instance for {updated_date} / {today}.
+		const formatDate = (format, momentDate = getMomentDate()) => {
+			try {
 				// Use Obsidian's built-in date format if no specific format provided
 				if (!format) {
 					return momentDate.format(this.app.vault.config.dateFormat || 'YYYY-MM-DD');
@@ -612,12 +625,21 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		};
 
-		// Two-pass replace so {date}/{date:FORMAT}/{filename} keep their
-		// existing semantics and never get mistaken for a property lookup.
+		// Two-pass replace so {date}/{date:FORMAT}/{filename}/{created_date}/
+		// {updated_date}/{today} keep their existing semantics and never get
+		// mistaken for a property lookup.
 		// Pass 1 — reserved placeholders.
-		let out = text.replace(/\{(date|filename)(?::([^}]+))?\}/g, (match, type, format) => {
+		// {date} and {created_date} are aliases for the file's creation date
+		// (kept both for backward compatibility — {date} shipped first).
+		let out = text.replace(/\{(date|created_date|updated_date|today|filename)(?::([^}]+))?\}/g, (match, type, format) => {
 			if (type === 'filename') {
 				return getFilename();
+			}
+			if (type === 'updated_date') {
+				return formatDate(format, getUpdatedMomentDate());
+			}
+			if (type === 'today') {
+				return formatDate(format, moment());
 			}
 			return formatDate(format);
 		});
@@ -1629,7 +1651,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					}));
 			} else if (action.action !== "delete") {
 				actionSetting.addText(t => t
-					.setPlaceholder("value (use commas; supports {propertyName}, {date}, {filename})")
+					.setPlaceholder("value (use commas; supports {propertyName}, {date}, {created_date}, {updated_date}, {today}, {filename})")
 					.setValue(action.value || "")
 					.onChange(async (v) => {
 						action.value = v;
@@ -1650,7 +1672,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			actionSetting.addText(t => t
-				.setPlaceholder("Text (use {date}, {date:FORMAT}, {filename}, or {propertyName})")
+				.setPlaceholder("Text (use {date}, {created_date}, {updated_date}, {today}, {filename}, or {propertyName})")
 				.setValue(action.text || "")
 				.onChange(async (v) => {
 					action.text = v;

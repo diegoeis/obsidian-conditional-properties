@@ -27,7 +27,7 @@ Stop manually updating properties across hundreds of notes. Define rules once, r
 - **OVERWRITE**: Replace entire property
 - **DELETE PROPERTY**: Remove property completely
 - **CHANGE TITLE**: Add prefix/suffix or overwrite with dynamic dates, filenames, or other property values
-- **Placeholders in action values (new in v0.20.0)**: reference any frontmatter property inline as `{propertyName}`, alongside the existing `{date}`, `{date:FORMAT}`, and `{filename}` placeholders. Works in property values and in title text.
+- **Placeholders in action values**: reference any frontmatter property inline as `{propertyName}` (v0.20.0), alongside `{date}`, `{date:FORMAT}`, `{filename}`, and — new in v0.21.0 — `{created_date}` (alias of `{date}`), `{updated_date}` (file's last-modified date), and `{today}` (current date when the rule runs). Works in property values and in title text.
 - **Typed property awareness (new in v0.19.0)**: when the target property is registered as `checkbox`, `date`, or `datetime`, values are written with the right YAML type instead of as plain strings — so `whatsapp: true` lands as a real boolean (renders as a checked checkbox), and `created_at: 08-08-2025` is parsed and stored as `2025-08-08` (renders in the Obsidian date widget).
 
 ### 🎛️ Smart Execution
@@ -197,16 +197,19 @@ Modify note titles dynamically:
 
 Placeholders work inside **any THEN action value** — property `Add value` / `Overwrite all values with`, and title `Prefix` / `Suffix` / `Overwrite`. They're expanded at the moment the rule runs, against the file being processed.
 
-| Placeholder         | Result                                                                                  |
-|---------------------|-----------------------------------------------------------------------------------------|
-| `{date}`            | File creation date in the default format (`YYYY-MM-DD`). Example: `2026-01-08`.        |
-| `{date:FORMAT}`     | File creation date in a custom moment.js format. Example: `{date:DD-MM-YYYY}` → `08-01-2026`. |
-| `{filename}`        | File basename without `.md`. Example: `meeting-notes`.                                  |
-| `{propertyName}`    | Live value of that frontmatter property on the current note (new in v0.20.0).           |
+| Placeholder            | Result                                                                                  |
+|------------------------|-----------------------------------------------------------------------------------------|
+| `{date}`               | File creation date in the default format (`YYYY-MM-DD`). Example: `2026-01-08`.        |
+| `{created_date}`       | Alias of `{date}` — same value, more explicit name (new in v0.21.0).                    |
+| `{updated_date}`       | File's last-modified date (`YYYY-MM-DD`), new in v0.21.0.                               |
+| `{today}`              | Current date when the rule runs (`YYYY-MM-DD`), new in v0.21.0 — independent of the file. |
+| `{date:FORMAT}`        | Any of the above with a custom moment.js format, e.g. `{date:DD-MM-YYYY}` → `08-01-2026`, `{updated_date:DD-MM-YYYY}`, `{today:YYYY}`. |
+| `{filename}`           | File basename without `.md`. Example: `meeting-notes`.                                  |
+| `{propertyName}`       | Live value of that frontmatter property on the current note (new in v0.20.0).           |
 
 ### Property placeholders (v0.20.0)
 
-Any token that isn't `date` / `filename` and doesn't contain `:` or whitespace is treated as a frontmatter property lookup. So `{g_excerpt}`, `{summary}`, `{kebab-case-prop}` all work.
+Any token that isn't `date` / `created_date` / `updated_date` / `today` / `filename` and doesn't contain `:` or whitespace is treated as a frontmatter property lookup. So `{g_excerpt}`, `{summary}`, `{kebab-case-prop}` all work.
 
 **Copy a value from one property to another:**
 ```yaml
@@ -218,7 +221,7 @@ Behavior:
 - **Missing property → empty string.** No errors, no literal `{name}` left behind in your YAML.
 - **Arrays are joined with `, `.** A source like `tags: [a, b, c]` becomes `a, b, c` in the expanded string.
 - **Earlier actions in the same rule are visible to later ones.** The expansion reads from the in-progress frontmatter, so if action #1 sets `excerpt`, action #2 can reference `{excerpt}`.
-- **Reserved names win.** `{date}` and `{filename}` are resolved first; a property literally named `date` or `filename` won't shadow them.
+- **Reserved names win.** `{date}`, `{created_date}`, `{updated_date}`, `{today}`, and `{filename}` are resolved first; a property with one of those names won't shadow them.
 
 ### Combinations
 
