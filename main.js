@@ -405,7 +405,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 				// Handle note file actions (rename / prefix / suffix / move / delete).
 				// Unlike property/title actions, these execute immediately (not
 				// batched at the end) so multiple file actions in the same rule
-				// compose in sequence — e.g. "Add name prefix" then "Move file"
+				// compose in sequence — e.g. "Add name prefix" then "Move file to"
 				// sees the already-prefixed name.
 				if (type === 'file') {
 					const applied = await this._applyFileAction(file, actionType, text, newFm);
@@ -590,8 +590,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 * across the vault) and `fileManager.trashFile` (respects the user's
 	 * configured deletion behavior: system trash, `.trash` folder, or
 	 * permanent delete). Moving a file outside the vault is not supported —
-	 * the plugin API has no access outside the vault sandbox, so "Move file"
-	 * only accepts vault-relative destination folders.
+	 * the plugin API has no access outside the vault sandbox, so "Move file
+	 * to" only accepts vault-relative destination folders.
 	 *
 	 * Returns `'deleted'` when the file was trashed, `true` when a rename/
 	 * move actually changed something, or `false` when the action was a
@@ -1906,7 +1906,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				d.addOption("rename", "Rename file");
 				d.addOption("addPrefix", "Add name prefix");
 				d.addOption("addSuffix", "Add name suffix");
-				d.addOption("move", "Move file");
+				d.addOption("move", "Move file to");
 				d.addOption("delete", "Delete file");
 				d.setValue(action.action);
 				d.onChange(async (v) => {
@@ -1920,7 +1920,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					rename: "new file name, without extension (supports {date}, {filename}, {propertyName}...)",
 					addPrefix: "prefix text (supports placeholders)",
 					addSuffix: "suffix text (supports placeholders)",
-					move: "destination folder inside the vault, e.g. Archive/2026 (supports placeholders)",
+					move: "destination folder inside the vault, created if missing — e.g. Archive/{today}",
 				};
 				actionSetting.addText(t => t
 					.setPlaceholder(FILE_ACTION_PLACEHOLDERS[action.action] || "value")

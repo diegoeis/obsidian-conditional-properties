@@ -28,7 +28,7 @@ Stop manually updating properties across hundreds of notes. Define rules once, r
 - **OVERWRITE**: Replace entire property
 - **DELETE PROPERTY**: Remove property completely
 - **CHANGE TITLE**: Add prefix/suffix or overwrite with dynamic dates, filenames, or other property values
-- **NOTE FILE actions (new in v0.23.0)**: Rename file, Add name prefix, Add name suffix, Move file (vault-only), Delete file — via the official Obsidian API (`fileManager.renameFile` keeps links updated, `fileManager.trashFile` respects your deletion preference)
+- **NOTE FILE actions (new in v0.23.0)**: Rename file, Add name prefix, Add name suffix, Move file to (vault-only, auto-creates the destination folder), Delete file — via the official Obsidian API (`fileManager.renameFile` keeps links updated, `fileManager.trashFile` respects your deletion preference)
 - **Placeholders in action values**: reference any frontmatter property inline as `{propertyName}` (v0.20.0), alongside `{date}`, `{date:FORMAT}`, `{filename}`, and — new in v0.21.0 — `{created_date}` (alias of `{date}`), `{updated_date}` (file's last-modified date), and `{today}` (current date when the rule runs). Works in property values and in title text.
 - **Typed property awareness (new in v0.19.0)**: when the target property is registered as `checkbox`, `date`, or `datetime`, values are written with the right YAML type instead of as plain strings — so `whatsapp: true` lands as a real boolean (renders as a checked checkbox), and `created_at: 08-08-2025` is parsed and stored as `2025-08-08` (renders in the Obsidian date widget).
 
@@ -230,17 +230,27 @@ Select **Note file** as the THEN action type to change the file itself instead o
 | **Rename file** | Replaces the entire filename (keeps the extension) with the text you enter. Left empty → skipped, the rest of the rule's actions still run. |
 | **Add name prefix** | Prepends text to the current filename. Empty text is a no-op. |
 | **Add name suffix** | Appends text to the current filename. Empty text is a no-op. |
-| **Move file** | Moves the file to a folder path inside the vault (e.g. `Archive/2026`). The folder is created if it doesn't exist. Left empty → skipped. Moving outside the vault isn't possible — Obsidian's plugin API has no access beyond the vault sandbox. |
+| **Move file to** | Moves the file to a folder path inside the vault (e.g. `Archive/2026`). **The folder is created automatically if it doesn't exist** — you never need to pre-create the destination. Left empty → skipped. Moving outside the vault isn't possible — Obsidian's plugin API has no access beyond the vault sandbox. |
 | **Delete file** | Sends the file to trash using your vault's configured deletion behavior (system trash, `.trash` folder, or permanent — whatever you set in Obsidian's Files & Links settings). |
 
 All file actions run through the official Obsidian API: `fileManager.renameFile` for rename/prefix/suffix/move (so links elsewhere in the vault stay intact), and `fileManager.trashFile` for delete.
+
+### Move file to: auto-creates the destination folder
+
+Because the folder is created if missing, **`Move file to` works great combined with date placeholders** to sort files into folders that don't exist yet — you set the rule up once, and it creates a fresh folder every day/month/year as needed.
+
+```yaml
+IF Note file: Filename contains "transcript"
+THEN Note file: Move file to "transcripts/{today}"
+```
+Today (2026-08-22), this moves any note whose filename contains `transcript` into `transcripts/2026-08-22/` — creating both `transcripts/` and `transcripts/2026-08-22/` the first time it runs, and reusing them on later runs the same day. Use `{today:YYYY-MM}` instead of `{today}` if you want one folder per month rather than per day.
 
 **Multiple file actions in the same rule compose in sequence** — each one executes immediately, so a later action sees the result of an earlier one:
 
 ```yaml
 THEN:
   - Note file → Add name prefix: "[ARCHIVED] "
-  - Note file → Move file: "Archive/{today:YYYY}"
+  - Note file → Move file to: "Archive/{today:YYYY}"
 ```
 The file is prefixed first, then the already-renamed file is moved.
 

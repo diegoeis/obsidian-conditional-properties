@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.23.3 - 2026-08-22
+### Changed
+- Renamed the THEN action **"Move file"** to **"Move file to"** for clarity.
+- Documented that `Move file to` auto-creates the destination folder when it doesn't exist yet — this already worked, but nothing told users it was safe to point the action at a folder that doesn't exist. README now has a dedicated example combining it with `{today}` to sort files into a fresh dated folder on each run.
+
 ## 0.23.2 - 2026-08-22
 ### Added
 - **Local lint tooling**: `npm install && npm run lint` now runs `eslint-plugin-obsidianmd` against `main.js` — the same checks the community-plugin review bot runs on release. Dev-only `package.json`/`package-lock.json`/`eslint.config.mjs`; no build step, no runtime dependencies added.
