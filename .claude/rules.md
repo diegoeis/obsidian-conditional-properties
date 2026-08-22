@@ -12,7 +12,7 @@
 4. **Review plugin guidelines**: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines
 5. **Study the sample plugin**: https://github.com/obsidianmd/obsidian-sample-plugin
 
-For submission specifics, see [`.claude/docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md`](docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md).
+For submission specifics, see [`.claude/docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md`](docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md) (this repo's own release/PR checklist), plus the two official mirrors this repo must actually comply with: [`.claude/docs/submission_requirements_for_plugins.md`](docs/submission_requirements_for_plugins.md) and [`.claude/docs/obsidian_plugin_guidelines.md`](docs/obsidian_plugin_guidelines.md) — both are review-bot-enforced, not just recommendations.
 
 ### Rule 2: No Assumptions Without Verification
 
@@ -124,6 +124,23 @@ Before any release:
 - ❌ Block the main thread with a heavy synchronous loop over the whole vault — scans already iterate file-by-file with `await` so the UI stays responsive
 - ❌ Skip error handling around file I/O
 
+## 🧭 Plugin Guidelines Compliance
+
+### Rule 12a: Follow the Official Plugin Guidelines and Submission Requirements
+
+Full text in [`.claude/docs/obsidian_plugin_guidelines.md`](docs/obsidian_plugin_guidelines.md) and [`.claude/docs/submission_requirements_for_plugins.md`](docs/submission_requirements_for_plugins.md) — each has a "How this applies to Conditional Properties" section at the bottom mapping every rule to this repo's actual code. Highlights to keep enforcing:
+
+- **Never use the global `app`/`window.app`** — always `this.app`.
+- **Sentence case everywhere in the UI** — known outstanding violation: "Latest Created notes" / "Latest Modified notes" in the settings dropdown should be "Latest created notes" / "Latest modified notes". Fix opportunistically, don't leave new violations.
+- **No "settings" in settings headings**, no top-level plugin-name heading in the settings tab — already correct, keep it that way.
+- **`setHeading()`, never raw `<h1>`/`<h2>`** — already correct.
+- **`FileManager.processFrontMatter()` for frontmatter, `Vault.process()` for background file edits, Editor API only for the active file** — already the pattern in `main.js`; don't regress to manual YAML splicing or `Vault.modify()`.
+- **`normalizePath()` for any user/placeholder-derived path** — currently `_sanitizeFilenameComponent()`/`_sanitizeVaultFolderPath()` roll their own traversal-stripping without it. Any change to the Note file actions should add `normalizePath()` alongside the existing sanitization, not replace it.
+- **No default hotkeys**, and use `checkCallback` (not plain `callback`) for any command whose availability depends on state — matches all three existing commands.
+- **`isDesktopOnly` must stay `false`** as long as no Node.js/Electron-only API is introduced; flip it the moment one is.
+- **`fundingUrl`**: leave out of `manifest.json` unless this plugin starts accepting donations.
+- **Description in `manifest.json`**: action-statement start, ≤250 chars, ends with a period, no emoji — re-check on every edit to that field.
+
 ## 📦 Release Process
 
 ### Rule 10: Release Checklist
@@ -160,8 +177,9 @@ Full mechanics are in root `CLAUDE.md` → **Release**. Summary:
 - Docs: https://docs.obsidian.md
 - Plugin API: https://docs.obsidian.md/Reference/TypeScript+API
 - Sample Plugin: https://github.com/obsidianmd/obsidian-sample-plugin
-- Plugin Guidelines: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines
-- Developer Policies: https://docs.obsidian.md/Developer+policies
+- Plugin Guidelines: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines (mirror: [`obsidian_plugin_guidelines.md`](docs/obsidian_plugin_guidelines.md))
+- Submission Requirements: https://docs.obsidian.md/community-directory/submission-requirements-for-plugins (mirror: [`submission_requirements_for_plugins.md`](docs/submission_requirements_for_plugins.md))
+- Developer Policies: https://docs.obsidian.md/Developer+policies (mirror: [`OBSIDIAN_DEVELOPMENT_POLICIES.md`](docs/OBSIDIAN_DEVELOPMENT_POLICIES.md))
 - Community Plugins repo: https://github.com/obsidianmd/obsidian-releases
 
 **Development:**
