@@ -25,18 +25,19 @@ This repo ships the **compiled plugin** directly. There is no TypeScript source,
 2. **[.claude/docs/OBSIDIAN_DEVELOPMENT_POLICIES.md](.claude/docs/OBSIDIAN_DEVELOPMENT_POLICIES.md)** — Obsidian's official **developer policies** (mirror of https://docs.obsidian.md/community-directory/developer-policies). Hard constraints that apply to **both plugins and themes**: no code obfuscation, no dynamic ads, no client-side telemetry, no self-update mechanism, mandatory LICENSE, mandatory README disclosures for network use / payment / accounts / server-side telemetry, fork restrictions, and trademark rules. Any change that touches networking, analytics, the LICENSE, or the README's disclosure sections must be checked against this file. Violations get the project removed from the directory.
 3. **[.claude/docs/submission_requirements_for_plugins.md](.claude/docs/submission_requirements_for_plugins.md)** — official plugin-specific submission requirements (mirror of https://docs.obsidian.md/community-directory/submission-requirements-for-plugins): `fundingUrl`/`minAppVersion`/description rules, `isDesktopOnly` for Node/Electron API use, no plugin ID in command IDs, no leftover sample code. Review-bot enforced, not optional.
 4. **[.claude/docs/obsidian_plugin_guidelines.md](.claude/docs/obsidian_plugin_guidelines.md)** — official common-review-comments guidelines (mirror of https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines): `this.app` over global `app`, sentence case + heading conventions, `processFrontMatter`/`Vault.process`/`normalizePath` preferences, no default hotkeys, resource cleanup, no `innerHTML`. Recommendations that may still be required depending on severity.
+5. **[.claude/rules/obsidian-plugin-rules.md](.claude/rules/obsidian-plugin-rules.md)** — index of task-scoped rule files (generic, portable to any Obsidian plugin repo). Each linked file is short and maps to one concern — load only the one relevant to the current task instead of all of them:
+   - [`submission-naming.md`](.claude/rules/submission-naming.md) — plugin ID/name/description, command IDs, `isDesktopOnly`, `fundingUrl`
+   - [`memory-lifecycle.md`](.claude/rules/memory-lifecycle.md) — `registerEvent`/`registerInterval`, view references, `onunload()`
+   - [`file-vault-api.md`](.claude/rules/file-vault-api.md) — Editor API vs. `Vault.process()`, `processFrontMatter()`, `normalizePath()`
+   - [`ui-ux.md`](.claude/rules/ui-ux.md) — sentence case, `.setHeading()`, settings-heading conventions, CSS variables, scoping, no inline/runtime styles
+   - [`accessibility.md`](.claude/rules/accessibility.md) — keyboard access, ARIA labels, focus indicators — mandatory, not optional
 
 ### Plugin development (this repo)
 
-5. **[.claude/docs/DEVELOPMENT_GUIDELINES.md](.claude/docs/DEVELOPMENT_GUIDELINES.md)** — Obsidian plugin do/don'ts: which APIs to use, lint hot-spots reviewers check, mobile compatibility, testing checklist. Consult **before writing any new Obsidian plugin code** so the plugin keeps passing the community lint.
-6. **[.claude/docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md](.claude/docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md)** — this repo's own submission and release flow (built on top of items 3–4 above). Consult before every release and every PR against `obsidian-releases`.
+6. **[.claude/docs/DEVELOPMENT_GUIDELINES.md](.claude/docs/DEVELOPMENT_GUIDELINES.md)** — Obsidian plugin do/don'ts: which APIs to use, lint hot-spots reviewers check, mobile compatibility, testing checklist. Consult **before writing any new Obsidian plugin code** so the plugin keeps passing the community lint.
+7. **[.claude/docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md](.claude/docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md)** — this repo's own submission and release flow (built on top of items 3–4 above). Consult before every release and every PR against `obsidian-releases`.
 
-### Theme development (other repos using this CLAUDE.md as a template)
-
-These files don't apply to *this* plugin repo, but the workspace ships them so the same CLAUDE.md skeleton can be reused on Obsidian theme repos. Ignore them when working on the conditional-properties plugin; pull them in when bootstrapping a theme.
-
-7. **[.claude/docs/OBSIDIAN_THEME_GUIDELINES.md](.claude/docs/OBSIDIAN_THEME_GUIDELINES.md)** — Obsidian theme authoring guidelines (mirror of https://docs.obsidian.md/Themes/App+themes/Theme+guidelines): use CSS variables, override under `body` / `.theme-light` / `.theme-dark`, accessibility and forward-compatibility expectations.
-8. **[.claude/docs/OBSIDIAN_THEME_SUBMIT.md](.claude/docs/OBSIDIAN_THEME_SUBMIT.md)** — theme submission flow (mirror of https://docs.obsidian.md/Themes/App+themes/Submit+your+theme): required files (`manifest.json`, `theme.css`, `README.md`, `LICENSE`), screenshot requirements, and the PR against `obsidianmd/obsidian-releases`.
+This repo is plugin-only — there is no theme-development section or theme doc mirrors here. If a future need arises to reuse this `CLAUDE.md` skeleton for an Obsidian theme repo, bring in `OBSIDIAN_THEME_GUIDELINES.md`/`OBSIDIAN_THEME_SUBMIT.md` mirrors at that point rather than referencing files that don't exist.
 
 ### LLM operating rules
 

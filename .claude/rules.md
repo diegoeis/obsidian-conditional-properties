@@ -6,11 +6,11 @@
 
 **NEVER assume how Obsidian APIs, methods, or features work. ALWAYS verify with official documentation FIRST.**
 
-1. **Check official docs FIRST**: https://docs.obsidian.md/Plugins/Getting+started/Build+a+plugin
-2. **Verify API reference**: https://docs.obsidian.md/Reference/TypeScript+API
+1. **Check official docs FIRST**: https://docs.obsidian.md/Plugins/Getting+started/Build+a+plugin (no local mirror — this is the getting-started walkthrough, not a rule set)
+2. **Verify API reference**: https://docs.obsidian.md/Reference/TypeScript+API (no local mirror — check the `obsidian` npm package's `obsidian.d.ts` for the exact method signature)
 3. **Check the type definitions** in the `obsidian` npm package's `obsidian.d.ts` (useful as a reference even though this repo has no `node_modules` — it documents the exact method signatures)
-4. **Review plugin guidelines**: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines
-5. **Study the sample plugin**: https://github.com/obsidianmd/obsidian-sample-plugin
+4. **Review plugin guidelines**: [`.claude/docs/obsidian_plugin_guidelines.md`](docs/obsidian_plugin_guidelines.md) — local mirror of https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines, check the live page only if the mirror looks stale
+5. **Study the sample plugin**: https://github.com/obsidianmd/obsidian-sample-plugin (no local mirror — external repo)
 
 For submission specifics, see [`.claude/docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md`](docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md) (this repo's own release/PR checklist), plus the two official mirrors this repo must actually comply with: [`.claude/docs/submission_requirements_for_plugins.md`](docs/submission_requirements_for_plugins.md) and [`.claude/docs/obsidian_plugin_guidelines.md`](docs/obsidian_plugin_guidelines.md) — both are review-bot-enforced, not just recommendations.
 
@@ -128,13 +128,13 @@ Before any release:
 
 ### Rule 12a: Follow the Official Plugin Guidelines and Submission Requirements
 
-Full text in [`.claude/docs/obsidian_plugin_guidelines.md`](docs/obsidian_plugin_guidelines.md) and [`.claude/docs/submission_requirements_for_plugins.md`](docs/submission_requirements_for_plugins.md) — each has a "How this applies to Conditional Properties" section at the bottom mapping every rule to this repo's actual code. Highlights to keep enforcing:
+Full text in [`.claude/docs/obsidian_plugin_guidelines.md`](docs/obsidian_plugin_guidelines.md) and [`.claude/docs/submission_requirements_for_plugins.md`](docs/submission_requirements_for_plugins.md) — each has a "How this applies to Conditional Properties" section at the bottom mapping every rule to this repo's actual code. For the generic, task-scoped version of these same rules (portable to any Obsidian plugin repo), see the index at [`.claude/rules/obsidian-plugin-rules.md`](rules/obsidian-plugin-rules.md). Highlights to keep enforcing here:
 
 - **Never use the global `app`/`window.app`** — always `this.app`.
-- **Sentence case everywhere in the UI** — known outstanding violation: "Latest Created notes" / "Latest Modified notes" in the settings dropdown should be "Latest created notes" / "Latest modified notes". Fix opportunistically, don't leave new violations.
+- **Sentence case everywhere in the UI** (see [`rules/ui-ux.md`](rules/ui-ux.md)) — known outstanding violation: "Latest Created notes" / "Latest Modified notes" in the settings dropdown should be "Latest created notes" / "Latest modified notes". Fix opportunistically, don't leave new violations.
 - **No "settings" in settings headings**, no top-level plugin-name heading in the settings tab — already correct, keep it that way.
 - **`setHeading()`, never raw `<h1>`/`<h2>`** — already correct.
-- **`FileManager.processFrontMatter()` for frontmatter, `Vault.process()` for background file edits, Editor API only for the active file** — already the pattern in `main.js`; don't regress to manual YAML splicing or `Vault.modify()`.
+- **`FileManager.processFrontMatter()` for frontmatter, `Vault.process()` for background file edits, Editor API only for the active file** (see [`rules/file-vault-api.md`](rules/file-vault-api.md)) — already the pattern in `main.js`; don't regress to manual YAML splicing or `Vault.modify()`.
 - **`normalizePath()` for any user/placeholder-derived path** — currently `_sanitizeFilenameComponent()`/`_sanitizeVaultFolderPath()` roll their own traversal-stripping without it. Any change to the Note file actions should add `normalizePath()` alongside the existing sanitization, not replace it.
 - **No default hotkeys**, and use `checkCallback` (not plain `callback`) for any command whose availability depends on state — matches all three existing commands.
 - **`isDesktopOnly` must stay `false`** as long as no Node.js/Electron-only API is introduced; flip it the moment one is.
@@ -174,13 +174,13 @@ Full mechanics are in root `CLAUDE.md` → **Release**. Summary:
 ## 📚 Reference Links
 
 **Obsidian:**
-- Docs: https://docs.obsidian.md
-- Plugin API: https://docs.obsidian.md/Reference/TypeScript+API
-- Sample Plugin: https://github.com/obsidianmd/obsidian-sample-plugin
-- Plugin Guidelines: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines (mirror: [`obsidian_plugin_guidelines.md`](docs/obsidian_plugin_guidelines.md))
-- Submission Requirements: https://docs.obsidian.md/community-directory/submission-requirements-for-plugins (mirror: [`submission_requirements_for_plugins.md`](docs/submission_requirements_for_plugins.md))
-- Developer Policies: https://docs.obsidian.md/Developer+policies (mirror: [`OBSIDIAN_DEVELOPMENT_POLICIES.md`](docs/OBSIDIAN_DEVELOPMENT_POLICIES.md))
-- Community Plugins repo: https://github.com/obsidianmd/obsidian-releases
+- Docs (no local mirror): https://docs.obsidian.md
+- Plugin API (no local mirror): https://docs.obsidian.md/Reference/TypeScript+API
+- Sample Plugin (no local mirror): https://github.com/obsidianmd/obsidian-sample-plugin
+- Plugin Guidelines: [`.claude/docs/obsidian_plugin_guidelines.md`](docs/obsidian_plugin_guidelines.md) (official page for freshness checks: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines)
+- Submission Requirements: [`.claude/docs/submission_requirements_for_plugins.md`](docs/submission_requirements_for_plugins.md) (official page for freshness checks: https://docs.obsidian.md/community-directory/submission-requirements-for-plugins)
+- Developer Policies: [`.claude/docs/OBSIDIAN_DEVELOPMENT_POLICIES.md`](docs/OBSIDIAN_DEVELOPMENT_POLICIES.md) (official page for freshness checks: https://docs.obsidian.md/Developer+policies)
+- Community Plugins repo (no local mirror): https://github.com/obsidianmd/obsidian-releases
 
 **Development:**
 - Conventional Commits: https://www.conventionalcommits.org/
