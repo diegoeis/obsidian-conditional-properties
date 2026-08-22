@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.1 - 2026-08-22
+### Fixes
+- **Note file actions could escape the vault via path traversal.** `Rename file` / `Add name prefix` / `Add name suffix` did not strip `/`, `\`, or `..` from the (possibly placeholder-expanded) text, so a value like `../outside/name` could compute a path outside the file's current folder. `Move file` only trimmed leading/trailing slashes and did not reject `..` segments, so a destination like `../../outside` could resolve above or outside the vault root. Both are now sanitized before any `renameFile`/`createFolder` call: rename/prefix/suffix strip path separators and `..` entirely (filename-only, never changes folder), and Move drops `.`/`..`/empty path segments (vault-relative only, confined inside the vault).
+
 ## 0.23.0 - 2026-08-22
 ### Added
 - **New THEN action type: "Note file"** — change the file itself instead of a frontmatter property or the H1 title. Five actions:

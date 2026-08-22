@@ -593,28 +593,38 @@ class ConditionalPropertiesPlugin extends Plugin {
 			}
 		}
 
-		const formattedText = this._formatText(rawText || '', file, newFm);
+		const rawFormattedText = this._formatText(rawText || '', file, newFm);
 		const ext = file.extension ? `.${file.extension}` : '';
 		const folder = (file.parent && file.parent.path && file.parent.path !== '/') ? file.parent.path : '';
 
-		if (fileActionType === 'rename') {
-			if (formattedText === '') return false; // empty → skip, per spec
-			const newPath = (folder ? `${folder}/` : '') + formattedText + ext;
-			return this._renameFileIfChanged(file, newPath);
-		}
+		if (fileActionType === 'rename' || fileActionType === 'addPrefix' || fileActionType === 'addSuffix') {
+			// Rename/prefix/suffix operate on the filename only — never allow
+			// them to change which folder the file lives in or escape the
+			// vault. Strip path separators and ".." so a formatted value like
+			// "../outside/name" or "sub/name" can't smuggle a path through.
+			const formattedText = this._sanitizeFilenameComponent(rawFormattedText);
+			if (formattedText === '') return false; // empty (or fully stripped) → skip, per spec
 
-		if (fileActionType === 'addPrefix' || fileActionType === 'addSuffix') {
-			if (formattedText === '') return false; // no-op
-			const newBase = fileActionType === 'addPrefix'
-				? formattedText + file.basename
-				: file.basename + formattedText;
+			let newBase;
+			if (fileActionType === 'rename') {
+				newBase = formattedText;
+			} else if (fileActionType === 'addPrefix') {
+				newBase = formattedText + file.basename;
+			} else {
+				newBase = file.basename + formattedText;
+			}
 			const newPath = (folder ? `${folder}/` : '') + newBase + ext;
 			return this._renameFileIfChanged(file, newPath);
 		}
 
 		if (fileActionType === 'move') {
-			const destFolder = formattedText.trim().replace(/^\/+|\/+$/g, '');
-			if (destFolder === '') return false; // no destination → skip
+			// Vault-relative only: strip ".", "..", and empty segments so a
+			// value like "../../outside" can't move the file above the vault
+			// root or anywhere outside it. Obsidian's plugin API has no
+			// access beyond the vault sandbox anyway — this just fails safe
+			// instead of resolving to an unintended path.
+			const destFolder = this._sanitizeVaultFolderPath(rawFormattedText);
+			if (destFolder === '') return false; // no valid destination → skip
 			try {
 				const exists = await this.app.vault.adapter.exists(destFolder);
 				if (!exists) await this.app.vault.createFolder(destFolder);
@@ -627,6 +637,32 @@ class ConditionalPropertiesPlugin extends Plugin {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Sanitizes a filename component (used by rename / add prefix / add
+	 * suffix). These change the file's name only, never its folder — so any
+	 * path separator or ".." in the user-entered (or placeholder-expanded)
+	 * text is stripped rather than honored. This keeps the resulting path
+	 * confined to the file's current folder and prevents a formatted value
+	 * from smuggling a path (e.g. "../outside/name") into the new filename.
+	 */
+	_sanitizeFilenameComponent(text) {
+		return String(text ?? "").replace(/[/\\]/g, '').split('..').join('');
+	}
+
+	/**
+	 * Sanitizes a vault-relative folder path (used by Move file). Splits on
+	 * "/", drops empty / "." / ".." segments, and rejoins — this keeps the
+	 * destination confined inside the vault even if the formatted value
+	 * contains traversal segments like "../../outside" or a leading "/".
+	 */
+	_sanitizeVaultFolderPath(text) {
+		return String(text ?? "")
+			.split('/')
+			.map(segment => segment.trim())
+			.filter(segment => segment !== '' && segment !== '.' && segment !== '..')
+			.join('/');
 	}
 
 	async _renameFileIfChanged(file, newPath) {
