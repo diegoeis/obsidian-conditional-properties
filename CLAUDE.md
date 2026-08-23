@@ -46,7 +46,7 @@ When making code or documentation changes to this plugin:
 - **Default to the official Obsidian API.** If you're about to use `fetch`, `fs`, `innerHTML`, `localStorage`, `var`, `eval`, manual YAML parsing, the global `app`, or any non-registered listener — stop and consult `DEVELOPMENT_GUIDELINES.md` and `obsidian_plugin_guidelines.md` first. There is almost always an Obsidian-native equivalent.
 - **Respect the Obsidian Developer Policies and submission requirements.** Before adding any network call, telemetry, ad, update mechanism, obfuscated code, account-required feature, or anything that reads files outside the vault — check `OBSIDIAN_DEVELOPMENT_POLICIES.md` and `submission_requirements_for_plugins.md`. If the policy requires a README disclosure, add it in the same change. Never insert client-side telemetry or a self-update mechanism, period.
 - **Never strip the lint-safe patterns** already in `main.js` (e.g. `createEl`/`createDiv`, `this.register*`, `this.app` never the global `app`, `fileManager.processFrontMatter`, `metadataCache`).
-- **Touch the release artifacts together.** If you bump behavior, you also bump `manifest.json` version, add to `versions.json`, append `CHANGELOG.md`, update `.claude/docs/features-info.md`, and (if a spec exists) update the related PRD/FRD in `.claude/docs/product/`.
+- **Touch the release artifacts together.** If you bump behavior, you also bump `manifest.json` version, add to `versions.json`, append `CHANGELOG.md`, and update the relevant feature section in `README.md` (the README's per-feature version tags, e.g. "new in v0.19.0", are the closest thing this repo has to a feature changelog — keep them accurate).
 - **Always confirm with the user before adding a new dependency** (runtime or dev/build tooling) — never add one silently, even if it seems obviously needed.
 - **Ask before implementing** if the request is ambiguous or the impact is non-trivial.
 
@@ -54,23 +54,28 @@ When making code or documentation changes to this plugin:
 
 - **Language**: always English (code, commits, docs).
 - **Git/release flow**: create the tag only on push; bump `manifest.json` + `versions.json`; tag is `X.Y.Z` (no `v`). For PR conflicts, force-push (don't recreate the branch).
-- **Always update on a release-bearing push**: `CHANGELOG.md`, `.claude/docs/features-info.md`, and any relevant PRD/FRD under `.claude/docs/product/`.
+- **Always update on a release-bearing push**: `CHANGELOG.md` and the relevant `README.md` feature section (see note above — `.claude/docs/features-info.md` and `.claude/docs/product/` are referenced by `.claude/rules.md` but don't exist in this repo yet; don't try to open them).
 - **Submission**: follow `.claude/docs/OBSIDIAN_PLUGIN_SUBMISSION_GUIDE.md` end-to-end before opening the `obsidian-releases` PR.
 
 ## Architecture (where things live in `main.js`)
 
-Single class `ConditionalPropertiesPlugin extends Plugin` plus `ConditionalPropertiesSettingTab`. Key methods:
+Single ~2200-line file: class `ConditionalPropertiesPlugin extends Plugin` (rule engine + scan orchestration) plus `ConditionalPropertiesSettingTab extends PluginSettingTab` (all settings UI, including rule/condition/action row builders). No other classes, no imports beyond the `obsidian` package.
 
-- `onload()` — loads settings via `loadData()`, runs `_migrateRules()`, registers scheduler interval, commands, and settings tab.
-- Commands registered:
-  - `conditional-properties-run-now` — "Run conditional rules on vault"
-  - `conditional-properties-run-current-file` — "Run conditional rules on current file"
-- `runScan()` → picks files via `_getFilesToScan()` (respecting `scanScope` + `scanCount`), reads frontmatter from `metadataCache.getFileCache(file).frontmatter`, then calls `applyRulesToFrontmatter()`.
-- `applyRulesToFrontmatter(file, currentFrontmatter, rulesOverride?)` — evaluates each rule:
-  - Source value: `_getNoteTitle(file)` for `FIRST_LEVEL_HEADING`, or `currentFrontmatter[ifProp]` for `PROPERTY`.
-  - Condition check: `_matchesCondition(sourceValue, ifValue, op, ifType)`.
-  - Property actions: `add` | `remove` | `overwrite` | `delete` | `rename`.
-  - Title actions: `prefix` | `suffix` | `overwrite`, with `_formatText()` expanding `{date}`, `{date:FORMAT}`, `{filename}` placeholders.
+- `onload()` — loads settings via `loadData()`, runs `_migrateRules()`, registers the scheduler interval, three commands, and the settings tab.
+- Commands (IDs are bare, no `conditional-properties-` prefix — Obsidian auto-namespaces):
+  - `run-now` — "Run conditional rules on vault" (`checkCallback`: disabled while a scan is running)
+  - `stop-scan` — "Stop running scan" (`checkCallback`: only enabled while a scan is running)
+  - `run-current-file` — "Run conditional rules on current file" (`checkCallback`: only enabled when a file is open)
+- `runScan()` / `runScanForRules(rulesSubset)` → pick files via `_getFilesToScan()` (respecting `scanScope` + `scanCount`), read frontmatter from `metadataCache.getFileCache(file).frontmatter`, then call `applyRulesToFrontmatter()` per file. Both check `this._cancelScan` between files so `requestStopScan()` lets the in-flight file finish and skips the rest.
+- Scan-state pub/sub: `onScanStateChange(callback)` returns an unsubscriber; the settings tab uses it to toggle each rule row's own Run/Stop button and spinner (`_scanStateUnsubscribers`, cleaned up in `hide()`).
+- `applyRulesToFrontmatter(file, currentFrontmatter, rulesOverride?)` — for each rule, evaluates `rule.conditions[]` against `rule.match` (`"any"` = OR, `"all"` = AND):
+  - Per-condition source value: `_getNoteTitle(file)` for `ifType: "FIRST_LEVEL_HEADING"`, the file/folder name for `ifType: "NOTE_FILE"` (ops: `filenameContains` | `filenameNotContains` | `filenameExactly` | `parentFolderIs` | `parentFolderIsNot`), or `currentFrontmatter[ifProp]` for `ifType: "PROPERTY"`.
+  - Condition check: `_matchesCondition(source, expected, op, ifType, propName)` — supports `exactly` | `contains` | `notContains` | `exists` | `notExists` | `isEmpty`, plus regex literals (`/pattern/flags`) for the string ops.
+  - `thenActions` dispatch by `action.type`:
+    - `"property"` — `action.action`: `add` | `remove` | `overwrite` | `delete` | `rename`. Typed-property coercion (checkbox/date/datetime) happens here via `app.metadataTypeManager`.
+    - `"title"` — `action.modificationType`: `prefix` | `suffix` | `overwrite`, text run through `_formatText()`.
+    - `"file"` — dispatched to `_applyFileAction(file, fileActionType, rawText, newFm)`; `fileActionType`: `rename` | `addPrefix` | `addSuffix` | `move` | `delete`. `delete` short-circuits the rest of that file's actions (the file no longer exists) — see `_sanitizeFilenameComponent()`/`_sanitizeVaultFolderPath()` for the path-traversal guards these go through before `fileManager.renameFile`/`trashFile`.
+  - `_formatText(text, file, fm, dateOnly?)` expands placeholders: `{date}` / `{created_date}` (alias), `{date:FORMAT}`, `{updated_date}`, `{today}`, `{filename}`, `{title}`, `{time}`, and `{propertyName}` (reads `fm`, the in-progress frontmatter). Both single-brace `{x}` and double-brace `{{x}}` forms are supported. `dateOnly: true` (used for Note file actions, since filenames can't hold a full timestamp) forces date-only formatting even for `{today}`/`{updated_date}`.
 - Persistence:
   - Title changes via `_updateNoteTitle(file, newTitle)`.
   - Frontmatter via `_writeFrontmatter(file, newFrontmatter)` — uses `fileManager.processFrontMatter` (the official recommended API), creates the YAML block if missing, deletes keys with `null`/`undefined`.
@@ -81,22 +86,28 @@ rules: Rule[]
 scanIntervalMinutes (min 5)
 scanScope: latestCreated | latestModified | entireVault
 scanCount
-operatorMigrationVersion
+operatorMigrationVersion   // current: 3 — see _migrateRules()
 ```
 
-### Rule shape
+### Rule shape (current, post-migration-v3)
 ```
-ifType: "PROPERTY" | "FIRST_LEVEL_HEADING"
-ifProp: string
-ifValue: string
-op: exactly | contains | notContains | exists | notExists | isEmpty
+match: "any" | "all"                    // OR / AND across conditions
+conditions: Array<{
+  ifType: "PROPERTY" | "FIRST_LEVEL_HEADING" | "NOTE_FILE"
+  ifProp: string                        // property name; unused for FIRST_LEVEL_HEADING
+  ifValue: string                       // ignored for exists/notExists/isEmpty
+  op: "exactly" | "contains" | "notContains" | "exists" | "notExists" | "isEmpty"
+      // NOTE_FILE narrows op to: "filenameContains" | "filenameNotContains"
+      //   | "filenameExactly" | "parentFolderIs" | "parentFolderIsNot"
+}>
 thenActions: Array<
   { type: "property", prop, value, action: "add"|"remove"|"overwrite"|"delete"|"rename" }
 | { type: "title", modificationType: "prefix"|"suffix"|"overwrite", text }
+| { type: "file", fileActionType: "rename"|"addPrefix"|"addSuffix"|"move"|"delete", text? }
 >
 ```
 
-`exists`, `notExists`, `isEmpty` ignore `ifValue`.
+`_migrateRules()` upgrades older `data.json` shapes on load (bumping `operatorMigrationVersion` up to 3): pre-v3 rules had a single flat `ifType`/`ifProp`/`ifValue`/`op` instead of `conditions[]` — legacy single-condition rules get wrapped into a one-item `conditions` array with `match: "any"`. When touching migration logic, preserve every prior version's upgrade path; don't just handle the latest shape.
 
 ## Development workflow
 
@@ -160,7 +171,7 @@ Release checklist:
 1. Bump `manifest.json` `version` (X.Y.Z).
 2. Update `versions.json` mapping new version → `minAppVersion`.
 3. Append entry to `CHANGELOG.md` (what + why).
-4. Update `.claude/docs/features-info.md` and relevant PRD/FRD if behavior changed.
+4. Update the relevant `README.md` feature section if user-facing behavior changed.
 5. Tag `X.Y.Z` and push. Publish a GitHub Release with the tag to trigger the workflow.
 
 ## Things to avoid
