@@ -207,6 +207,8 @@ IF First level heading contains: /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]
 ```
 Matches a title like "Nota da reunião 2026-08-22 com John Doe" — the plugin finds the date `2026-08-22` inside the text. Standard JS regex flags are supported as a suffix, e.g. `/report/i` for case-insensitive matching or `/^draft/m` for multiline. If the text you type looks like a regex but is missing its `/slashes/`, the settings UI shows a hint under the field so it's easy to catch. A malformed pattern (or unknown flag) never crashes a scan: it's treated as "does not match" and you'll get a one-time Notice + console error identifying the broken pattern.
 
+**Mobile note:** avoid regex lookbehind (`(?<=...)` / `(?<!...)`) if you sync your vault to iOS — it isn't supported on iOS versions before 16.4. Named capture groups (`(?<name>...)`, used by [`{{match:name}}`](#-beta-using-the-regex-match-in-then) below) are unaffected; only *lookbehind* assertions are the risk.
+
 ### 🧪 Beta: using the regex match in THEN
 
 Reuse whatever your IF regex matched — no need to retype it in the THEN action. Available in **property values**, **title actions**, and **Note file actions** (rename / prefix / suffix / move), via `{{match}}` and friends:
