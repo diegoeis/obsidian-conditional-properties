@@ -1,0 +1,12 @@
+title: Conditional Properties
+description: Automate your Obsidian frontmatter with smart IF/THEN rules.
+theme: jekyll-theme-cayman
+show_downloads: false
+url: "https://diegoeis.github.io"
+baseurl: "/obsidian-conditional-properties"
+
+# Markdown/GFM tables, fenced code blocks, etc.
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge

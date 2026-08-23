@@ -155,6 +155,16 @@ Recent fixes worth remembering when touching title logic:
 - First-level heading detection: detect H1 **only when it appears immediately after YAML frontmatter** (see commit `29ea0bd`). Don't reintroduce broader scanning — it caused false positives.
 - Inline title setting must be ignored when checking for H1 existence (commit `2af8ba5`).
 
+## Documentation site (mirrors `.github/workflows/pages.yml`)
+
+The public docs site (linked from the README) is built from `docs-site/` and published via GitHub Pages, using GitHub's "Actions" deployment source (not a `gh-pages` branch, not a `/docs` folder on `main`).
+
+- **Source**: `docs-site/index.md` (Jekyll front matter + Markdown) and `docs-site/_config.yml`. Edit these directly — no local build needed to preview content structure, just push.
+- **Workflow**: `.github/workflows/pages.yml` — triggers on push to `main` touching `docs-site/**`, or manually via `workflow_dispatch`. It runs `actions/jekyll-build-pages` (Jekyll runs inside the GitHub-hosted runner — nothing to install locally, no new project dependency), then `actions/upload-pages-artifact` + `actions/deploy-pages`.
+- **Published files never live in a branch you can see.** The built site is stored as a Pages deployment artifact, not committed anywhere — `git log` on any branch will never show the rendered HTML.
+- **One-time setup required** (not done by this workflow): repo Settings → Pages → Build and deployment → Source → "GitHub Actions".
+- Keep `docs-site/index.md` and `README.md` in sync manually when a feature changes — they currently share content but are separate files, not generated from one source.
+
 ## Release (mirrors `.github/workflows/release.yml`)
 
 GitHub Actions triggers on published releases and zips `manifest.json`, `main.js`, `styles.css`. To reproduce locally:

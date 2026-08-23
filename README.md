@@ -2,6 +2,8 @@
 
 **Automate your frontmatter with smart IF/THEN rules.** Set properties, modify titles, and keep your vault organized—automatically.
 
+📖 [Full documentation site](https://diegoeis.github.io/obsidian-conditional-properties/)
+
 ![Plugin Interface](https://i.imgur.com/d13fhzH.jpeg)
 
 ## Why Use This Plugin?
