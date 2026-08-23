@@ -20,6 +20,10 @@ class ConditionalPropertiesPlugin extends Plugin {
 			scanCount: 15,
 			operatorMigrationVersion: 0
 		}, loaded);
+		// Dedupes the "invalid regular expression" Notice per raw pattern text
+		// so a broken /pattern/ in a rule doesn't spam one Notice per file
+		// during a full-vault scan — see _compileRegexOrNotify().
+		this._notifiedInvalidRegex = new Set();
 		await this._migrateRules();
 		this.registerInterval(this._setupScheduler());
 		this.addCommand({
@@ -379,12 +383,24 @@ class ConditionalPropertiesPlugin extends Plugin {
 
 			const matchMode = rule.match === "all" ? "all" : "any";
 
+			// Captures the regex groups from the first regex-mode condition (in
+			// declared order) that matched this rule — feeds {{match}} /
+			// {{match:N}} / {{match:name}} in this rule's THEN actions. Stays
+			// null for rules with no regex-mode condition, or when the winning
+			// condition was a plain literal comparison. Beta feature — see
+			// README "Using the regex match in THEN (Beta)".
+			let capturedMatch = null;
+
 			const evaluateCondition = async (cond) => {
 				try {
 					const cType = cond.ifType || "PROPERTY";
 					const cOp = cond.op || "exactly";
 					if (cType === "NOTE_FILE") {
-						return this._matchesNoteFileCondition(file, cond);
+						const isMatch = this._matchesNoteFileCondition(file, cond);
+						if (isMatch && !capturedMatch) {
+							capturedMatch = this._captureRegexGroups(file.basename || "", cond);
+						}
+						return isMatch;
 					}
 					let sourceValue;
 					if (cType === "FIRST_LEVEL_HEADING") {
@@ -402,7 +418,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 						// rules 1..N-1 from this same run, never rules after it.
 						sourceValue = newFm?.[cond.ifProp];
 					}
-					return this._matchesCondition(sourceValue, cond.ifValue, cOp, cType, cond.ifProp);
+					const isMatch = this._matchesCondition(sourceValue, cond.ifValue, cOp, cType, cond.ifProp);
+					if (isMatch && !capturedMatch) {
+						capturedMatch = this._captureRegexGroups(sourceValue, cond);
+					}
+					return isMatch;
 				} catch (e) {
 					console.error(`ConditionalProperties: condition error in rule ${ruleIdx}`, e);
 					return false;
@@ -434,7 +454,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 				// compose in sequence — e.g. "Add name prefix" then "Move file to"
 				// sees the already-prefixed name.
 				if (type === 'file') {
-					const applied = await this._applyFileAction(file, actionType, text, newFm);
+					const applied = await this._applyFileAction(file, actionType, text, newFm, capturedMatch);
 					if (applied === 'deleted') {
 						fileDeleted = true;
 						fileActionApplied = true;
@@ -450,7 +470,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 						const currentTitle = await this._getNoteTitle(file);
 
 						// Format the text with any placeholders
-						const formattedText = this._formatText(text, file, newFm);
+						const formattedText = this._formatText(text, file, newFm, false, capturedMatch);
 
 						if (modificationType === 'overwrite') {
 							if (currentTitle !== null && currentTitle === formattedText) {
@@ -487,7 +507,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 				// Handle property modifications (original functionality)
 				if (!prop) continue;
 				// Process any date placeholders in the value
-				const processedValue = this._formatText(value, file, newFm);
+				const processedValue = this._formatText(value, file, newFm, false, capturedMatch);
 				const propType = this._getPropertyType(prop);
 				const isScalarTyped = propType === "checkbox" || propType === "date" || propType === "datetime";
 
@@ -529,7 +549,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 					changed = true;
 				} else if (actionType === "remove") {
 					// Process any date placeholders in the value before removal
-					const processedValue = this._formatText(value, file, newFm);
+					const processedValue = this._formatText(value, file, newFm, false, capturedMatch);
 
 					// Handle removing from arrays or properties
 					if (Array.isArray(newFm[prop])) {
@@ -537,7 +557,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 						valuesToRemove.forEach(v => {
 							const initialLength = newFm[prop].length;
 							// Process each item in the array to handle date placeholders
-							const processedItem = this._formatText(v, file, newFm);
+							const processedItem = this._formatText(v, file, newFm, false, capturedMatch);
 							newFm[prop] = newFm[prop].filter(item => !this._valueEquals(item, processedItem));
 							if (newFm[prop].length < initialLength) {
 								changed = true;
@@ -623,7 +643,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 * move actually changed something, or `false` when the action was a
 	 * no-op (empty text, or the computed path is unchanged).
 	 */
-	async _applyFileAction(file, fileActionType, rawText, newFm) {
+	async _applyFileAction(file, fileActionType, rawText, newFm, matchGroups) {
 		if (fileActionType === 'delete') {
 			try {
 				await this.app.fileManager.trashFile(file);
@@ -637,7 +657,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 		// dateOnly: file/folder names can never contain a time component, so a
 		// bare {today}/{date}/etc. here always resolves to YYYY-MM-DD, never
 		// whatever date format the vault has configured elsewhere.
-		const rawFormattedText = this._formatText(rawText || '', file, newFm, true);
+		const rawFormattedText = this._formatText(rawText || '', file, newFm, true, matchGroups);
 		const ext = file.extension ? `.${file.extension}` : '';
 		const folder = (file.parent && file.parent.path && file.parent.path !== '/') ? file.parent.path : '';
 
@@ -744,9 +764,13 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 *   elsewhere, even in the unlikely case that format includes time. An
 	 *   explicit `{today:FORMAT}` is still honored as-is — this only changes
 	 *   the no-format default.
+	 * @param {RegExpExecArray|null} [matchGroups] - Capture result from the
+	 *   rule's winning regex-mode IF condition (see `_captureRegexGroups`),
+	 *   or null when there wasn't one. Powers `{{match}}` / `{{match:N}}` /
+	 *   `{{match:name}}` — BETA, double-brace only, no legacy `{match}` form.
 	 * @returns {string} The formatted text with placeholders replaced
 	 */
-	_formatText(text, file, fm, dateOnly) {
+	_formatText(text, file, fm, dateOnly, matchGroups) {
 		// Get file creation date or use current date as fallback
 		const getMomentDate = () => {
 			try {
@@ -890,6 +914,25 @@ class ConditionalPropertiesPlugin extends Plugin {
 		out = out.replace(/\{(date|created_date|updated_date|today|time|title|filename)(?::([^}]+))?\}/g,
 			(match, type, format) => resolveReserved(type, format, false));
 
+		// Pass 2.5 — {{match}} / {{match:N}} / {{match:name}} — BETA. Refers to
+		// the capture from this rule's winning regex-mode IF condition (see
+		// `_captureRegexGroups`); `matchGroups` is that condition's
+		// `RegExp.exec()` result, or null when the rule had no regex-mode
+		// condition (or it wasn't the one that decided the match). No
+		// argument → the full match (`matchGroups[0]`). A number → that
+		// numbered capture group. Anything else → a named group
+		// (`(?<name>...)` in the pattern). Missing group/no match → "".
+		// Double-brace only — added after the {}/{{}} split, so there's no
+		// legacy single-brace form and none is planned. Must run before Pass
+		// 3 below, or {{match}} would be swallowed as a property lookup for
+		// a property literally named "match".
+		out = out.replace(/\{\{match(?::([^}]+))?\}\}/g, (match, ref) => {
+			if (!matchGroups) return "";
+			if (!ref) return matchGroups[0] ?? "";
+			if (/^\d+$/.test(ref)) return matchGroups[Number(ref)] ?? "";
+			return (matchGroups.groups && matchGroups.groups[ref]) ?? "";
+		});
+
 		// Pass 3 — {{propertyName}}: any other double-brace reference is a
 		// frontmatter property lookup, Obsidian Templates-style. Must run
 		// after pass 1 (so a reserved name is never treated as a property)
@@ -932,6 +975,20 @@ class ConditionalPropertiesPlugin extends Plugin {
 			return normalizedSource === "";
 		}
 
+		// Regex mode: a value wrapped in forward slashes (e.g. `/\d{4}-\d{2}-\d{2}/`
+		// — same convention as Obsidian's own Web Clipper URL-trigger patterns)
+		// opts "exactly match" / "contains" / "does not contain" into a regular
+		// expression test instead of a literal string comparison. Typed-property
+		// coercion below only makes sense for literal comparisons, so it's
+		// skipped in regex mode.
+		const rawExpected = typeof expected === "string" ? expected : String(expected ?? "");
+		const isRegex = this._isRegexPattern(rawExpected);
+		let regex = null;
+		if (isRegex) {
+			regex = this._compileRegexOrNotify(rawExpected);
+			if (!regex) return false;
+		}
+
 		// Typed-property awareness in IF: when the property is registered as
 		// checkbox / date / datetime in Obsidian's metadata type manager,
 		// coerce the user-entered `expected` value through the same pipeline
@@ -940,7 +997,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 		// `checkbox` property that stores boolean `true`, and have the
 		// comparison succeed.
 		let comparableExpected = expected;
-		if (ifType === "PROPERTY" && propName) {
+		if (!isRegex && ifType === "PROPERTY" && propName) {
 			const propType = this._getPropertyType(propName);
 			if (propType === "checkbox" || propType === "date" || propType === "datetime") {
 				comparableExpected = this._coerceValueForProperty(propName, expected, propType);
@@ -951,6 +1008,10 @@ class ConditionalPropertiesPlugin extends Plugin {
 		const normalizedExpected = this._normalizeValue(comparableExpected);
 		const evaluate = (value) => {
 			const normalizedSource = this._normalizeValue(value);
+			if (isRegex) {
+				const matches = regex.test(normalizedSource);
+				return op === "notContains" ? !matches : matches;
+			}
 			switch (op) {
 				case "exactly":
 					return normalizedSource === normalizedExpected;
@@ -974,6 +1035,97 @@ class ConditionalPropertiesPlugin extends Plugin {
 	}
 
 	/**
+	 * True when `value` looks like a regex-mode IF value: `/pattern/`
+	 * optionally followed by standard JS regex flags (e.g. `/report/i`,
+	 * `/\d{4}-\d{2}-\d{2}/`). Requires at least one character inside the
+	 * slashes. Flag validity isn't checked here — an unknown flag (e.g.
+	 * `/x/z`) still counts as "regex mode" so it fails at RegExp
+	 * construction (`_compileRegexOrNotify`) with a clear error, instead of
+	 * silently being treated as a literal string.
+	 */
+	_isRegexPattern(value) {
+		return typeof value === "string" && /^\/(.+)\/([a-z]*)$/.test(value);
+	}
+
+	/**
+	 * Heuristic-only, UI-hint check for "this value probably meant to be a
+	 * regex but forgot the /slashes/" — never used for matching logic, only
+	 * to power the inline hint under a condition's value field. Flags
+	 * regex-specific escapes/constructs that are very unlikely to appear in
+	 * plain frontmatter/title/filename text: `\d`/`\w`/`\s`/`\b` (and their
+	 * uppercase negations), non-capturing/lookaround groups, `{n}`/`{n,m}`
+	 * quantifiers, and `[a-z]`-style character-class ranges.
+	 */
+	_looksLikeUnwrappedRegex(value) {
+		if (typeof value !== "string" || value === "") return false;
+		if (this._isRegexPattern(value)) return false; // already correctly wrapped
+		return /\\[dDwWsSbB]|\(\?[:=!<]|\{\d+(,\d*)?\}|\[[^\]]*[-^][^\]]*\]/.test(value);
+	}
+
+	/**
+	 * Appends a warning div under a condition row's value field, shown only
+	 * when `_looksLikeUnwrappedRegex` matches the current text. Lives as a
+	 * child of `line.settingEl` (a Setting row rendered `display: block` by
+	 * styles.css), so it naturally flows below the field with no extra
+	 * layout work — and is torn down along with the rest of the row by
+	 * `_rebuildCondition`, since that replaces `settingEl` wholesale.
+	 * Returns an `update(value)` function to call from the field's onChange.
+	 */
+	_addRegexHint(line, initialValue) {
+		const hintEl = line.settingEl.createDiv({ cls: "conditional-regex-hint is-hidden" });
+		hintEl.setText("This looks like a regular expression — wrap it in /slashes/ to use it as one.");
+		const update = (value) => hintEl.toggleClass("is-hidden", !this._looksLikeUnwrappedRegex(value));
+		update(initialValue);
+		return update;
+	}
+
+	/**
+	 * Compiles a regex-mode IF value (already confirmed via _isRegexPattern)
+	 * into a RegExp. A malformed pattern never throws past this point — it's
+	 * logged, surfaced once per unique pattern via Notice (deduped so a full
+	 * vault scan doesn't spam one Notice per file), and treated as "does not
+	 * match" by the caller.
+	 */
+	_compileRegexOrNotify(rawPattern) {
+		const match = /^\/(.+)\/([a-z]*)$/.exec(rawPattern);
+		const pattern = match ? match[1] : rawPattern.slice(1, -1);
+		const flags = match ? match[2] : "";
+		try {
+			return new RegExp(pattern, flags);
+		} catch (e) {
+			console.error(`Conditional properties: invalid regular expression "${rawPattern}"`, e);
+			if (!this._notifiedInvalidRegex.has(rawPattern)) {
+				this._notifiedInvalidRegex.add(rawPattern);
+				new Notice(`Conditional properties: invalid regular expression ${rawPattern} — ${e.message}`, 8000);
+			}
+			return null;
+		}
+	}
+
+	/**
+	 * BETA — powers {{match}} / {{match:N}} / {{match:name}} in THEN actions
+	 * (see `_formatText`). Called only after `cond` is already confirmed to
+	 * have matched (by `_matchesCondition` / `_matchesNoteFileCondition`) —
+	 * this never decides match/no-match itself, it just recovers the
+	 * `RegExp.exec()` result for a condition that was already a winner.
+	 * Returns null for a non-regex condition, an array-valued source (not
+	 * supported yet — a condition on a list property like `tags` can match
+	 * via regex, but there's no single scalar to expose group captures
+	 * from), or an already-reported invalid pattern. A fresh RegExp is
+	 * compiled per call, so a `g`-flagged pattern's `lastIndex` state never
+	 * leaks between files.
+	 */
+	_captureRegexGroups(sourceValue, cond) {
+		if (Array.isArray(sourceValue)) return null;
+		const rawExpected = typeof cond?.ifValue === "string" ? cond.ifValue : "";
+		if (!this._isRegexPattern(rawExpected)) return null;
+		const regex = this._compileRegexOrNotify(rawExpected);
+		if (!regex) return null;
+		const normalizedSource = this._normalizeValue(sourceValue == null ? "" : sourceValue);
+		return regex.exec(normalizedSource);
+	}
+
+	/**
 	 * Evaluates a "Note file" condition — the file's name or the folders it
 	 * lives in, as opposed to a frontmatter property or the H1 title.
 	 *   filenameContains / filenameNotContains / filenameExactly — compare
@@ -990,13 +1142,27 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 */
 	_matchesNoteFileCondition(file, cond) {
 		const op = cond.op || "filenameContains";
-		const normalizedExpected = this._normalizeValue(cond.ifValue).toLowerCase();
 
 		if (op === "parentFolderIs" || op === "parentFolderIsNot") {
+			const normalizedExpected = this._normalizeValue(cond.ifValue).toLowerCase();
 			const isInFolder = this._fileIsInFolderPath(file, normalizedExpected);
 			return op === "parentFolderIs" ? isInFolder : !isInFolder;
 		}
 
+		// Regex mode (filename ops only — not parentFolderIs/IsNot above): same
+		// `/pattern/` convention as _matchesCondition. Tested against the raw
+		// (not lowercased) filename since regex case-sensitivity is the user's
+		// own call to make via the pattern.
+		const rawExpected = typeof cond.ifValue === "string" ? cond.ifValue : String(cond.ifValue ?? "");
+		if (this._isRegexPattern(rawExpected)) {
+			const regex = this._compileRegexOrNotify(rawExpected);
+			if (!regex) return false;
+			const rawFilename = this._normalizeValue(file.basename || "");
+			const matches = regex.test(rawFilename);
+			return op === "filenameNotContains" ? !matches : matches;
+		}
+
+		const normalizedExpected = this._normalizeValue(cond.ifValue).toLowerCase();
 		const filename = this._normalizeValue(file.basename || "").toLowerCase();
 		switch (op) {
 			case "filenameExactly":
@@ -1774,13 +1940,18 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				});
 			});
 
+			let updateNoteFileRegexHint = null;
 			line.addText(t => t
-				.setPlaceholder(isFolderOp ? "folder name or path, e.g. meetings/transcripts/company" : "text")
+				.setPlaceholder(isFolderOp ? "folder name or path, e.g. meetings/transcripts/company" : "text, or /regex/")
 				.setValue(cond.ifValue || "")
 				.onChange(async (v) => {
 					cond.ifValue = v;
+					if (updateNoteFileRegexHint) updateNoteFileRegexHint(v);
 					await this.plugin.saveData(this.plugin.settings);
 				}));
+			if (!isFolderOp) {
+				updateNoteFileRegexHint = this.plugin._addRegexHint(line, cond.ifValue || "");
+			}
 		} else if (cond.ifType === "FIRST_LEVEL_HEADING") {
 			line.addDropdown(d => {
 				this._configureOperatorDropdown(d, cond.op, async (value) => {
@@ -1793,13 +1964,16 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			if (cond.op !== 'exists' && cond.op !== 'notExists' && cond.op !== 'isEmpty') {
+				let updateHeadingRegexHint;
 				line.addText(t => t
-					.setPlaceholder("Heading text")
+					.setPlaceholder("Heading text, or /regex/")
 					.setValue(cond.ifValue || "")
 					.onChange(async (v) => {
 						cond.ifValue = v;
+						updateHeadingRegexHint(v);
 						await this.plugin.saveData(this.plugin.settings);
 					}));
+				updateHeadingRegexHint = this.plugin._addRegexHint(line, cond.ifValue || "");
 			}
 		} else {
 			line.addText(t => t
@@ -1821,13 +1995,16 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			if (cond.op !== 'exists' && cond.op !== 'notExists' && cond.op !== 'isEmpty') {
+				let updateValueRegexHint;
 				line.addText(t => t
-					.setPlaceholder("Value")
+					.setPlaceholder("Value, or /regex/")
 					.setValue(cond.ifValue || "")
 					.onChange(async (v) => {
 						cond.ifValue = v;
+						updateValueRegexHint(v);
 						await this.plugin.saveData(this.plugin.settings);
 					}));
+				updateValueRegexHint = this.plugin._addRegexHint(line, cond.ifValue || "");
 			}
 		}
 

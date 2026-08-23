@@ -127,3 +127,11 @@
 #eis-cp-plugin .is-hidden {
   display: none !important;
 }
+
+/* Inline hint shown under a condition's value field when the typed text
+   looks like a regular expression that's missing its /slashes/. */
+#eis-cp-plugin .conditional-regex-hint {
+  font-size: 0.75rem;
+  color: var(--text-warning);
+  margin-top: 4px;
+}

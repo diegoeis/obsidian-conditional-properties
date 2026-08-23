@@ -198,6 +198,43 @@ Perfect for running rules only on active notes instead of your entire vault.
 | `notExists` | Property absent | `reviewed notExists` |
 | `isEmpty` | Empty value | `tags isEmpty` |
 
+### Regular expression matching (new in v0.24.0)
+
+Wrap the value of `exactly`, `contains`, or `notContains` in forward slashes to match with a regular expression instead of a literal string — same convention as [Obsidian's Web Clipper URL-trigger patterns](https://help.obsidian.md/web-clipper/triggers#Regular+expression+matching). Works on **Property**, **First level heading**, and **Note file** (filename) conditions.
+
+```yaml
+IF First level heading contains: /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
+```
+Matches a title like "Nota da reunião 2026-08-22 com John Doe" — the plugin finds the date `2026-08-22` inside the text. Standard JS regex flags are supported as a suffix, e.g. `/report/i` for case-insensitive matching or `/^draft/m` for multiline. If the text you type looks like a regex but is missing its `/slashes/`, the settings UI shows a hint under the field so it's easy to catch. A malformed pattern (or unknown flag) never crashes a scan: it's treated as "does not match" and you'll get a one-time Notice + console error identifying the broken pattern.
+
+### 🧪 Beta: using the regex match in THEN
+
+Reuse whatever your IF regex matched — no need to retype it in the THEN action. Available in **property values**, **title actions**, and **Note file actions** (rename / prefix / suffix / move), via `{{match}}` and friends:
+
+| Placeholder | Resolves to |
+|---|---|
+| `{{match}}` | The full text matched by the pattern |
+| `{{match:1}}`, `{{match:2}}`, … | Numbered capture group `(...)` — non-capturing groups `(?:...)` don't count |
+| `{{match:name}}` | Named capture group, from a pattern written as `(?<name>...)` |
+
+```yaml
+IF Note file: Filename contains → /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
+THEN Note file: Move file to → transcripts/{{match}}
+```
+Moves any file whose name contains a date like `2026-08-22` into `transcripts/2026-08-22/`, auto-creating the folder — no need to duplicate the date pattern on the THEN side.
+
+Named groups work the same way:
+```yaml
+IF Note file: Filename contains → /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/
+THEN Note file: Move file to → transcripts/{{match:year}}/{{match:month}}
+```
+
+**Current limitations (beta):**
+- `{{match}}` reads from the **first** regex-mode condition (in the order you listed them) that was the reason the rule matched. A rule with multiple conditions doesn't expose more than one condition's captures.
+- Not supported yet for a `Property` condition whose value is a **list** (e.g. `tags`) — regex still matches against list items, but there's no single scalar to pull a capture from. `Property` (single value), `First level heading`, and `Note file` (filename) conditions are supported.
+- Double-brace only (`{{match}}`), matching the rule that all placeholders introduced from now on ship `{{}}`-only, with no legacy `{}` form — see the placeholder syntax note below.
+- If the rule had no matching regex condition, or you reference a group/name that doesn't exist in the pattern, `{{match...}}` resolves to an empty string rather than erroring.
+
 ## Note File Conditions (new in v0.22.0)
 
 Select **Note file** as the condition type to check the file itself, instead of a frontmatter property or the H1 title. All comparisons are case-insensitive.
@@ -209,6 +246,8 @@ Select **Note file** as the condition type to check the file itself, instead of 
 | `Filename exactly match` | `file.basename` | filename exactly "index" |
 | `Parent folder is` | the folder path the file lives in | see below |
 | `Parent folder is not` | the folder path the file lives in (inverted) | see below |
+
+The three filename operators above also accept a `/regex/`-wrapped value (see [Regular expression matching](#regular-expression-matching-new-in-v0240)); `Parent folder is` / `Parent folder is not` always stay literal path matching.
 
 **Parent folder is** accepts either a single folder name or a partial path — enter the folder name(s) only, never a path starting with `/` from the vault root:
 
@@ -301,6 +340,9 @@ This is not a bug — `{date}` shipped before double-brace support existed and a
 | `{title}` / `{{title}}` | Same as `{filename}` — matches Obsidian's Templates `{{title}}` (new in v0.24.0). |
 | `{propertyName}` / `{{propertyName}}` | Live value of that frontmatter property on the current note (v0.20.0). |
 | `:FORMAT` suffix | Any of the above with a custom [moment.js](https://momentjs.com/docs/#/displaying/format/) format — works with either brace style: `{date:DD-MM-YYYY}` → `08-01-2026`, `{{date:MM}}` → just today's month, `{{time:HH:mm:ss}}`, `{updated_date:YYYY}`. |
+| `{{match}}` / `{{match:N}}` / `{{match:name}}` | 🧪 Beta, **double-brace only** — see [Using the regex match in THEN](#-beta-using-the-regex-match-in-then) above. |
+
+**Going forward, new placeholders ship double-brace only.** The single/double-brace pair above is frozen as-is for backward compatibility — no new placeholder gets a single-brace form, `{{match}}` being the first one.
 
 ### Property placeholders (v0.20.0)
 
@@ -375,7 +417,8 @@ Settings → Backup and restore.
 - [x] Multiple conditions per rule (`match any` / `match all`)
 - [x] Frontmatter property placeholders (`{propertyName}`) in action values
 - [ ] Modify note content (beyond frontmatter)
-- [ ] Advanced operators (regex, comparison)
+- [x] Regex matching (`/pattern/`) on `exactly` / `contains` / `notContains`
+- [ ] Comparison operators (greater than / less than)
 - [ ] Nested condition groups (e.g. `(A AND B) OR C`)
 - [ ] Folder/tag-based scoping
 
