@@ -1,6 +1,6 @@
 ---
 title: Typed Properties
-nav_order: 6
+nav_order: 7
 ---
 
 # Typed properties (checkbox / date / datetime)

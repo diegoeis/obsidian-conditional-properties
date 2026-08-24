@@ -52,6 +52,7 @@ THEN First level title: Add suffix " - {{date:DD/MM/YYYY}}"
 | Section | What's there |
 |---|---|
 | [Getting Started](/getting-started) | Install the plugin and build your first rule |
+| [Examples](/examples) | A cookbook of rules, from simple to complex |
 | [Conditions (IF)](/conditions/) | Property, First level title, Note file, regex matching, multiple conditions |
 | [Actions (THEN)](/actions/) | Property, First level title, Note file actions, multiple actions per rule |
 | [Placeholders](/placeholders) | `{{date}}`, `{{time}}`, `{{title}}`, `{{propertyName}}`, `{{match}}` |

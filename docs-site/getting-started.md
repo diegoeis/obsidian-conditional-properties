@@ -44,6 +44,7 @@ See [Execution & Scheduling](/execution-scheduling) for scan scopes and the Stop
 
 ## Where to go from here
 
+- [Examples](/examples) — a cookbook of rules, from simple to complex
 - [Conditions (IF)](/conditions/) — everything a rule can check
 - [Actions (THEN)](/actions/) — everything a rule can do
 - [Placeholders](/placeholders) — dynamic values like `{{date}}` and `{{propertyName}}`

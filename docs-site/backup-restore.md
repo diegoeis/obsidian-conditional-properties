@@ -1,6 +1,6 @@
 ---
 title: Backup & Restore
-nav_order: 8
+nav_order: 9
 ---
 
 # Backup & restore settings
