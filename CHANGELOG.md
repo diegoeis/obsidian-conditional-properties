@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.24.2 - 2026-08-24
+### Changed
+- **Settings tab UI rebuilt on native Obsidian patterns.** The DOM is now batched off-document and attached once instead of inserting each row live (fixes lag when opening the tab with many rules), wrapped in Obsidian's own setting-group/setting-items shell, and every `conditional-*` CSS class renamed to `cp-*` under one shared row shape. No behavior change — same rules, same fields, same commands.
+- **Documentation rewritten to mirror the settings screen exactly.** Every condition/action example across `README.md` and the docs site now uses the literal dropdown labels in the literal field order shown on screen (e.g. `Property: status → exactly match → "done"` instead of the previous shorthand `property: status exactly "done"`), instead of an invented pseudo-syntax. Also fixed: the manual-install path (`.obsidian/plugins/conditional-properties`, not `.../obsidian-conditional-properties`), a missing note that Note file conditions don't have `exists`/`does not exist`/`is empty`, and the claim that `{{date}}`/`{{time}}` always default to `YYYY-MM-DD`/`HH:mm` (they follow the vault's configured Date/Time format when one is set).
+- **Placeholder documentation and settings-field hints now double-brace only** (`{{date}}`, `{{propertyName}}`, …). The single-brace form (`{date}`, etc.) still works in existing rules for backward compatibility, but is no longer shown or described anywhere — new and existing users only see one syntax.
+
 ## 0.24.1 - 2026-08-23
 ### Changed
 - **Renamed "First level heading" (IF) and "First heading" (THEN) to "First level title"**, on both sides, for a consistent name. This is a UI label change only — the underlying `ifType: "FIRST_LEVEL_HEADING"` and `action.type: "title"` values stored in existing rules are unchanged, so no migration is needed and existing rules keep working exactly as before.
