@@ -1543,7 +1543,18 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			this._teardownScanSubscriptions();
 			const { containerEl } = this;
 			containerEl.empty();
-			const rootEl = containerEl.createEl("div", { attr: { id: "eis-cp-plugin" } });
+			// Build the whole tab off-DOM (detached) and attach it once at the
+			// end. With dozens of rules — each rendering several Setting/
+			// Dropdown/ExtraButton rows for its conditions and actions — every
+			// createEl() call used to insert straight into `containerEl`, which
+			// is already live in the document. That forces the browser to
+			// recompute layout incrementally on every single insertion instead
+			// of once. `createEl`/`createDiv` work identically on a detached
+			// element (they're prototype methods, not tied to attachment), so
+			// this only changes *when* the tree joins the document, not how
+			// it's built.
+			const rootEl = document.createElement("div");
+			rootEl.id = "eis-cp-plugin";
 
 			// Scan Interval Setting
 			new Setting(rootEl)
@@ -1721,6 +1732,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				const originalIndex = this.plugin.settings.rules.length - 1 - idxReversed;
 				this._renderRule(rootEl, rule, originalIndex);
 			});
+
+			// Attach the fully-built tree in one shot — see the comment above
+			// `rootEl`'s creation for why this is deferred to here.
+			containerEl.appendChild(rootEl);
 
 		} catch (error) {
 			console.error("Error in display():", error);
@@ -1913,7 +1928,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		line.addDropdown(d => {
 			d.addOption("PROPERTY", "Property");
-			d.addOption("FIRST_LEVEL_HEADING", "First level heading");
+			d.addOption("FIRST_LEVEL_HEADING", "First level title");
 			d.addOption("NOTE_FILE", "Note file");
 			d.setValue(cond.ifType);
 			d.onChange(async (v) => {
@@ -1966,7 +1981,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			if (cond.op !== 'exists' && cond.op !== 'notExists' && cond.op !== 'isEmpty') {
 				let updateHeadingRegexHint;
 				line.addText(t => t
-					.setPlaceholder("Heading text, or /regex/")
+					.setPlaceholder("First level title text, or /regex/")
 					.setValue(cond.ifValue || "")
 					.onChange(async (v) => {
 						cond.ifValue = v;
@@ -2150,7 +2165,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		actionSetting.addDropdown(d => {
 			d.addOption("property", "Property");
-			d.addOption("title", "First heading");
+			d.addOption("title", "First level title");
 			d.addOption("file", "Note file");
 			d.setValue(action.type || "property");
 			d.onChange(async (v) => {

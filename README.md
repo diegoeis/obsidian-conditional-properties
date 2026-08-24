@@ -26,9 +26,9 @@ Every feature below has a short description and a working example. Deeper refere
 IF property: status exactly "done"
 ```
 
-**First level heading condition** — check the note's title (the H1 immediately after frontmatter, or the inline title).
+**First level title condition** — check the note's title (the H1 immediately after frontmatter, or the inline title).
 ```yaml
-IF First level heading contains "Meeting"
+IF First level title contains "Meeting"
 ```
 
 **Note file condition** — check the file itself: its name or the folder(s) it lives in, instead of a property or title.
@@ -48,7 +48,7 @@ IF property: tags notContains "draft"
 
 **Regex matching** — wrap a value in `/pattern/flags` to match with a regular expression instead of a literal string, on `exactly`/`contains`/`notContains`. See [Regular expression matching](#regular-expression-matching).
 ```yaml
-IF First level heading contains /\d{4}-\d{2}-\d{2}/
+IF First level title contains /\d{4}-\d{2}-\d{2}/
 ```
 
 **Multiple conditions per rule** — combine conditions with `Match any` (OR) or `Match all` (AND).
@@ -105,9 +105,9 @@ THEN OVERWRITE property: completed = "true"
 ```
 Result on disk: `completed: true` (boolean) — renders as a checked checkbox, not text.
 
-**Title actions** — prefix, suffix, or overwrite the note's title.
+**First level title actions** — prefix, suffix, or overwrite the note's title.
 ```yaml
-THEN Change Title: Overwrite to "{date:YYYY-MM-DD} - {filename}"
+THEN First level title: Overwrite to "{date:YYYY-MM-DD} - {filename}"
 ```
 Result: `2026-01-08 - team-sync`.
 
@@ -170,10 +170,10 @@ Scope: Latest modified, count: 15
 
 ### Regular expression matching
 
-Wrap the value of `exactly`, `contains`, or `notContains` in forward slashes to match with a regular expression instead of a literal string — same convention as [Obsidian's Web Clipper URL-trigger patterns](https://help.obsidian.md/web-clipper/triggers#Regular+expression+matching). Works on **Property**, **First level heading**, and **Note file** (filename) conditions.
+Wrap the value of `exactly`, `contains`, or `notContains` in forward slashes to match with a regular expression instead of a literal string — same convention as [Obsidian's Web Clipper URL-trigger patterns](https://help.obsidian.md/web-clipper/triggers#Regular+expression+matching). Works on **Property**, **First level title**, and **Note file** (filename) conditions.
 
 ```yaml
-IF First level heading contains: /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
+IF First level title contains: /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
 ```
 Matches a title like "Nota da reunião 2026-08-22 com John Doe" — the plugin finds the date `2026-08-22` inside the text. Standard JS regex flags are supported as a suffix, e.g. `/report/i` for case-insensitive matching or `/^draft/m` for multiline. If the text you type looks like a regex but is missing its `/slashes/`, the settings UI shows a hint under the field so it's easy to catch. A malformed pattern (or unknown flag) never crashes a scan: it's treated as "does not match" and you'll get a one-time Notice + console error identifying the broken pattern.
 
@@ -203,7 +203,7 @@ THEN Note file: Move file to → transcripts/{{match:year}}/{{match:month}}
 
 **Current limitations (beta):**
 - `{{match}}` reads from the **first** regex-mode condition (in the order you listed them) that was the reason the rule matched. A rule with multiple conditions doesn't expose more than one condition's captures.
-- Not supported yet for a `Property` condition whose value is a **list** (e.g. `tags`) — regex still matches against list items, but there's no single scalar to pull a capture from. `Property` (single value), `First level heading`, and `Note file` (filename) conditions are supported.
+- Not supported yet for a `Property` condition whose value is a **list** (e.g. `tags`) — regex still matches against list items, but there's no single scalar to pull a capture from. `Property` (single value), `First level title`, and `Note file` (filename) conditions are supported.
 - Double-brace only (`{{match}}`) — see [Two syntaxes, same placeholders](#two-syntaxes-same-placeholders).
 - If the rule had no matching regex condition, or you reference a group/name that doesn't exist in the pattern, `{{match...}}` resolves to an empty string rather than erroring.
 

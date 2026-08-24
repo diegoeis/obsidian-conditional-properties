@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.1 - 2026-08-23
+### Changed
+- **Renamed "First level heading" (IF) and "First heading" (THEN) to "First level title"**, on both sides, for a consistent name. This is a UI label change only — the underlying `ifType: "FIRST_LEVEL_HEADING"` and `action.type: "title"` values stored in existing rules are unchanged, so no migration is needed and existing rules keep working exactly as before.
+
 ## 0.24.0 - 2026-08-22
 ### Added
 - **Regular expression matching in IF conditions**, using the same `/pattern/` convention as [Obsidian's Web Clipper URL-trigger patterns](https://help.obsidian.md/web-clipper/triggers#Regular+expression+matching): wrap a value in forward slashes to opt "exactly match", "contains", and "does not contain" into a regex test instead of a literal string comparison. Works on **Property**, **First level heading**, and **Note file** (filename) conditions — not on `Parent folder is` / `Parent folder is not`, which stay literal path matching. Example: a "First level heading" condition with `contains` and value `/\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/` matches a title like "Nota da reunião 2026-08-22 com John Doe". Standard JS regex flags are supported as a suffix, e.g. `/report/i`.
