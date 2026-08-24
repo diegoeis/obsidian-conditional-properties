@@ -16,7 +16,7 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PLUGIN_ID="conditional-properties"
-DEFAULT_TARGET="/Users/diegoeis/obs-notes/.obsidian/plugins/${PLUGIN_ID}"
+DEFAULT_TARGET="/Users/diegoeis/Documents/obs-notes/.obsidian/plugins/${PLUGIN_ID}"
 TARGET_DIR="${OBSIDIAN_PLUGIN_DIR:-$DEFAULT_TARGET}"
 
 FILES=(main.js styles.css manifest.json)
