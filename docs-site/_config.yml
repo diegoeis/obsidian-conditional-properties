@@ -1,7 +1,7 @@
 title: Conditional Properties
 description: Automate your Obsidian frontmatter with smart IF/THEN rules.
-theme: jekyll-theme-cayman
-show_downloads: false
+remote_theme: just-the-docs/just-the-docs
+
 url: "https://diegoeis.github.io"
 baseurl: "/obsidian-conditional-properties"
 
@@ -10,3 +10,26 @@ markdown: kramdown
 kramdown:
   input: GFM
   syntax_highlighter: rouge
+
+# just-the-docs settings
+search_enabled: true
+heading_anchors: true
+back_to_top: true
+back_to_top_text: "Back to top"
+
+aux_links:
+  "View on GitHub":
+    - "https://github.com/diegoeis/obsidian-conditional-properties"
+
+footer_content: 'Copyright &copy; 2026 Diego Eis. Distributed under an <a href="https://github.com/diegoeis/obsidian-conditional-properties/blob/main/LICENSE">MIT license</a>.'
+
+callouts:
+  note:
+    title: Note
+    color: blue
+  warning:
+    title: Warning
+    color: yellow
+  important:
+    title: Important
+    color: red
