@@ -30,6 +30,6 @@ The rule fires when **at least one** condition matches.
 
 ## Using it in the settings UI
 
-Click **+ Add condition** below the IF block to add more conditions, and use the dropdown to switch between `any` and `all`. Existing rules from previous plugin versions are auto-migrated and keep their original behavior unchanged.
+Click **+ add condition** below the IF block to add more conditions, and use the dropdown to switch between `any` and `all`. Existing rules from previous plugin versions are auto-migrated and keep their original behavior unchanged.
 
 You can mix condition types freely — a `Match all` rule can combine a Property condition with a Note file condition, for example.

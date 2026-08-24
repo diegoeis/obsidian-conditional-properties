@@ -14,7 +14,7 @@ A rule's **IF** block decides which notes it applies to. Every condition has thr
 | Type | Checks | Page |
 |---|---|---|
 | **Property** | Any frontmatter property's value | [Property](/conditions/property) |
-| **First level title** | The note's title — the H1 immediately after frontmatter, or the inline title | [First level title](/conditions/first-level-title) |
+| **First level title** | The note's title — the H1 immediately after frontmatter (not Obsidian's separate "inline title" feature) | [First level title](/conditions/first-level-title) |
 | **Note file** | The file's own name, or the folder(s) it lives in | [Note file](/conditions/note-file) |
 
 ## Six comparison operators

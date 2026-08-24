@@ -30,6 +30,9 @@ Replaces the entire value.
 THEN OVERWRITE property: status = "archived"
 ```
 
+{: .important }
+**Unlike Add/Remove, Overwrite does not split on commas.** `THEN OVERWRITE property: tags = "a, b, c"` writes the literal string `"a, b, c"` as a single value, not the array `[a, b, c]`. The settings UI's "(use commas; …)" hint on the value field applies to Add and Remove, not to Overwrite — if you need a multi-value array, use **Add** (on an empty or non-existent property, it creates the array for you) instead of Overwrite.
+
 ## Delete property
 
 Removes the property from the note entirely.
@@ -45,6 +48,9 @@ Copies a property's value to a new name and removes the old one.
 ```yaml
 THEN RENAME property: old_name -> new_name
 ```
+
+{: .note }
+If a property already exists under the target name, the rename is silently skipped — it never overwrites an existing property. The **new name field does not support placeholders** (unlike every other property action's value field) — it's used exactly as typed.
 
 ## Typed property awareness
 

@@ -22,6 +22,12 @@ IF property: excerpt isEmpty
 
 If the property holds a **list** (e.g. `tags: [a, b, c]`), `exactly` / `contains` / `notContains` test each item in the list — a match on any one item counts as a match for `exactly`/`contains`, and `notContains` requires none of the items to match.
 
+{: .important }
+**`exactly` / `contains` / `notContains` are case-sensitive.** `status exactly "Done"` will not match a stored `status: done`. This is different from [Note file](/conditions/note-file) filename matching, which is case-insensitive by default.
+
+{: .note }
+**`isEmpty` on a missing property returns `false`, not `true`.** A property that doesn't exist at all is neither "empty" nor "not empty" as far as `isEmpty` is concerned — use `notExists` to catch a missing property. `isEmpty` only returns `true` for a property that's present but holds an empty string or empty array.
+
 ## Regex matching
 
 `exactly`, `contains`, and `notContains` accept a `/pattern/flags` value instead of a literal string. See [Regex Matching](/conditions/regex-matching) for the full syntax and flags.

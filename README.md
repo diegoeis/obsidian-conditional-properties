@@ -26,7 +26,7 @@ Every feature below has a short description and a working example. Deeper refere
 IF property: status exactly "done"
 ```
 
-**First level title condition** — check the note's title (the H1 immediately after frontmatter, or the inline title).
+**First level title condition** — check the note's title: the H1 heading immediately after frontmatter (or at the very top of the note if there's no frontmatter). Obsidian's separate "inline title" feature is never read — only an actual `#` H1 line counts, and only when nothing but whitespace precedes it.
 ```yaml
 IF First level title contains "Meeting"
 ```
@@ -84,7 +84,7 @@ THEN ADD tags: important
 THEN REMOVE tags: active, wip
 ```
 
-**Overwrite property** — replace the entire value.
+**Overwrite property** — replace the entire value. Unlike Add/Remove, this does **not** split on commas — `status = "a, b, c"` writes the literal string `"a, b, c"`, not an array. Use Add for a multi-value array.
 ```yaml
 THEN OVERWRITE property: status = "archived"
 ```
@@ -94,7 +94,7 @@ THEN OVERWRITE property: status = "archived"
 THEN DELETE PROPERTY: legacy_data
 ```
 
-**Rename property** — copy a property's value to a new name and remove the old one.
+**Rename property** — copy a property's value to a new name and remove the old one. Skipped silently if the target name already exists. The new-name field does not accept placeholders.
 ```yaml
 THEN RENAME property: old_name -> new_name
 ```
@@ -168,6 +168,8 @@ Scope: Latest modified, count: 15
 | `notExists` | Property absent | `reviewed notExists` |
 | `isEmpty` | Empty value | `tags isEmpty` |
 
+`exactly` / `contains` / `notContains` are **case-sensitive** on Property and First level title conditions (Note file filename matching is the one exception — that's case-insensitive, see below). On a **Property** condition, `isEmpty` on a property that doesn't exist at all returns `false`, not `true` — use `notExists` to catch a missing property. `isEmpty` on a missing **First level title** does return `true`, since a note with no H1 reads as "empty" there.
+
 ### Regular expression matching
 
 Wrap the value of `exactly`, `contains`, or `notContains` in forward slashes to match with a regular expression instead of a literal string — same convention as [Obsidian's Web Clipper URL-trigger patterns](https://help.obsidian.md/web-clipper/triggers#Regular+expression+matching). Works on **Property**, **First level title**, and **Note file** (filename) conditions.
@@ -176,6 +178,8 @@ Wrap the value of `exactly`, `contains`, or `notContains` in forward slashes to 
 IF First level title contains: /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
 ```
 Matches a title like "Nota da reunião 2026-08-22 com John Doe" — the plugin finds the date `2026-08-22` inside the text. Standard JS regex flags are supported as a suffix, e.g. `/report/i` for case-insensitive matching or `/^draft/m` for multiline. If the text you type looks like a regex but is missing its `/slashes/`, the settings UI shows a hint under the field so it's easy to catch. A malformed pattern (or unknown flag) never crashes a scan: it's treated as "does not match" and you'll get a one-time Notice + console error identifying the broken pattern.
+
+**Regex mode is case-sensitive by default** (add the `i` flag yourself for case-insensitive matching) — the opposite of literal Note file filename matching, which is case-insensitive by default. Property and First level title literal matching is case-sensitive either way. **`exactly` and `contains` behave identically in regex mode** — both just test whether the pattern matches anywhere in the value (`RegExp.test()`); `exactly` does not implicitly anchor to the whole string. Anchor it yourself with `^...$` for a true full-string match. Typed-property coercion (checkbox/date/datetime normalization) is skipped entirely in regex mode — the property's raw stored value is tested directly.
 
 **Mobile note:** avoid regex lookbehind (`(?<=...)` / `(?<!...)`) if you sync your vault to iOS — it isn't supported on iOS versions before 16.4. Named capture groups (`(?<name>...)`, used by [`{{match:name}}`](#match-in-then-beta) below) are unaffected; only *lookbehind* assertions are the risk.
 
@@ -227,11 +231,11 @@ Match any of the following:
 THEN REMOVE tags: active
 ```
 
-Click **+ Add condition** below the IF block to add more conditions, and the dropdown to switch between `any` and `all`. Existing rules from previous plugin versions are auto-migrated and keep their behavior unchanged.
+Click **+ add condition** below the IF block to add more conditions, and the dropdown to switch between `any` and `all`. Existing rules from previous plugin versions are auto-migrated and keep their behavior unchanged.
 
 ## Note file conditions
 
-Select **Note file** as the condition type to check the file itself, instead of a frontmatter property or the H1 title. All comparisons are case-insensitive.
+Select **Note file** as the condition type to check the file itself, instead of a frontmatter property or the H1 title. Literal (non-regex) comparisons are case-insensitive; a `/regex/` value is case-sensitive instead unless you add the `i` flag — see [Regular expression matching](#regular-expression-matching).
 
 | Operator | Checks against | Example |
 |----------|-----------------|---------|

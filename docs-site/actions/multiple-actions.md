@@ -15,7 +15,7 @@ THEN:
   - REMOVE tags: active, wip
 ```
 
-Actions run in the order listed. Property and title actions are batched and written once at the end of the rule; [Note file actions](/actions/note-file-actions) execute immediately and compose in sequence — a later Note file action sees the result of an earlier one in the same rule.
+Actions run in the order listed. Property and title actions are batched in memory and only written to disk once, after **every rule** has finished running against that file in the current scan — not after each individual rule. [Note file actions](/actions/note-file-actions) are the exception: they execute immediately and compose in sequence, so a later Note file action (in this rule or a later one) sees the result of an earlier one right away.
 
 ## Rule chaining within a scan
 

@@ -14,7 +14,7 @@ A rule's **THEN** block is what happens to a note once its IF conditions match. 
 | Type | Changes | Page |
 |---|---|---|
 | **Property** | A frontmatter property | [Property Actions](/actions/property-actions) |
-| **First level title** | The note's title (H1 / inline title) | [First Level Title Actions](/actions/first-level-title-actions) |
+| **First level title** | The note's title (the H1 after frontmatter) | [First Level Title Actions](/actions/first-level-title-actions) |
 | **Note file** | The file itself — its name or which folder it's in | [Note File Actions](/actions/note-file-actions) |
 
 ## Multiple actions per rule

@@ -6,7 +6,7 @@ nav_order: 3
 
 # Note file condition
 
-Checks the file itself — its name, or the folder(s) it lives in — instead of a frontmatter property or the title. All comparisons are case-insensitive.
+Checks the file itself — its name, or the folder(s) it lives in — instead of a frontmatter property or the title. Literal (non-regex) comparisons are case-insensitive. A `/regex/` value is case-**sensitive** instead, unless you add the `i` flag — see [Regex Matching](/conditions/regex-matching).
 
 ```yaml
 IF Note file: Filename contains "draft"

@@ -28,3 +28,12 @@ The full, unabridged history lives in [CHANGELOG.md on GitHub](https://github.co
 ## 0.22.0 and earlier
 
 Note file conditions (`Filename contains`, `Filename not contains`, `Filename exactly match`, `Parent folder is`), Note file actions (rename, prefix, suffix, move, delete), multiple conditions per rule (`match any` / `match all`), typed property awareness (checkbox / date / datetime) on both IF and THEN, and the original rule engine. See [CHANGELOG.md](https://github.com/diegoeis/obsidian-conditional-properties/blob/main/CHANGELOG.md) for the complete version-by-version history back to `0.1.0`.
+
+## Roadmap
+
+Not built yet, tracked in [README.md's Roadmap section](https://github.com/diegoeis/obsidian-conditional-properties#roadmap):
+
+- Modify note content (beyond frontmatter)
+- Comparison operators (greater than / less than)
+- Nested condition groups (e.g. `(A AND B) OR C`)
+- Folder/tag-based scoping

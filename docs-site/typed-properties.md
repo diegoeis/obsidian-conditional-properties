@@ -9,6 +9,9 @@ Some Obsidian property types have native widgets — a checkmark for `checkbox`,
 
 The plugin detects when the target property is one of these types and converts the rule's value automatically, on both the [IF](/conditions/property#typed-property-awareness) and [THEN](/actions/property-actions#typed-property-awareness) sides. You can keep writing rules with plain text and the plugin handles the rest.
 
+{: .note }
+This coercion only applies to a **literal** IF value. In [regex mode](/conditions/regex-matching#typed-properties-bypass-regex), it's skipped — the property's raw stored value is tested directly against your pattern.
+
 ## Checkbox
 
 ```yaml

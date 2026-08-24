@@ -44,7 +44,7 @@ Behavior:
 - **Missing property → empty string.** No errors, no literal `{{name}}` left behind in your YAML.
 - **Arrays are joined with `, `.** A source like `tags: [a, b, c]` becomes `a, b, c` in the expanded string.
 - **Earlier actions in the same rule are visible to later ones.** If action #1 sets `excerpt`, action #2 can reference `{{excerpt}}`.
-- **Reserved names win.** `date`, `created_date`, `updated_date`, `time`, `title` are resolved as reserved placeholders first; a property with one of those names won't shadow them.
+- **Reserved names win.** `date`, `created_date`, `updated_date`, `today`, `time`, `title`, `filename`, and `match` are all resolved as reserved placeholders first; a property with one of those names won't shadow them. If you have a property literally named `match`, `{{match}}` always resolves via the [regex-capture logic](/actions/note-file-actions#match-in-then-beta) — never that property's value.
 
 ## Dates are always date-only in Note file actions
 

@@ -165,7 +165,7 @@ Combines a [regex](/conditions/regex-matching) condition, a [Note file condition
 
 ### Exclude archived notes while auto-tagging by multiple signals
 
-Nested condition groups like `(A OR B) AND C` aren't supported in a single rule yet (see the [Changelog](/changelog) roadmap) — but you can get the same result with two separate rules that share a condition and a THEN action:
+Nested condition groups like `(A OR B) AND C` aren't supported in a single rule yet (see the [Roadmap](/changelog#roadmap)) — but you can get the same result with two separate rules that share a condition and a THEN action:
 
 ```yaml
 Rule 1:
