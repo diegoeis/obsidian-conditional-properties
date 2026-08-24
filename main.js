@@ -1072,7 +1072,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 * Returns an `update(value)` function to call from the field's onChange.
 	 */
 	_addRegexHint(line, initialValue) {
-		const hintEl = line.settingEl.createDiv({ cls: "conditional-regex-hint is-hidden" });
+		const hintEl = line.settingEl.createDiv({ cls: "cp-regex-hint is-hidden" });
 		hintEl.setText("This looks like a regular expression — wrap it in /slashes/ to use it as one.");
 		const update = (value) => hintEl.toggleClass("is-hidden", !this._looksLikeUnwrappedRegex(value));
 		update(initialValue);
@@ -1556,8 +1556,14 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			const rootEl = document.createElement("div");
 			rootEl.id = "eis-cp-plugin";
 
+			// Two top-level groups: general plugin settings, then the rules
+			// list — each wrapped in the same setting-group > setting-items
+			// shell so both sections read as one consistent unit.
+			const configGroupEl = rootEl.createEl("div", { cls: "setting-group" });
+			const configItemsEl = configGroupEl.createEl("div", { cls: "setting-items" });
+
 			// Scan Interval Setting
-			new Setting(rootEl)
+			new Setting(configItemsEl)
 				.setName("Scan interval (minutes)")
 				.setDesc("Minimum 5 minutes")
 				.addText(text => {
@@ -1572,7 +1578,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			let syncNotesToScanVisibility = () => {};
 
-			new Setting(rootEl)
+			new Setting(configItemsEl)
 				.setName("Scan scope")
 				.setDesc("Choose which notes to scan")
 				.addDropdown(dropdown => {
@@ -1587,7 +1593,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					});
 				});
 
-			const notesToScanSetting = new Setting(rootEl)
+			const notesToScanSetting = new Setting(configItemsEl)
 				.setName("Notes to scan")
 				.setDesc("Number of notes to scan (applies to latest created or latest modified scope, 1-1000)")
 				.addText(text => {
@@ -1607,7 +1613,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			syncNotesToScanVisibility();
 
 			// Add Export/Import Buttons
-			const exportImportSetting = new Setting(rootEl)
+			const exportImportSetting = new Setting(configItemsEl)
 				.setName("Backup and restore")
 				.setDesc("Export or import your plugin settings");
 
@@ -1635,12 +1641,12 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				btn.onClick(() => importInput.click());
 			});
 
-			rootEl.appendChild(importInput);
+			configItemsEl.appendChild(importInput);
 
 			// Run Now Button — with Stop button next to it while scan is running
 			let runNowBtnRef = null;
 			let stopBtnRef = null;
-			const runNowSetting = new Setting(rootEl)
+			const runNowSetting = new Setting(configItemsEl)
 				.setName("Run now")
 				.setDesc("Execute all rules across selected scope");
 
@@ -1665,7 +1671,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				stopBtnRef = btn;
 				btn.setButtonText("Stop");
 				btn.setWarning();
-				btn.buttonEl.classList.add("conditional-stop");
+				btn.buttonEl.classList.add("cp-stop");
 				btn.onClick(() => {
 					this.plugin.requestStopScan();
 					new Notice("Conditional properties: stop requested — finishing current file");
@@ -1692,45 +1698,66 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			this._scanStateUnsubscribers = this._scanStateUnsubscribers || [];
 			this._scanStateUnsubscribers.push(unsubscribeRunNow);
 
-			// Rules Section
-			new Setting(rootEl)
-				.setName("Rules")
-				.setHeading();
+			// Rules Section — its own setting-group, separate from the
+			// general config group above. The title + "Add rule" button
+			// live in their own .setting-item.setting-item-heading, a direct
+			// child of .setting-group (a sibling of .setting-items, not
+			// nested inside it) — same shape Obsidian's own settings use for
+			// a group heading with an action attached.
+			const rulesGroupEl = rootEl.createEl("div", { cls: "setting-group cp-rules-group" });
+
 			this.plugin.settings.rules = this.plugin.settings.rules || [];
 
-			// Add Rule Button
-			const addWrap = rootEl.createEl("div", { cls: "setting-item" });
-			new ButtonComponent(addWrap)
-				.setButtonText("Add rule")
-				.setCta()
-				.onClick(async () => {
-					const newRule = {
-						match: "any",
-						conditions: [{
-							ifType: "PROPERTY",
-							ifProp: "",
-							ifValue: "",
-							op: "exactly"
-						}],
-						thenActions: [{
-							prop: "",
-							value: "",
-							action: "add"
-						}]
-					};
-					this.plugin.settings.rules.push(newRule);
-					await this.plugin.saveData(this.plugin.settings);
+			// rulesItemsEl is declared here (before the heading Setting below)
+			// only so the "Add rule" button's onClick closure can reference
+			// it — the element itself is created further down, in the actual
+			// desired DOM order. The closure won't run until well after this
+			// whole function finishes setting up, so the binding is populated
+			// by the time anyone clicks the button.
+			let rulesItemsEl;
 
-					const newRuleEl = this._renderRule(rootEl, newRule, this.plugin.settings.rules.length - 1);
-					if (newRuleEl && addWrap.nextSibling) {
-						rootEl.insertBefore(newRuleEl, addWrap.nextSibling);
-					}
-				});
+			new Setting(rulesGroupEl)
+				.setName("Rules")
+				.setDesc("Define your rules using IF conditions and THEN for actions.")
+				.setHeading()
+				.addButton(btn => btn
+					.setButtonText("Add rule")
+					.setCta()
+					.onClick(async () => {
+						const newRule = {
+							match: "any",
+							conditions: [{
+								ifType: "PROPERTY",
+								ifProp: "",
+								ifValue: "",
+								op: "exactly"
+							}],
+							thenActions: [{
+								prop: "",
+								value: "",
+								action: "add"
+							}]
+						};
+						this.plugin.settings.rules.push(newRule);
+						await this.plugin.saveData(this.plugin.settings);
+
+						// New rules go to the top of the list, right under the
+						// heading — capture the current first card before
+						// rendering (which appends the new one at the end),
+						// then move it back to the front.
+						const previousFirst = rulesItemsEl.firstChild;
+						const newRuleEl = this._renderRule(rulesItemsEl, newRule, this.plugin.settings.rules.length - 1);
+						if (newRuleEl && previousFirst) {
+							rulesItemsEl.insertBefore(newRuleEl, previousFirst);
+						}
+					}));
+
+			rulesItemsEl = rulesGroupEl.createEl("div", { cls: "setting-items" });
 
 			// Render Rules
 			this.plugin.settings.rules.slice().reverse().forEach((rule, idxReversed) => {
 				const originalIndex = this.plugin.settings.rules.length - 1 - idxReversed;
-				this._renderRule(rootEl, rule, originalIndex);
+				this._renderRule(rulesItemsEl, rule, originalIndex);
 			});
 
 			// Attach the fully-built tree in one shot — see the comment above
@@ -1744,7 +1771,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	}
 
 	_renderRule(containerEl, rule, idx) {
-		const wrap = containerEl.createEl("div", { cls: "conditional-rule" });
+		const wrap = containerEl.createEl("div", { cls: "cp-rule" });
 		if (!Array.isArray(rule.thenActions)) {
 			rule.thenActions = [{ prop: "", value: "", action: "add" }];
 		}
@@ -1764,8 +1791,13 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			rule.match = "any";
 		}
 
-		const ifHeader = wrap.createEl("div", { cls: "conditional-rules-header conditional-if-header" });
+		// IF block: header (with the any/all match dropdown once there's
+		// more than one condition) + the condition lines themselves + the
+		// "+ add condition" row.
+		const ifBlockEl = wrap.createEl("div", { cls: "cp-if-block" });
+		const ifHeader = ifBlockEl.createEl("div", { cls: "cp-rule-header" });
 		ifHeader.createEl("strong", { text: "If:" });
+		const ifRuleBlockEl = ifBlockEl.createEl("div", { cls: "cp-rule-block" });
 
 		const conditionSettings = [];
 		const ruleCtx = {
@@ -1782,10 +1814,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		}
 
 		rule.conditions.forEach((cond, condIdx) => {
-			conditionSettings.push(this._renderCondition(wrap, ruleCtx, cond, condIdx));
+			conditionSettings.push(this._renderCondition(ifRuleBlockEl, ruleCtx, cond, condIdx));
 		});
 
-		const addCondWrap = wrap.createEl("div", { cls: "conditional-add-condition" });
+		const addCondWrap = ifBlockEl.createEl("div", { cls: "cp-rule-add" });
 		new ButtonComponent(addCondWrap)
 			.setButtonText("+ add condition")
 			.setCta()
@@ -1801,8 +1833,12 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 				const wasSingle = rule.conditions.length === 2;
 				const newCondIdx = rule.conditions.length - 1;
-				const newLine = this._renderCondition(wrap, ruleCtx, newCond, newCondIdx);
-				wrap.insertBefore(newLine.settingEl, addCondWrap);
+				// ifRuleBlockEl only ever holds condition lines (the header and
+				// the add-row are its siblings, not interleaved with them
+				// anymore), so a freshly-rendered line — appended by Setting's
+				// own constructor — already lands in the right place with no
+				// reordering needed.
+				const newLine = this._renderCondition(ifRuleBlockEl, ruleCtx, newCond, newCondIdx);
 				conditionSettings.push(newLine);
 
 				if (wasSingle) {
@@ -1814,17 +1850,21 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				}
 			});
 
-		const thenHeader = wrap.createEl("div", { cls: "conditional-rules-header" });
+		// THEN block — same shape as the IF block above, minus the match
+		// dropdown (a rule only ever has one THEN, never "any/all" of them).
+		const thenBlockEl = wrap.createEl("div", { cls: "cp-then-block" });
+		const thenHeader = thenBlockEl.createEl("div", { cls: "cp-rule-header" });
 		thenHeader.createEl("strong", { text: "Then:" });
+		const thenRuleBlockEl = thenBlockEl.createEl("div", { cls: "cp-rule-block" });
 
 		const actionEntries = [];
 		ruleCtx.actionEntries = actionEntries;
 
 		rule.thenActions.forEach((action, actionIdx) => {
-			actionEntries.push(this._renderThenAction(wrap, ruleCtx, action, actionIdx));
+			actionEntries.push(this._renderThenAction(thenRuleBlockEl, ruleCtx, action, actionIdx));
 		});
 
-		const addActionWrap = wrap.createEl("div", { cls: "conditional-add-action-wrap" });
+		const addActionWrap = thenBlockEl.createEl("div", { cls: "cp-rule-add" });
 		new ButtonComponent(addActionWrap)
 			.setButtonText("+ add action")
 			.setCta()
@@ -1839,15 +1879,14 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				await this.plugin.saveData(this.plugin.settings);
 
 				const newActionIdx = rule.thenActions.length - 1;
-				const newEntry = this._renderThenAction(wrap, ruleCtx, newAction, newActionIdx);
-				wrap.insertBefore(newEntry.el, addActionWrap);
+				const newEntry = this._renderThenAction(thenRuleBlockEl, ruleCtx, newAction, newActionIdx);
 				actionEntries.push(newEntry);
 			});
 
-		const actions = wrap.createEl("div", { cls: "conditional-actions" });
+		const actions = wrap.createEl("div", { cls: "cp-rule-actions" });
 		const runBtn = new ButtonComponent(actions)
 			.setButtonText("Run this rule")
-			.setClass("conditional-run-one")
+			.setClass("cp-rule-run")
 			.onClick(async () => {
 				if (this.plugin.isScanRunning()) return;
 				try {
@@ -1865,7 +1904,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const ruleStopBtn = new ButtonComponent(actions)
 			.setButtonText("Stop")
 			.setWarning()
-			.setClass("conditional-stop-rule")
+			.setClass("cp-rule-stop")
 			.onClick(() => {
 				this.plugin.requestStopScan();
 				new Notice("Conditional properties: stop requested — finishing current file");
@@ -1892,7 +1931,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		new ButtonComponent(actions)
 			.setButtonText("Remove")
 			.setWarning()
-			.setClass("conditional-remove")
+			.setClass("cp-rule-remove")
 			.onClick(async () => {
 				const currentIdx = this.plugin.settings.rules.indexOf(rule);
 				if (currentIdx === -1) return;
@@ -1917,9 +1956,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		if (!cond.ifType) cond.ifType = "PROPERTY";
 		if (!cond.op) cond.op = "exactly";
 
-		const line = new Setting(containerEl).setName(`Condition ${condIdx + 1}`);
-		line.settingEl.addClass("conditional-condition");
-		line.settingEl.addClass("conditional-then-action");
+		const line = new Setting(containerEl);
+		line.settingEl.addClass("cp-rule-line");
+		line.settingEl.removeClass("setting-item");
+		this._setRuleLineLabel(line, `Condition ${condIdx + 1}`);
 
 		const rebuild = async () => {
 			await this.plugin.saveData(this.plugin.settings);
@@ -2072,8 +2112,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	_ensureMatchDropdown(ruleCtx) {
 		if (ruleCtx.matchWrapEl) return;
 		const { ifHeader, rule } = ruleCtx;
-		const matchWrap = ifHeader.createEl("div", { cls: "conditional-match" });
-		matchWrap.createEl("span", { text: "Match", cls: "conditional-match-label" });
+		const matchWrap = ifHeader.createEl("div", { cls: "cp-match" });
+		matchWrap.createEl("span", { text: "Match", cls: "cp-match-label" });
 		new DropdownComponent(matchWrap)
 			.addOption("any", "Any of the following")
 			.addOption("all", "All of the following")
@@ -2088,6 +2128,14 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	_addConditionRemoveButton(settingLine, ruleCtx, cond) {
 		let btnEl = null;
 		settingLine.addExtraButton(b => {
+			// ExtraButtonComponent has no setWarning() (that's ButtonComponent-only
+			// — see obsidian.d.ts). Obsidian's own core UI hits the same gap and
+			// works around it by adding "mod-warning" straight to extraSettingsEl
+			// (confirmed in app.js/app.css) — .clickable-icon.mod-warning just
+			// tints the icon with var(--text-error); hover stays the normal
+			// neutral clickable-icon hover. Doing the same here instead of
+			// hand-rolling our own color rule in styles.css.
+			b.extraSettingsEl.addClass("mod-warning");
 			b.setIcon("cross")
 				.setTooltip("Remove this condition")
 				.onClick(async () => {
@@ -2105,7 +2153,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					await this.plugin.saveData(this.plugin.settings);
 
 					conditionSettings.forEach((line, i) => {
-						line.setName(`Condition ${i + 1}`);
+						this._setRuleLineLabel(line, `Condition ${i + 1}`);
 					});
 
 					if (rule.conditions.length === 1) {
@@ -2124,6 +2172,29 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			btnEl = b.extraSettingsEl;
 		});
 		ruleCtx.removeBtnByCondition.set(settingLine, btnEl);
+	}
+
+	/**
+	 * Obsidian's Setting always builds a .setting-item-info wrapper holding
+	 * .setting-item-name + .setting-item-description. Our condition/action
+	 * rows only need a compact label, never a description, so this swaps
+	 * that whole wrapper out for a single <h6 class="cp-rule-label">, and
+	 * stashes it on the Setting instance (`setting.labelEl`) so later
+	 * renumbering (after a row is added/removed) can update the text
+	 * directly instead of calling Setting.setName() — which would just
+	 * write into the now-detached info wrapper we removed. Safe to call
+	 * repeatedly: the swap only happens once per Setting.
+	 */
+	_setRuleLineLabel(setting, text) {
+		if (!setting.labelEl) {
+			const infoEl = setting.settingEl.querySelector(".setting-item-info");
+			const labelEl = document.createElement("h6");
+			labelEl.className = "cp-rule-label";
+			setting.settingEl.insertBefore(labelEl, infoEl);
+			if (infoEl) infoEl.remove();
+			setting.labelEl = labelEl;
+		}
+		setting.labelEl.textContent = text;
 	}
 
 	_configureOperatorDropdown(dropdown, currentValue, onChange) {
@@ -2147,8 +2218,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 	_renderThenAction(containerEl, ruleCtx, action, actionIdx) {
 		const rule = ruleCtx.rule;
-		const actionWrap = containerEl.createEl("div", { cls: "conditional-then-action" });
-		const actionSetting = new Setting(actionWrap).setName(`Action ${actionIdx + 1}`);
+		const actionWrap = containerEl.createEl("div", { cls: "cp-rule-line" });
+		const actionSetting = new Setting(actionWrap);
+		this._setRuleLineLabel(actionSetting, `Action ${actionIdx + 1}`);
 		
 		// Initialize action type if not set
 		if (!action.type) {
@@ -2274,25 +2346,45 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		const entry = { el: actionWrap, setting: actionSetting };
 
-		actionSetting.addExtraButton(b => b
-			.setIcon("cross")
-			.setTooltip("Remove this action")
-			.onClick(async () => {
-				const currentIdx = rule.thenActions.indexOf(action);
-				if (currentIdx === -1) return;
+		actionSetting.addExtraButton(b => {
+			// See the matching comment in _addConditionRemoveButton() — same
+			// "mod-warning on extraSettingsEl" workaround Obsidian's own core
+			// UI uses, since ExtraButtonComponent has no setWarning().
+			b.extraSettingsEl.addClass("mod-warning");
+			return b
+				.setIcon("cross")
+				.setTooltip("Remove this action")
+				.onClick(async () => {
+					const currentIdx = rule.thenActions.indexOf(action);
+					if (currentIdx === -1) return;
 
-				rule.thenActions.splice(currentIdx, 1);
-				const entries = ruleCtx.actionEntries || [];
-				const entryIdx = entries.indexOf(entry);
-				if (entryIdx !== -1) entries.splice(entryIdx, 1);
-				actionWrap.remove();
+					rule.thenActions.splice(currentIdx, 1);
+					const entries = ruleCtx.actionEntries || [];
+					const entryIdx = entries.indexOf(entry);
+					if (entryIdx !== -1) entries.splice(entryIdx, 1);
+					actionWrap.remove();
 
-				await this.plugin.saveData(this.plugin.settings);
+					await this.plugin.saveData(this.plugin.settings);
 
-				entries.forEach((e, i) => {
-					e.setting.setName(`Action ${i + 1}`);
+					entries.forEach((e, i) => {
+						this._setRuleLineLabel(e.setting, `Action ${i + 1}`);
+					});
 				});
-			}));
+		});
+
+		// Setting always builds its own nested .setting-item div inside the
+		// container it's given. We want .cp-rule-line to be that row
+		// directly instead — same flat shape _renderCondition uses (a single
+		// element carrying the row's class, no .setting-item nested inside
+		// it) — so move the Setting's own children up into actionWrap and
+		// drop the now-empty intermediate node. This has to happen after
+		// every addDropdown/addText/addExtraButton call above, since those
+		// all append into elements living inside that nested settingEl.
+		const nestedSettingEl = actionSetting.settingEl;
+		while (nestedSettingEl.firstChild) {
+			actionWrap.appendChild(nestedSettingEl.firstChild);
+		}
+		nestedSettingEl.remove();
 
 		return entry;
 	}

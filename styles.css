@@ -1,110 +1,146 @@
-#eis-cp-plugin .conditional-rule {
+/* Obsidian's own buttons default --cursor to "default" (arrow), not
+   "pointer" — a deliberate desktop-app choice, but not what we want for
+   our own action buttons/icons. `filter: brightness()` darkens on hover
+   regardless of each button's background source (native tokens or our own
+   hardcoded colors like .cp-rule-remove's), so every button gets the same
+   darker-on-hover feedback without needing a per-button darker color. */
+#eis-cp-plugin button,
+#eis-cp-plugin .clickable-icon {
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  #eis-cp-plugin button:hover,
+  #eis-cp-plugin .clickable-icon:hover {
+    filter: brightness(0.85);
+  }
+}
+
+#eis-cp-plugin .cp-rules-group .setting-items {
+  padding: 20px;
+}
+
+#eis-cp-plugin .cp-rule {
   border: 1px solid var(--background-modifier-border);
   padding: 20px;
   border-radius: 5px;
   margin-bottom: 20px;
+  background: #fff;
   transition: all .15s linear;
 }
 
-#eis-cp-plugin .conditional-rule:hover {
-  box-shadow: 0 0 7px rgba(0, 0, 0, 0.2);
+#eis-cp-plugin .cp-rule:hover {
+  border-color: var(--background-modifier-border-hover);
 }
 
-#eis-cp-plugin .conditional-rule .setting-item {
+/* Shared row shape for both an IF condition and a THEN action — they're
+   the same element, same styling, just different content inside. */
+#eis-cp-plugin .cp-rule-line {
   display: block;
+  padding-top: 12px;
+  margin-bottom: 7px;
 }
 
-#eis-cp-plugin .conditional-rule .setting-item-control {
+#eis-cp-plugin .cp-rule .setting-item-control {
   display: flex;
   text-align: left;
   flex-wrap: wrap;
 }
 
-#eis-cp-plugin .conditional-rule .setting-item-control * {
+/* Obsidian's native .setting-item-control sets text-align: end for the
+   usual label-left/value-right single-control row. Our condition/action
+   rows pack several controls side by side instead, so that alignment
+   looks wrong here — and <select> in Electron/Chromium doesn't reliably
+   inherit text-align from an ancestor for its closed-state display, so it
+   has to be set directly on the element, not just the container. */
+#eis-cp-plugin .cp-rule select,
+#eis-cp-plugin .cp-rule .dropdown {
+  text-align: left;
+}
+
+#eis-cp-plugin .cp-rule .setting-item-control * {
   display: inline-block;
   width: 100%;
   flex: 1;
 }
 
-/* Section headers (If: and Then:) */
-#eis-cp-plugin .conditional-rules-header {
-  font-size: 0.9rem;
-  font-weight: bold;
-  padding-top: 15px;
-  padding-bottom: 10px;
-  border-top: 4px solid var(--background-modifier-border);
-  margin-top: 10px;
-}
-
-#eis-cp-plugin .conditional-if-header {
+/* IF/THEN block headers — same shape for both, so a rule reads as two
+   parallel sections instead of two differently-styled ones. */
+#eis-cp-plugin .cp-rule-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: none;
-  margin-top: 0;
-  padding-top: 0;
+  font-size: 0.9rem;
+  font-weight: bold;
+  padding-bottom: 10px;
 }
 
-#eis-cp-plugin .conditional-if-header strong {
-  font-size: 0.9rem;
+#eis-cp-plugin .cp-rule-header strong {
+  font-size: 1.3rem;
+}
+
+/* The THEN block is the one that needs visual separation from the IF
+   block above it — the headers themselves stay identical. */
+#eis-cp-plugin .cp-then-block {
+  border-top: 4px solid var(--background-modifier-border);
+  margin-top: 30px;
+  padding-top: 30px;
 }
 
 /* Match any/all dropdown inside the If header */
-#eis-cp-plugin .conditional-match {
+#eis-cp-plugin .cp-match {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-#eis-cp-plugin .conditional-match-label {
+#eis-cp-plugin .cp-match-label {
   font-size: 0.8rem;
   opacity: 0.75;
 }
 
-#eis-cp-plugin .conditional-match-select {
+#eis-cp-plugin .cp-match-select {
   font-size: 0.8rem;
 }
 
 /* Condition / Action row label tweaks */
-#eis-cp-plugin .conditional-rule .setting-item-name {
-  font-size: .7rem;
-  font-weight: normal;
+#eis-cp-plugin .cp-rule .cp-rule-label {
+  padding: 0 0 5px;
+  margin: 0;
 }
 
-#eis-cp-plugin .conditional-rule .setting-item:hover .setting-item-name {
+#eis-cp-plugin .cp-rule .cp-rule-line:hover .cp-rule-label {
   font-weight: bold;
 }
 
-#eis-cp-plugin .conditional-then-action:last-child {
-  border-bottom-style: solid;
+#eis-cp-plugin .cp-rule-line .extra-setting-button {
+  background: var(--text-error);
+  color: #fff;
+  max-width: 40px;
 }
 
-#eis-cp-plugin .conditional-then-action .setting-item-info {
-  padding-bottom: 5px;
-}
-
-#eis-cp-plugin .conditional-then-action .setting-item {
-  padding-top: 12px;
-  margin-bottom: 7px;
-}
-
-#eis-cp-plugin .setting-item .extra-setting-button {
-  background-color: var(--color-red);
-	color: #fff;
-	max-width: 30px;
-	cursor: pointer;
+#eis-cp-plugin .cp-rule-add {
+  padding: 10px 0 0;
 }
 
 /* Rule-level action row (Run this rule + Remove) */
-#eis-cp-plugin .conditional-actions {
+#eis-cp-plugin .cp-rule-actions {
   border-top: 3px dotted var(--modal-border-color);
-  padding-top: 15px;
-  margin-top: 15px;
+  padding-top: 30px;
+  margin-top: 30px;
 }
 
-#eis-cp-plugin .conditional-remove {
+#eis-cp-plugin .cp-rule-remove {
   float: right;
   margin: 0;
+  background: var(--text-error);
+  color: #fff;
+  cursor: pointer;
+}
+
+#eis-cp-plugin .cp-rule-run {
+  cursor: pointer;
+  border: 1px solid var(--text-accent);
 }
 
 /* Loading state for any button currently running a scan */
@@ -118,8 +154,8 @@
 }
 
 /* Stop buttons sit immediately to the right of their Run counterpart */
-#eis-cp-plugin .conditional-stop,
-#eis-cp-plugin .conditional-stop-rule {
+#eis-cp-plugin .cp-stop,
+#eis-cp-plugin .cp-rule-stop {
   margin-left: 8px;
 }
 
@@ -130,7 +166,7 @@
 
 /* Inline hint shown under a condition's value field when the typed text
    looks like a regular expression that's missing its /slashes/. */
-#eis-cp-plugin .conditional-regex-hint {
+#eis-cp-plugin .cp-regex-hint {
   font-size: 0.75rem;
   color: var(--text-warning);
   margin-top: 4px;
