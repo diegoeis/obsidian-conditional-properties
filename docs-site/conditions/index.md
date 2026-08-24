@@ -21,7 +21,7 @@ A rule's **IF** block decides which notes it applies to. Every condition has thr
 
 | Operator | Description | Example |
 |----------|-------------|---------|
-| `exactly` | Exact match | `type = "meeting"` |
+| `exactly` | Exact match | `type exactly "meeting"` |
 | `contains` | Substring match | `name contains "Diego"` |
 | `notContains` | Does not contain | `tags notContains "draft"` |
 | `exists` | Property present | `status exists` |

@@ -54,8 +54,8 @@ IF First level title contains /\d{4}-\d{2}-\d{2}/
 **Multiple conditions per rule** — combine conditions with `Match any` (OR) or `Match all` (AND).
 ```yaml
 Match all of the following:
-  - property: status = "done"
-  - property: priority = "high"
+  - property: status exactly "done"
+  - property: priority exactly "high"
 THEN ADD tags: urgent-completed
 ```
 
@@ -67,7 +67,7 @@ matches a note whose YAML stores `created_at: 2025-08-08`.
 
 **Rule chaining within a scan** — a later rule's condition sees property (or filename/folder) changes an earlier rule already made in the same run, not just the state from before the scan started.
 ```yaml
-Rule 1: IF property: status = "done"            THEN ADD tags: completed
+Rule 1: IF property: status exactly "done"            THEN ADD tags: completed
 Rule 2: IF property: tags contains "completed"  THEN ADD priority: low
 ```
 Rule 2 fires in the same pass Rule 1 added the tag — no second scan needed.
@@ -161,7 +161,7 @@ Scope: Latest modified, count: 15
 
 | Operator | Description | Example |
 |----------|-------------|---------|
-| `exactly` | Exact match | `type = "meeting"` |
+| `exactly` | Exact match | `type exactly "meeting"` |
 | `contains` | Substring match | `name contains "Diego"` |
 | `notContains` | Does not contain | `tags notContains "draft"` |
 | `exists` | Property present | `status exists` |
@@ -214,16 +214,16 @@ Combine conditions inside a single rule using **Match any / Match all of the fol
 **AND example — match all of the following:**
 ```yaml
 Match all of the following:
-  - property: status = "done"
-  - property: priority = "high"
+  - property: status exactly "done"
+  - property: priority exactly "high"
 THEN ADD tags: urgent-completed
 ```
 
 **OR example — match any of the following:**
 ```yaml
 Match any of the following:
-  - property: status = "archived"
-  - property: deleted = "true"
+  - property: status exactly "archived"
+  - property: deleted exactly "true"
 THEN REMOVE tags: active
 ```
 
@@ -309,7 +309,7 @@ The plugin detects when the target property is one of these types and converts t
 ### Checkbox
 
 ```yaml
-IF property: status = "done"
+IF property: status exactly "done"
 THEN OVERWRITE property: completed = "true"
 ```
 Result on disk: `completed: true` (boolean). Obsidian renders a checked checkbox.
@@ -321,7 +321,7 @@ Rules:
 ### Date / datetime
 
 ```yaml
-IF property: status = "done"
+IF property: status exactly "done"
 THEN OVERWRITE property: created_at = "08-08-2025"
 ```
 Result on disk: `created_at: 2025-08-08` (ISO date). Obsidian renders the date widget.
@@ -345,7 +345,7 @@ Datetime properties (`YYYY-MM-DDTHH:mm:ss`) are not parsed and are written exact
 Rules run in the order they're listed. A `PROPERTY` condition in a later rule sees property changes an earlier rule already made **in the same scan** — not just the frontmatter as it was before the scan started. So this works in a single pass:
 
 ```yaml
-Rule 1: IF property: status = "done"     THEN ADD tags: completed
+Rule 1: IF property: status exactly "done"     THEN ADD tags: completed
 Rule 2: IF property: tags contains "completed"   THEN ADD priority: low
 ```
 

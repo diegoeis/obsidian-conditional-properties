@@ -28,7 +28,7 @@ Every rule has the same shape: an **IF** block (one or more conditions) and a **
 4. Click **Run this rule** to test it against your configured scan scope, or **Run now** to run every rule in the vault.
 
 ```yaml
-IF property: type = "meeting"
+IF property: type exactly "meeting"
 THEN ADD tags: work, important
 ```
 

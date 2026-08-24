@@ -31,7 +31,7 @@ Stop manually updating properties across hundreds of notes. Define rules once, r
 
 **Auto-tag meetings:**
 ```yaml
-IF property: type = "meeting"
+IF property: type exactly "meeting"
 THEN ADD tags: work, important
 ```
 
@@ -43,7 +43,7 @@ THEN Note file: Move file to "transcripts/{{date}}"
 
 **Date-stamp completed tasks:**
 ```yaml
-IF property: status = "done"
+IF property: status exactly "done"
 THEN First level title: Add suffix " - {{date:DD/MM/YYYY}}"
 ```
 

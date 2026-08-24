@@ -20,7 +20,7 @@ A cookbook of rules, from a single condition/action to combinations of several f
 ### Auto-tag meetings
 
 ```yaml
-IF property: type = "meeting"
+IF property: type exactly "meeting"
 THEN ADD tags: work, important
 ```
 Any note with `type: meeting` gets `tags: [work, important]` added, without duplicating values on repeated runs.
@@ -28,7 +28,7 @@ Any note with `type: meeting` gets `tags: [work, important]` added, without dupl
 ### Archive by status
 
 ```yaml
-IF property: status = "archived"
+IF property: status exactly "archived"
 THEN REMOVE tags: active, wip
 ```
 
@@ -55,7 +55,7 @@ See [Conditions (IF)](/conditions/) and [Actions (THEN)](/actions/) for the full
 ### Date-stamp completed tasks
 
 ```yaml
-IF property: status = "done"
+IF property: status exactly "done"
 THEN First level title: Add suffix " - {{date}}"
 ```
 Uses a [placeholder](/placeholders) to append today's date to the title.
@@ -87,7 +87,7 @@ THEN ADD property excerpt: "{{g_excerpt}}"
 ### Chain several actions in one rule
 
 ```yaml
-IF property: project_status = "completed"
+IF property: project_status exactly "completed"
 THEN:
   - OVERWRITE property: status = "done"
   - ADD tags: archived
@@ -99,7 +99,7 @@ See [Multiple Actions](/actions/multiple-actions) for execution order.
 ### Typed checkbox + date together
 
 ```yaml
-IF property: status = "done"
+IF property: status exactly "done"
 THEN:
   - OVERWRITE property: completed = "true"
   - OVERWRITE property: completed_at = "{{date}}"
@@ -114,7 +114,7 @@ THEN:
 
 ```yaml
 Match all of the following:
-  - property: status = "done"
+  - property: status exactly "done"
   - Note file: Parent folder is not "Archive"
 THEN Note file: Add name prefix: "[DONE] "
 ```
@@ -140,7 +140,7 @@ Sorts files into `archive/2026/08/`-style folders based on a date embedded in th
 
 ```yaml
 Rule 1:
-  IF property: status = "done"
+  IF property: status exactly "done"
   THEN ADD tags: completed
 
 Rule 2:
@@ -170,7 +170,7 @@ Nested condition groups like `(A OR B) AND C` aren't supported in a single rule 
 ```yaml
 Rule 1:
   Match all of the following:
-    - property: type = "meeting"
+    - property: type exactly "meeting"
     - Note file: Parent folder is not "Archive"
   THEN ADD tags: meeting, needs-review
 

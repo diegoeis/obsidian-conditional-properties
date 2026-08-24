@@ -22,7 +22,7 @@ Actions run in the order listed. Property and title actions are batched and writ
 This isn't limited to actions inside one rule — it also applies **across rules** in the same scan. A later rule's IF condition sees property (or filename/folder) changes an earlier rule already made in the same run, not just the frontmatter as it was before the scan started.
 
 ```yaml
-Rule 1: IF property: status = "done"            THEN ADD tags: completed
+Rule 1: IF property: status exactly "done"            THEN ADD tags: completed
 Rule 2: IF property: tags contains "completed"  THEN ADD priority: low
 ```
 Rule 2 fires in the same pass Rule 1 added the tag — no second scan needed.

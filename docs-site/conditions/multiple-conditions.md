@@ -12,8 +12,8 @@ Combine conditions inside a single rule using **Match any / Match all of the fol
 
 ```yaml
 Match all of the following:
-  - property: status = "done"
-  - property: priority = "high"
+  - property: status exactly "done"
+  - property: priority exactly "high"
 THEN ADD tags: urgent-completed
 ```
 The rule only fires when **every** condition matches.
@@ -22,8 +22,8 @@ The rule only fires when **every** condition matches.
 
 ```yaml
 Match any of the following:
-  - property: status = "archived"
-  - property: deleted = "true"
+  - property: status exactly "archived"
+  - property: deleted exactly "true"
 THEN REMOVE tags: active
 ```
 The rule fires when **at least one** condition matches.

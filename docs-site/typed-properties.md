@@ -12,7 +12,7 @@ The plugin detects when the target property is one of these types and converts t
 ## Checkbox
 
 ```yaml
-IF property: status = "done"
+IF property: status exactly "done"
 THEN OVERWRITE property: completed = "true"
 ```
 Result on disk: `completed: true` (boolean). Obsidian renders a checked checkbox.
@@ -24,7 +24,7 @@ Rules:
 ## Date / datetime
 
 ```yaml
-IF property: status = "done"
+IF property: status exactly "done"
 THEN OVERWRITE property: created_at = "08-08-2025"
 ```
 Result on disk: `created_at: 2025-08-08` (ISO date). Obsidian renders the date widget.
