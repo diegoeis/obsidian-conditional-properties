@@ -7,7 +7,7 @@ permalink: /conditions/
 
 # Conditions (IF)
 
-A rule's **IF** block decides which notes it applies to. Every condition has three parts: a **type** (what to check), an **operator** (how to compare), and a **value** (what to compare against) — except `exists` / `notExists` / `isEmpty`, which don't need a value.
+A rule's **IF** block decides which notes it applies to. A condition row has, in order: a **type** dropdown (what to check), a property-name field (Property conditions only), an **operator** dropdown (how to compare), and a **value** field (what to compare against) — the value field is skipped for `exists` / `does not exist` / `is empty`.
 
 ## Condition types
 
@@ -19,20 +19,22 @@ A rule's **IF** block decides which notes it applies to. Every condition has thr
 
 ## Six comparison operators
 
+These are the exact labels in the operator dropdown for **Property** and **First level title** conditions. **Note file** conditions use a different, five-option dropdown instead — see [Note file](/conditions/note-file) — none of the six below apply there.
+
 | Operator | Description | Example |
 |----------|-------------|---------|
-| `exactly` | Exact match | `type exactly "meeting"` |
-| `contains` | Substring match | `name contains "Diego"` |
-| `notContains` | Does not contain | `tags notContains "draft"` |
-| `exists` | Property present | `status exists` |
-| `notExists` | Property absent | `reviewed notExists` |
-| `isEmpty` | Empty value | `tags isEmpty` |
+| `exactly match` | Exact match | `Property: type → exactly match → "meeting"` |
+| `contains` | Substring match | `Property: name → contains → "Diego"` |
+| `does not contain` | Does not contain | `Property: tags → does not contain → "draft"` |
+| `exists` | Property present | `Property: status → exists` |
+| `does not exist` | Property absent | `Property: reviewed → does not exist` |
+| `is empty` | Empty value | `Property: tags → is empty` |
 
-`exactly`, `contains`, and `notContains` also accept a `/regex/` value instead of a literal string — see [Regex Matching](/conditions/regex-matching).
+`exactly match`, `contains`, and `does not contain` also accept a `/regex/` value instead of a literal string — see [Regex Matching](/conditions/regex-matching).
 
 ## Combining conditions
 
-A single rule can have more than one condition — see [Multiple Conditions](/conditions/multiple-conditions) for `Match any` (OR) vs `Match all` (AND).
+A single rule can have more than one condition — see [Multiple Conditions](/conditions/multiple-conditions) for the **Match** dropdown's **Any of the following** (OR) vs **All of the following** (AND).
 
 ## Note
 

@@ -1,8 +1,8 @@
 # Conditional Properties for Obsidian
 
-**Automate your frontmatter with smart IF/THEN rules.** Set properties, modify titles, and keep your vault organized — automatically.
+📖 **[Full documentation site](https://diegoeis.github.io/obsidian-conditional-properties/)** — every condition, action, and placeholder, with examples that mirror the settings screen field-by-field.
 
-📖 [Full documentation site](https://diegoeis.github.io/obsidian-conditional-properties/)
+**Automate your frontmatter with smart IF/THEN rules.** Set properties, modify titles, and keep your vault organized — automatically.
 
 ![Plugin Interface](https://i.imgur.com/d13fhzH.jpeg)
 
@@ -21,118 +21,120 @@ Every feature below has a short description and a working example. Deeper refere
 
 ### Conditions (IF)
 
-**Property condition** — check any frontmatter property's value.
+**Property condition** — check any frontmatter property's value. The condition row is: **Property** type → property name field → operator dropdown → value field.
 ```yaml
-IF property: status exactly "done"
+IF  Property: status → exactly match → "done"
 ```
 
 **First level title condition** — check the note's title: the H1 heading immediately after frontmatter (or at the very top of the note if there's no frontmatter). Obsidian's separate "inline title" feature is never read — only an actual `#` H1 line counts, and only when nothing but whitespace precedes it.
 ```yaml
-IF First level title contains "Meeting"
+IF  First level title: contains → "Meeting"
 ```
 
 **Note file condition** — check the file itself: its name or the folder(s) it lives in, instead of a property or title.
 ```yaml
-IF Note file: Filename contains "draft"
+IF  Note file: Filename contains → "draft"
 ```
 
 **Parent folder is / Parent folder is not** — match a folder name or partial path anywhere in the file's location, not just the immediate parent.
 ```yaml
-IF Note file: Parent folder is "meetings/transcripts/company"
+IF  Note file: Parent folder is → "meetings/transcripts/company"
 ```
 
-**Six comparison operators** — `exactly`, `contains`, `notContains`, `exists`, `notExists`, `isEmpty`. See the full [Operators reference](#operators-reference) below.
+**Six comparison operators** — `exactly match`, `contains`, `does not contain`, `exists`, `does not exist`, `is empty`. See the full [Operators reference](#operators-reference) below. (Note file conditions have their own five operators instead — see [Note file conditions](#note-file-conditions).)
 ```yaml
-IF property: tags notContains "draft"
+IF  Property: tags → does not contain → "draft"
 ```
 
-**Regex matching** — wrap a value in `/pattern/flags` to match with a regular expression instead of a literal string, on `exactly`/`contains`/`notContains`. See [Regular expression matching](#regular-expression-matching).
+**Regex matching** — wrap a value in `/pattern/flags` to match with a regular expression instead of a literal string, on `exactly match`/`contains`/`does not contain`. See [Regular expression matching](#regular-expression-matching).
 ```yaml
-IF First level title contains /\d{4}-\d{2}-\d{2}/
+IF  First level title: contains → /\d{4}-\d{2}-\d{2}/
 ```
 
-**Multiple conditions per rule** — combine conditions with `Match any` (OR) or `Match all` (AND).
+**Multiple conditions per rule** — combine conditions with the **Match** dropdown set to **Any of the following** (OR) or **All of the following** (AND).
 ```yaml
-Match all of the following:
-  - property: status exactly "done"
-  - property: priority exactly "high"
-THEN ADD tags: urgent-completed
+Match: All of the following
+  Condition 1  Property: status → exactly match → "done"
+  Condition 2  Property: priority → exactly match → "high"
+THEN  Property: tags → Add value → urgent-completed
 ```
 
 **Typed property awareness (IF side)** — when a property is registered as `checkbox`, `date`, or `datetime`, your typed value is normalized before comparing, so `08-08-2025` matches a stored `2025-08-08`.
 ```yaml
-IF property: created_at exactly "08-08-2025"
+IF  Property: created_at → exactly match → "08-08-2025"
 ```
 matches a note whose YAML stores `created_at: 2025-08-08`.
 
 **Rule chaining within a scan** — a later rule's condition sees property (or filename/folder) changes an earlier rule already made in the same run, not just the state from before the scan started.
 ```yaml
-Rule 1: IF property: status exactly "done"            THEN ADD tags: completed
-Rule 2: IF property: tags contains "completed"  THEN ADD priority: low
+Rule 1: IF  Property: status → exactly match → "done"    THEN  Property: tags → Add value → completed
+Rule 2: IF  Property: tags → contains → "completed"       THEN  Property: priority → Add value → low
 ```
 Rule 2 fires in the same pass Rule 1 added the tag — no second scan needed.
 
 ### Actions (THEN)
 
+The action row for a Property action is: **Property** type → property name field → action dropdown → value field.
+
 **Add value** — add a value to a property without duplicating it. Converts a scalar to an array when needed.
 ```yaml
-THEN ADD tags: important
+THEN  Property: tags → Add value → important
 ```
 
 **Remove value** — remove a specific value from a property or array.
 ```yaml
-THEN REMOVE tags: active, wip
+THEN  Property: tags → Remove value → active, wip
 ```
 
-**Overwrite property** — replace the entire value. Unlike Add/Remove, this does **not** split on commas — `status = "a, b, c"` writes the literal string `"a, b, c"`, not an array. Use Add for a multi-value array.
+**Overwrite all values with** — replace the entire value. Unlike Add/Remove, this does **not** split on commas — `Overwrite all values with → "a, b, c"` writes the literal string `"a, b, c"`, not an array. Use Add value for a multi-value array.
 ```yaml
-THEN OVERWRITE property: status = "archived"
+THEN  Property: status → Overwrite all values with → "archived"
 ```
 
-**Delete property** — remove the property from the note entirely.
+**Delete property** — remove the property from the note entirely. No value field for this one — the action dropdown alone is the whole action.
 ```yaml
-THEN DELETE PROPERTY: legacy_data
+THEN  Property: legacy_data → Delete property
 ```
 
-**Rename property** — copy a property's value to a new name and remove the old one. Skipped silently if the target name already exists. The new-name field does not accept placeholders.
+**Rename property to** — copy a property's value to a new name and remove the old one. Skipped silently if the target name already exists. The new-name field does not accept placeholders.
 ```yaml
-THEN RENAME property: old_name -> new_name
+THEN  Property: old_name → Rename property to → new_name
 ```
 
 **Typed property awareness (THEN side)** — writing to a `checkbox`/`date`/`datetime` property stores the real YAML type, so Obsidian's native widgets render correctly.
 ```yaml
-THEN OVERWRITE property: completed = "true"
+THEN  Property: completed → Overwrite all values with → "true"
 ```
 Result on disk: `completed: true` (boolean) — renders as a checked checkbox, not text.
 
-**First level title actions** — prefix, suffix, or overwrite the note's title.
+**First level title actions** — the action row is **First level title** type → modification dropdown (`Add prefix` / `Add suffix` / `Overwrite to`) → text field.
 ```yaml
-THEN First level title: Overwrite to "{date:YYYY-MM-DD} - {filename}"
+THEN  First level title: Overwrite to → "{{date:YYYY-MM-DD}} - {{filename}}"
 ```
 Result: `2026-01-08 - team-sync`.
 
-**Note file actions** — Rename file, Add name prefix, Add name suffix, Move file to, Delete file. See [Note file actions](#note-file-actions).
+**Note file actions** — the action row is **Note file** type → action dropdown (`Rename file` / `Add name prefix` / `Add name suffix` / `Move file to` / `Delete file`) → text field (omitted for Delete file). See [Note file actions](#note-file-actions).
 ```yaml
-THEN Note file: Move file to "Archive/{today:YYYY}"
+THEN  Note file: Move file to → "Archive/{today:YYYY}"
 ```
 
 **Multiple actions per rule** — chain several actions in one rule; note file actions execute immediately and compose in sequence.
 ```yaml
 THEN:
-  - OVERWRITE property: status = "done"
-  - ADD tags: archived
-  - REMOVE tags: active, wip
+  - Property: status → Overwrite all values with → "done"
+  - Property: tags → Add value → archived
+  - Property: tags → Remove value → active, wip
 ```
 
 **Placeholders in action values** — reference dates, the filename, or any frontmatter property inline. See the full [Placeholders](#placeholders) reference.
 ```yaml
-THEN ADD property excerpt: "{{g_excerpt}}"
+THEN  Property: excerpt → Add value → "{{g_excerpt}}"
 ```
 
 **{{match}} in THEN (Beta)** — reuse whatever an IF regex condition matched, instead of retyping the pattern. See [{{match}} in THEN](#match-in-then-beta).
 ```yaml
-IF Note file: Filename contains /\d{4}-\d{2}-\d{2}/
-THEN Note file: Move file to "transcripts/{{match}}"
+IF    Note file: Filename contains → /\d{4}-\d{2}-\d{2}/
+THEN  Note file: Move file to → "transcripts/{{match}}"
 ```
 
 ### Execution & scheduling
@@ -159,27 +161,29 @@ Scope: Latest modified, count: 15
 
 ## Operators reference
 
+These are the exact labels shown in the operator dropdown for **Property** and **First level title** conditions. **Note file** conditions use a separate five-option dropdown instead — see [Note file conditions](#note-file-conditions).
+
 | Operator | Description | Example |
 |----------|-------------|---------|
-| `exactly` | Exact match | `type exactly "meeting"` |
-| `contains` | Substring match | `name contains "Diego"` |
-| `notContains` | Does not contain | `tags notContains "draft"` |
-| `exists` | Property present | `status exists` |
-| `notExists` | Property absent | `reviewed notExists` |
-| `isEmpty` | Empty value | `tags isEmpty` |
+| `exactly match` | Exact match | `Property: type → exactly match → "meeting"` |
+| `contains` | Substring match | `Property: name → contains → "Diego"` |
+| `does not contain` | Does not contain | `Property: tags → does not contain → "draft"` |
+| `exists` | Property present | `Property: status → exists` |
+| `does not exist` | Property absent | `Property: reviewed → does not exist` |
+| `is empty` | Empty value | `Property: tags → is empty` |
 
-`exactly` / `contains` / `notContains` are **case-sensitive** on Property and First level title conditions (Note file filename matching is the one exception — that's case-insensitive, see below). On a **Property** condition, `isEmpty` on a property that doesn't exist at all returns `false`, not `true` — use `notExists` to catch a missing property. `isEmpty` on a missing **First level title** does return `true`, since a note with no H1 reads as "empty" there.
+`exactly match` / `contains` / `does not contain` are **case-sensitive** on Property and First level title conditions (Note file filename matching is the one exception — that's case-insensitive, see below). On a **Property** condition, `is empty` on a property that doesn't exist at all returns `false`, not `true` — use `does not exist` to catch a missing property. `is empty` on a missing **First level title** does return `true`, since a note with no H1 reads as "empty" there.
 
 ### Regular expression matching
 
-Wrap the value of `exactly`, `contains`, or `notContains` in forward slashes to match with a regular expression instead of a literal string — same convention as [Obsidian's Web Clipper URL-trigger patterns](https://help.obsidian.md/web-clipper/triggers#Regular+expression+matching). Works on **Property**, **First level title**, and **Note file** (filename) conditions.
+Wrap the value of **exactly match**, **contains**, or **does not contain** in forward slashes to match with a regular expression instead of a literal string — same convention as [Obsidian's Web Clipper URL-trigger patterns](https://help.obsidian.md/web-clipper/triggers#Regular+expression+matching). Works on **Property**, **First level title**, and **Note file** (the three filename operators only — not `Parent folder is` / `Parent folder is not`).
 
 ```yaml
-IF First level title contains: /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
+IF  First level title: contains → /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
 ```
 Matches a title like "Nota da reunião 2026-08-22 com John Doe" — the plugin finds the date `2026-08-22` inside the text. Standard JS regex flags are supported as a suffix, e.g. `/report/i` for case-insensitive matching or `/^draft/m` for multiline. If the text you type looks like a regex but is missing its `/slashes/`, the settings UI shows a hint under the field so it's easy to catch. A malformed pattern (or unknown flag) never crashes a scan: it's treated as "does not match" and you'll get a one-time Notice + console error identifying the broken pattern.
 
-**Regex mode is case-sensitive by default** (add the `i` flag yourself for case-insensitive matching) — the opposite of literal Note file filename matching, which is case-insensitive by default. Property and First level title literal matching is case-sensitive either way. **`exactly` and `contains` behave identically in regex mode** — both just test whether the pattern matches anywhere in the value (`RegExp.test()`); `exactly` does not implicitly anchor to the whole string. Anchor it yourself with `^...$` for a true full-string match. Typed-property coercion (checkbox/date/datetime normalization) is skipped entirely in regex mode — the property's raw stored value is tested directly.
+**Regex mode is case-sensitive by default** (add the `i` flag yourself for case-insensitive matching) — the opposite of literal Note file filename matching, which is case-insensitive by default. Property and First level title literal matching is case-sensitive either way. **`exactly match` and `contains` behave identically in regex mode** — both just test whether the pattern matches anywhere in the value (`RegExp.test()`); `exactly match` does not implicitly anchor to the whole string. Anchor it yourself with `^...$` for a true full-string match. Typed-property coercion (checkbox/date/datetime normalization) is skipped entirely in regex mode — the property's raw stored value is tested directly.
 
 **Mobile note:** avoid regex lookbehind (`(?<=...)` / `(?<!...)`) if you sync your vault to iOS — it isn't supported on iOS versions before 16.4. Named capture groups (`(?<name>...)`, used by [`{{match:name}}`](#match-in-then-beta) below) are unaffected; only *lookbehind* assertions are the risk.
 
@@ -194,15 +198,15 @@ Reuse whatever your IF regex matched — no need to retype it in the THEN action
 | `{{match:name}}` | Named capture group, from a pattern written as `(?<name>...)` |
 
 ```yaml
-IF Note file: Filename contains → /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
-THEN Note file: Move file to → transcripts/{{match}}
+IF    Note file: Filename contains → /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
+THEN  Note file: Move file to → "transcripts/{{match}}"
 ```
 Moves any file whose name contains a date like `2026-08-22` into `transcripts/2026-08-22/`, auto-creating the folder — no need to duplicate the date pattern on the THEN side.
 
 Named groups work the same way:
 ```yaml
-IF Note file: Filename contains → /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/
-THEN Note file: Move file to → transcripts/{{match:year}}/{{match:month}}
+IF    Note file: Filename contains → /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/
+THEN  Note file: Move file to → "transcripts/{{match:year}}/{{match:month}}"
 ```
 
 **Current limitations (beta):**
@@ -213,29 +217,29 @@ THEN Note file: Move file to → transcripts/{{match:year}}/{{match:month}}
 
 ## Multiple conditions per rule
 
-Combine conditions inside a single rule using **Match any / Match all of the following** (inspired by Zotero).
+Combine conditions inside a single rule using the **Match** dropdown next to the IF block, set to **Any of the following** or **All of the following** (inspired by Zotero).
 
-**AND example — match all of the following:**
+**AND example — Match: All of the following:**
 ```yaml
-Match all of the following:
-  - property: status exactly "done"
-  - property: priority exactly "high"
-THEN ADD tags: urgent-completed
+Match: All of the following
+  Condition 1  Property: status → exactly match → "done"
+  Condition 2  Property: priority → exactly match → "high"
+THEN  Property: tags → Add value → urgent-completed
 ```
 
-**OR example — match any of the following:**
+**OR example — Match: Any of the following:**
 ```yaml
-Match any of the following:
-  - property: status exactly "archived"
-  - property: deleted exactly "true"
-THEN REMOVE tags: active
+Match: Any of the following
+  Condition 1  Property: status → exactly match → "archived"
+  Condition 2  Property: deleted → exactly match → "true"
+THEN  Property: tags → Remove value → active
 ```
 
-Click **+ add condition** below the IF block to add more conditions, and the dropdown to switch between `any` and `all`. Existing rules from previous plugin versions are auto-migrated and keep their behavior unchanged.
+Click **+ add condition** below the IF block to add more conditions, and use the **Match** dropdown to switch between **Any of the following** and **All of the following**. Existing rules from previous plugin versions are auto-migrated and keep their behavior unchanged.
 
 ## Note file conditions
 
-Select **Note file** as the condition type to check the file itself, instead of a frontmatter property or the H1 title. Literal (non-regex) comparisons are case-insensitive; a `/regex/` value is case-sensitive instead unless you add the `i` flag — see [Regular expression matching](#regular-expression-matching).
+Select **Note file** as the condition type to check the file itself, instead of a frontmatter property or the H1 title. Note file conditions don't have a separate property-name field, and use their own five-option operator dropdown instead of the six-operator one above — no `exists` / `does not exist` / `is empty` here. Literal (non-regex) comparisons are case-insensitive; a `/regex/` value is case-sensitive instead unless you add the `i` flag — see [Regular expression matching](#regular-expression-matching).
 
 | Operator | Checks against | Example |
 |----------|-----------------|---------|
@@ -262,16 +266,16 @@ Matches when those three segments appear contiguous and in that order anywhere i
 **Parent folder is not** is the exact inverse — same matching rules, opposite result. Useful to exclude a folder from a broader rule:
 
 ```yaml
-IF Note file: Parent folder is not → "Archive"
-THEN Note file: Add name prefix: "[ACTIVE] "
+IF    Note file: Parent folder is not → "Archive"
+THEN  Note file: Add name prefix → "[ACTIVE] "
 ```
 Runs on every note **except** those under an `Archive` folder anywhere in their path. Leaving the value empty makes `Parent folder is` never match and `Parent folder is not` always match (same "nothing to compare against" convention as the `does not contain` operator elsewhere in the plugin).
 
 ## Note file actions
 
-Select **Note file** as the THEN action type to change the file itself instead of a frontmatter property or the H1 title. All text fields support the same placeholders as property/title actions (`{date}`, `{created_date}`, `{updated_date}`, `{today}`, `{filename}`, `{propertyName}`).
+Select **Note file** as the THEN action type to change the file itself instead of a frontmatter property or the H1 title. All text fields support the same placeholders as property/title actions (`{{date}}`, `{{created_date}}`, `{{updated_date}}`, `{{today}}`, `{{filename}}`, `{{propertyName}}`).
 
-**A bare date placeholder here is always date-only.** `{today}` (or `{date}` / `{created_date}` / `{updated_date}`) with no explicit `:FORMAT` always resolves to `YYYY-MM-DD` in these fields — never a time component, even if your vault has a different default date format configured elsewhere. This only applies to the no-format default: if you explicitly type a format, e.g. `{today:YYYY-MM-DD_HH-mm}`, it's honored exactly as you typed it — including a literal `:` if your OS's filesystem accepts one. The plugin never second-guesses text you typed explicitly, only the automatic default.
+**A bare date placeholder here is always date-only.** `{{today}}` (or `{{date}}` / `{{created_date}}` / `{{updated_date}}`) with no explicit `:FORMAT` always resolves to `YYYY-MM-DD` in these fields — never a time component, even if your vault has a different default date format configured elsewhere. This only applies to the no-format default: if you explicitly type a format, e.g. `{{today:YYYY-MM-DD_HH-mm}}`, it's honored exactly as you typed it — including a literal `:` if your OS's filesystem accepts one. The plugin never second-guesses text you typed explicitly, only the automatic default.
 
 | Action | Effect |
 |--------|--------|
@@ -288,17 +292,17 @@ All file actions run through the official Obsidian API: `fileManager.renameFile`
 Because the folder is created if missing, **`Move file to` works great combined with date placeholders** to sort files into folders that don't exist yet — you set the rule up once, and it creates a fresh folder every day/month/year as needed.
 
 ```yaml
-IF Note file: Filename contains "transcript"
-THEN Note file: Move file to "transcripts/{today}"
+IF    Note file: Filename contains → "transcript"
+THEN  Note file: Move file to → "transcripts/{{today}}"
 ```
-This moves any note whose filename contains `transcript` into `transcripts/YYYY-MM-DD/` (today's date) — creating both `transcripts/` and the dated subfolder the first time it runs, and reusing them on later runs the same day. Use `{today:YYYY-MM}` instead of `{today}` if you want one folder per month rather than per day.
+This moves any note whose filename contains `transcript` into `transcripts/YYYY-MM-DD/` (today's date) — creating both `transcripts/` and the dated subfolder the first time it runs, and reusing them on later runs the same day. Use `{{today:YYYY-MM}}` instead of `{{today}}` if you want one folder per month rather than per day.
 
 **Multiple file actions in the same rule compose in sequence** — each one executes immediately, so a later action sees the result of an earlier one:
 
 ```yaml
 THEN:
-  - Note file → Add name prefix: "[ARCHIVED] "
-  - Note file → Move file to: "Archive/{today:YYYY}"
+  - Note file: Add name prefix → "[ARCHIVED] "
+  - Note file: Move file to → "Archive/{today:YYYY}"
 ```
 The file is prefixed first, then the already-renamed file is moved.
 
@@ -313,8 +317,8 @@ The plugin detects when the target property is one of these types and converts t
 ### Checkbox
 
 ```yaml
-IF property: status exactly "done"
-THEN OVERWRITE property: completed = "true"
+IF    Property: status → exactly match → "done"
+THEN  Property: completed → Overwrite all values with → "true"
 ```
 Result on disk: `completed: true` (boolean). Obsidian renders a checked checkbox.
 
@@ -325,8 +329,8 @@ Rules:
 ### Date / datetime
 
 ```yaml
-IF property: status exactly "done"
-THEN OVERWRITE property: created_at = "08-08-2025"
+IF    Property: status → exactly match → "done"
+THEN  Property: created_at → Overwrite all values with → "08-08-2025"
 ```
 Result on disk: `created_at: 2025-08-08` (ISO date). Obsidian renders the date widget.
 
@@ -340,17 +344,17 @@ Datetime properties (`YYYY-MM-DDTHH:mm:ss`) are not parsed and are written exact
 
 ### Notes
 
-- This applies to both `ADD value` and `OVERWRITE all values with` actions on typed properties. For these types `ADD` behaves as `OVERWRITE` because the underlying types are scalar (you can't have a checkbox holding `[true, false]`).
+- This applies to both **Add value** and **Overwrite all values with** actions on typed properties. For these types **Add value** behaves as **Overwrite all values with** because the underlying types are scalar (you can't have a checkbox holding `[true, false]`).
 - Properties without a registered type (or registered as `text`, `number`, `multitext`, `tags`, etc.) keep the original string-based behavior. Nothing changes for those.
-- The same type-aware coercion happens when matching IF conditions, not just when writing THEN actions. For checkbox properties, `IF property: done exactly "true"` matches a note with `done: true` (boolean) regardless of how the user typed `true` (case-insensitive).
+- The same type-aware coercion happens when matching IF conditions, not just when writing THEN actions. For checkbox properties, `Property: done → exactly match → "true"` matches a note with `done: true` (boolean) regardless of how the user typed `true` (case-insensitive).
 
 ## Rule chaining within a scan
 
-Rules run in the order they're listed. A `PROPERTY` condition in a later rule sees property changes an earlier rule already made **in the same scan** — not just the frontmatter as it was before the scan started. So this works in a single pass:
+Rules run in the order they're listed. A **Property** condition in a later rule sees property changes an earlier rule already made **in the same scan** — not just the frontmatter as it was before the scan started. So this works in a single pass:
 
 ```yaml
-Rule 1: IF property: status exactly "done"     THEN ADD tags: completed
-Rule 2: IF property: tags contains "completed"   THEN ADD priority: low
+Rule 1: IF  Property: status → exactly match → "done"    THEN  Property: tags → Add value → completed
+Rule 2: IF  Property: tags → contains → "completed"       THEN  Property: priority → Add value → low
 ```
 
 Rule 2 fires on the same run Rule 1 added the `completed` tag, no second scan needed. Note file actions in an earlier rule (rename, move) are visible the same way — a later rule's `Note file` condition checks the file's *current* name/folder, including any rename/move already applied earlier in the same scan.
@@ -368,59 +372,44 @@ Useful for running rules only on active notes instead of your entire vault.
 
 Placeholders work inside **any THEN action value** — property `Add value` / `Overwrite all values with`, title `Prefix` / `Suffix` / `Overwrite`, and Note file `Rename` / `Add name prefix` / `Add name suffix` / `Move file to`. They're expanded at the moment the rule runs, against the file being processed.
 
-### Two syntaxes, same placeholders
-
-You can write placeholders with **single braces** (`{date}`, this plugin's original syntax) or **double braces** (`{{date}}`, matching [Obsidian's own Templates syntax](https://obsidian.md/help/plugins/templates)). Both work everywhere, and you can mix them freely in the same value. There is exactly **one** deliberate difference between the two:
-
-| | `{date}` (single brace) | `{{date}}` (double brace) |
-|---|---|---|
-| Meaning | The file's **creation date** | **Today's date** — matches Obsidian's real `{{date}}` |
-
-This is not a bug — `{date}` shipped before double-brace support existed and already meant "creation date" for existing users, so it keeps that meaning forever for backward compatibility. `{{date}}` was added later specifically to match what `{{date}}` means in every other part of Obsidian (today), so plugin users who already know Obsidian's template syntax get what they expect. Every other placeholder name means the exact same thing in both syntaxes — this divergence is unique to `date`.
-
 | Placeholder | Result |
 |---|---|
-| `{date}` | File's creation date, default format (`YYYY-MM-DD`). Example: `2026-01-08`. |
-| `{{date}}` | **Today's date** (not the file's), default format (`YYYY-MM-DD`) — matches Obsidian's Templates `{{date}}`. |
-| `{created_date}` / `{{created_date}}` | File's creation date — explicit alias of `{date}`, same meaning in both syntaxes. |
-| `{updated_date}` / `{{updated_date}}` | File's last-modified date. |
-| `{today}` / `{{today}}` | Today's date, independent of the file — same value as `{{date}}`. |
-| `{time}` / `{{time}}` | Current time, default format (`HH:mm`) — matches Obsidian's Templates `{{time}}`. |
-| `{filename}` / `{{filename}}` | File basename without `.md`. Example: `meeting-notes`. |
-| `{title}` / `{{title}}` | Same as `{filename}` — matches Obsidian's Templates `{{title}}`. |
-| `{propertyName}` / `{{propertyName}}` | Live value of that frontmatter property on the current note. |
-| `:FORMAT` suffix | Any of the above with a custom [moment.js](https://momentjs.com/docs/#/displaying/format/) format — works with either brace style: `{date:DD-MM-YYYY}` → `08-01-2026`, `{{date:MM}}` → just today's month, `{{time:HH:mm:ss}}`, `{updated_date:YYYY}`. |
-| `{{match}}` / `{{match:N}}` / `{{match:name}}` | Beta, **double-brace only** — see [{{match}} in THEN](#match-in-then-beta) above. |
-
-**Going forward, new placeholders ship double-brace only.** The single/double-brace pair above is frozen as-is for backward compatibility — no new placeholder gets a single-brace form, `{{match}}` being the first one.
+| `{{date}}` / `{{today}}` | Today's date (both names mean the same thing). Default format is `YYYY-MM-DD`, unless your vault has a custom Date format set under Files & Links — then that format is used instead. Example: `2026-01-08`. |
+| `{{created_date}}` | The file's creation date. |
+| `{{updated_date}}` | The file's last-modified date. |
+| `{{time}}` | Current time. Default format is `HH:mm`, unless your vault has a custom Time format set — then that format is used instead. Matches Obsidian's Templates `{{time}}`. |
+| `{{filename}}` / `{{title}}` | File basename without `.md`. Example: `meeting-notes`. |
+| `{{propertyName}}` | Live value of that frontmatter property on the current note. |
+| `:FORMAT` suffix | Any of the above with a custom [moment.js](https://momentjs.com/docs/#/displaying/format/) format: `{{date:DD-MM-YYYY}}` → `08-01-2026`, `{{date:MM}}` → just today's month, `{{time:HH:mm:ss}}`, `{{updated_date:YYYY}}`. |
+| `{{match}}` / `{{match:N}}` / `{{match:name}}` | Beta — see [{{match}} in THEN](#match-in-then-beta) above. |
 
 ### Property placeholders
 
-Any token that isn't one of the reserved names above and doesn't contain `:` or whitespace is treated as a frontmatter property lookup — in either brace style. So `{g_excerpt}`, `{{g_excerpt}}`, `{summary}`, `{kebab-case-prop}` all work.
+Any token that isn't one of the reserved names above, and whose first character isn't `:` or whitespace, is treated as a frontmatter property lookup. So `{{g_excerpt}}`, `{{summary}}`, `{{kebab-case-prop}}` all work.
 
 **Copy a value from one property to another:**
 ```yaml
-IF property: g_excerpt exists
-THEN ADD property excerpt: "{{g_excerpt}}"
+IF    Property: g_excerpt → exists
+THEN  Property: excerpt → Add value → "{{g_excerpt}}"
 ```
 
 Behavior:
-- **Missing property → empty string.** No errors, no literal `{name}` or `{{name}}` left behind in your YAML.
+- **Missing property → empty string.** No errors, no literal `{{name}}` left behind in your YAML.
 - **Arrays are joined with `, `.** A source like `tags: [a, b, c]` becomes `a, b, c` in the expanded string.
-- **Earlier actions in the same rule are visible to later ones.** The expansion reads from the in-progress frontmatter, so if action #1 sets `excerpt`, action #2 can reference `{excerpt}` or `{{excerpt}}`.
-- **Reserved names win.** `date`, `created_date`, `updated_date`, `today`, `time`, `title`, and `filename` are resolved as reserved placeholders first (in both brace styles); a property with one of those names won't shadow them.
+- **Earlier actions in the same rule are visible to later ones.** The expansion reads from the in-progress frontmatter, so if action #1 sets `excerpt`, action #2 can reference `{{excerpt}}`.
+- **Reserved names win.** `date`, `created_date`, `updated_date`, `today`, `time`, `title`, and `filename` are resolved as reserved placeholders first; a property with one of those names won't shadow them.
 
 ### Note file actions: dates are always date-only
 
-Inside `Rename` / `Add name prefix` / `Add name suffix` / `Move file to`, a **bare** date placeholder (`{{date}}`, `{date}`, `{created_date}`, `{updated_date}`, `{today}` — no explicit `:FORMAT`) always resolves to `YYYY-MM-DD`, never a time component, regardless of your vault's configured default date format. File and folder names elsewhere in the OS can't contain certain characters depending on platform, so these fields don't inherit a format that might not have been meant for filenames. An explicit format is always honored exactly as typed, including one with `:` in it — the plugin never rewrites what you explicitly typed, it only picks a safe default when you didn't specify one.
+Inside `Rename` / `Add name prefix` / `Add name suffix` / `Move file to`, a **bare** date placeholder (`{{date}}`, `{{created_date}}`, `{{updated_date}}`, `{{today}}` — no explicit `:FORMAT`) always resolves to `YYYY-MM-DD`, never a time component, regardless of your vault's configured default date format. File and folder names elsewhere in the OS can't contain certain characters depending on platform, so these fields don't inherit a format that might not have been meant for filenames. An explicit format is always honored exactly as typed, including one with `:` in it — the plugin never rewrites what you explicitly typed, it only picks a safe default when you didn't specify one.
 
 ### Combinations
 
-Placeholders mix freely in the same value, and the two brace styles combine freely too:
+Placeholders mix freely in the same value:
 - `{{date:YYYY-MM-DD}} - {{title}}` → `2026-08-22 - meeting-notes`
-- `Meeting {filename} - {date:DD/MM/YY}` → `Meeting meeting-notes - 08/01/26`
+- `Meeting {{filename}} - {{date:DD/MM/YY}}` → `Meeting meeting-notes - 08/01/26`
 - `{{date}}/{{title}}` as a Move file to destination → `2026-08-22/meeting-notes` (folder auto-created)
-- `{g_title} ({date:YYYY})` → `My Post (2026)`
+- `{{g_title}} ({{date:YYYY}})` → `My Post (2026)`
 
 ## Installation
 
@@ -430,7 +419,7 @@ Placeholders mix freely in the same value, and the two brace styles combine free
 3. Install and enable
 
 ### Manual installation
-1. Copy folder to `.obsidian/plugins/obsidian-conditional-properties`
+1. Copy folder to `.obsidian/plugins/conditional-properties`
 2. Settings → Community Plugins → Enable "Conditional Properties"
 
 ## Usage
@@ -463,10 +452,10 @@ Settings → Backup and restore.
 - [x] Current file execution
 - [x] Property existence checks
 - [x] Rename property action
-- [x] Title overwrite with `{filename}` and `{date:FORMAT}` placeholders
+- [x] Title overwrite with `{{filename}}` and `{{date:FORMAT}}` placeholders
 - [x] Multiple conditions per rule (`match any` / `match all`)
-- [x] Frontmatter property placeholders (`{propertyName}`) in action values
-- [x] Regex matching (`/pattern/`) on `exactly` / `contains` / `notContains`
+- [x] Frontmatter property placeholders (`{{propertyName}}`) in action values
+- [x] Regex matching (`/pattern/`) on `exactly match` / `contains` / `does not contain`
 - [ ] Modify note content (beyond frontmatter)
 - [ ] Comparison operators (greater than / less than)
 - [ ] Nested condition groups (e.g. `(A AND B) OR C`)

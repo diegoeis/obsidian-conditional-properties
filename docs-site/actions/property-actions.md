@@ -11,42 +11,44 @@ nav_order: 1
 Adds a value to a property without duplicating it. Converts a scalar to an array when needed.
 
 ```yaml
-THEN ADD tags: important
+THEN  Property: tags → Add value → important
 ```
+
+The action row is: **Property** type → property name field → action dropdown → value field.
 
 ## Remove value
 
 Removes a specific value from a property or array.
 
 ```yaml
-THEN REMOVE tags: active, wip
+THEN  Property: tags → Remove value → active, wip
 ```
 
-## Overwrite property
+## Overwrite all values with
 
 Replaces the entire value.
 
 ```yaml
-THEN OVERWRITE property: status = "archived"
+THEN  Property: status → Overwrite all values with → "archived"
 ```
 
 {: .important }
-**Unlike Add/Remove, Overwrite does not split on commas.** `THEN OVERWRITE property: tags = "a, b, c"` writes the literal string `"a, b, c"` as a single value, not the array `[a, b, c]`. The settings UI's "(use commas; …)" hint on the value field applies to Add and Remove, not to Overwrite — if you need a multi-value array, use **Add** (on an empty or non-existent property, it creates the array for you) instead of Overwrite.
+**Unlike Add/Remove, Overwrite all values with does not split on commas.** `Property: tags → Overwrite all values with → "a, b, c"` writes the literal string `"a, b, c"` as a single value, not the array `[a, b, c]`. The settings UI's "(use commas; …)" hint on the value field applies to Add value and Remove value, not to Overwrite all values with — if you need a multi-value array, use **Add value** (on an empty or non-existent property, it creates the array for you) instead of Overwrite.
 
 ## Delete property
 
-Removes the property from the note entirely.
+Removes the property from the note entirely. No value field — the action dropdown alone tells the plugin what to do.
 
 ```yaml
-THEN DELETE PROPERTY: legacy_data
+THEN  Property: legacy_data → Delete property
 ```
 
-## Rename property
+## Rename property to
 
 Copies a property's value to a new name and removes the old one.
 
 ```yaml
-THEN RENAME property: old_name -> new_name
+THEN  Property: old_name → Rename property to → new_name
 ```
 
 {: .note }
@@ -57,16 +59,16 @@ If a property already exists under the target name, the rename is silently skipp
 Writing to a `checkbox` / `date` / `datetime` property stores the real YAML type, so Obsidian's native widgets render correctly instead of showing plain text.
 
 ```yaml
-THEN OVERWRITE property: completed = "true"
+THEN  Property: completed → Overwrite all values with → "true"
 ```
 Result on disk: `completed: true` (boolean) — renders as a checked checkbox, not text.
 
-For these scalar types, `ADD` behaves like `OVERWRITE` — you can't have a checkbox holding `[true, false]`. See [Typed Properties](/typed-properties) for the full parsing rules, including how date strings get normalized.
+For these scalar types, **Add value** behaves like **Overwrite all values with** — you can't have a checkbox holding `[true, false]`. See [Typed Properties](/typed-properties) for the full parsing rules, including how date strings get normalized.
 
 ## Placeholders in values
 
 Any property action's value can reference dates, times, the filename, another property, or a regex capture — see [Placeholders](/placeholders).
 
 ```yaml
-THEN ADD property excerpt: "{{g_excerpt}}"
+THEN  Property: excerpt → Add value → "{{g_excerpt}}"
 ```

@@ -7,6 +7,12 @@ nav_order: 11
 
 The full, unabridged history lives in [CHANGELOG.md on GitHub](https://github.com/diegoeis/obsidian-conditional-properties/blob/main/CHANGELOG.md). Highlights of recent releases:
 
+## 0.24.2
+
+- Settings tab UI rebuilt on native Obsidian patterns (setting-group/setting-items shell, batched DOM build, `cp-*` class naming). No behavior change.
+- Documentation rewritten so every example mirrors the settings screen's exact dropdown labels and field order.
+- Placeholder documentation and settings-field hints are double-brace only (`{{date}}`, `{{propertyName}}`, …) going forward.
+
 ## 0.24.1
 
 - Renamed "First level heading" (IF) and "First heading" (THEN) to **First level title**, on both sides, for a consistent name. UI label only — existing rules are unaffected.
@@ -15,7 +21,7 @@ The full, unabridged history lives in [CHANGELOG.md on GitHub](https://github.co
 
 - Regular expression matching in IF conditions (`/pattern/flags`) on Property, First level title, and Note file (filename) conditions.
 - 🧪 Beta: `{{match}}` / `{{match:N}}` / `{{match:name}}` — reuse an IF regex's match in THEN actions.
-- Obsidian Templates-style `{{...}}` placeholder syntax, alongside the original single-brace syntax.
+- Obsidian Templates-style `{{...}}` placeholder syntax.
 - New placeholders: `{{time}}` and `{{title}}`.
 - Fixed "Run this rule" making every other rule's row look like it was running too.
 

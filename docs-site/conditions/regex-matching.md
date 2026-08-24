@@ -6,12 +6,12 @@ nav_order: 4
 
 # Regular expression matching
 
-Wrap the value of `exactly`, `contains`, or `notContains` in forward slashes to match with a regular expression instead of a literal string — the same `/pattern/flags` convention as [Obsidian's Web Clipper URL-trigger patterns](https://help.obsidian.md/web-clipper/triggers#Regular+expression+matching).
+Wrap the value of **exactly match**, **contains**, or **does not contain** in forward slashes to match with a regular expression instead of a literal string — the same `/pattern/flags` convention as [Obsidian's Web Clipper URL-trigger patterns](https://help.obsidian.md/web-clipper/triggers#Regular+expression+matching).
 
-Works on [Property](/conditions/property), [First level title](/conditions/first-level-title), and [Note file](/conditions/note-file) (the three filename operators). It does **not** work on `Parent folder is` / `Parent folder is not`, which always stay literal path matching.
+Works on [Property](/conditions/property), [First level title](/conditions/first-level-title), and [Note file](/conditions/note-file) (the three filename operators — `Filename contains`, `Filename not contains`, `Filename exactly match`). It does **not** work on `Parent folder is` / `Parent folder is not`, which always stay literal path matching.
 
 ```yaml
-IF First level title contains: /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
+IF  First level title: contains → /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
 ```
 Matches a title like "Nota da reunião 2026-08-22 com John Doe" — the plugin finds the date `2026-08-22` inside the text.
 
@@ -28,7 +28,7 @@ Standard JS regex flags are supported as a suffix:
 **Regex mode is case-sensitive by default**, on every condition type — add the `i` flag yourself if you want case-insensitive matching. This is the opposite of literal (non-regex) matching on a [Note file](/conditions/note-file) filename condition, which is always case-insensitive. [Property](/conditions/property) and [First level title](/conditions/first-level-title) literal matching is case-sensitive either way, so only the Note file case actually flips behavior when you switch to a regex.
 
 {: .important }
-**`exactly` and `contains` behave identically in regex mode.** Both simply test whether the pattern matches anywhere in the value (JavaScript's `RegExp.test()`) — `exactly` does **not** implicitly anchor the pattern to the whole string. If you want a true full-string match, anchor it yourself with `^` and `$`: `/^\d{4}-\d{2}-\d{2}$/`. Only `notContains` actually changes behavior in regex mode (it negates the test result).
+**`exactly match` and `contains` behave identically in regex mode.** Both simply test whether the pattern matches anywhere in the value (JavaScript's `RegExp.test()`) — `exactly match` does **not** implicitly anchor the pattern to the whole string. If you want a true full-string match, anchor it yourself with `^` and `$`: `/^\d{4}-\d{2}-\d{2}$/`. Only `does not contain` actually changes behavior in regex mode (it negates the test result).
 
 ## Missing slashes
 

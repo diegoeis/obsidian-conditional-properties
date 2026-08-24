@@ -25,8 +25,8 @@ All of these run through the official Obsidian API: `fileManager.renameFile` for
 You never need to pre-create the destination — combine it with a date placeholder to sort files into folders that don't exist yet:
 
 ```yaml
-IF Note file: Filename contains "transcript"
-THEN Note file: Move file to "transcripts/{{date}}"
+IF    Note file: Filename contains → "transcript"
+THEN  Note file: Move file to → "transcripts/{{date}}"
 ```
 This moves any note whose filename contains `transcript` into `transcripts/YYYY-MM-DD/` (today's date), creating both `transcripts/` and the dated subfolder the first time it runs, and reusing them on later runs the same day. Use `{{date:YYYY-MM}}` instead of `{{date}}` for one folder per month.
 
@@ -40,8 +40,8 @@ Each file action executes immediately, so a later action in the same rule sees t
 
 ```yaml
 THEN:
-  - Note file → Add name prefix: "[ARCHIVED] "
-  - Note file → Move file to: "Archive/{{date:YYYY}}"
+  - Note file: Add name prefix → "[ARCHIVED] "
+  - Note file: Move file to → "Archive/{{date:YYYY}}"
 ```
 The file is prefixed first, then the already-renamed file is moved.
 
@@ -60,15 +60,15 @@ Reuse whatever your IF regex condition matched — no need to retype the pattern
 | `{{match:name}}` | Named capture group, from a pattern written as `(?<name>...)` |
 
 ```yaml
-IF Note file: Filename contains → /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
-THEN Note file: Move file to → transcripts/{{match}}
+IF    Note file: Filename contains → /\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])/
+THEN  Note file: Move file to → "transcripts/{{match}}"
 ```
 Moves any file whose name contains a date like `2026-08-22` into `transcripts/2026-08-22/`, auto-creating the folder — no need to duplicate the date pattern on the THEN side.
 
 Named groups work the same way:
 ```yaml
-IF Note file: Filename contains → /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/
-THEN Note file: Move file to → transcripts/{{match:year}}/{{match:month}}
+IF    Note file: Filename contains → /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/
+THEN  Note file: Move file to → "transcripts/{{match:year}}/{{match:month}}"
 ```
 
 {: .warning }

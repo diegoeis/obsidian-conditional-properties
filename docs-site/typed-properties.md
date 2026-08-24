@@ -15,8 +15,8 @@ This coercion only applies to a **literal** IF value. In [regex mode](/condition
 ## Checkbox
 
 ```yaml
-IF property: status exactly "done"
-THEN OVERWRITE property: completed = "true"
+IF    Property: status → exactly match → "done"
+THEN  Property: completed → Overwrite all values with → "true"
 ```
 Result on disk: `completed: true` (boolean). Obsidian renders a checked checkbox.
 
@@ -27,8 +27,8 @@ Rules:
 ## Date / datetime
 
 ```yaml
-IF property: status exactly "done"
-THEN OVERWRITE property: created_at = "08-08-2025"
+IF    Property: status → exactly match → "done"
+THEN  Property: created_at → Overwrite all values with → "08-08-2025"
 ```
 Result on disk: `created_at: 2025-08-08` (ISO date). Obsidian renders the date widget.
 
@@ -43,6 +43,6 @@ Datetime properties (`YYYY-MM-DDTHH:mm:ss`) are not parsed and are written exact
 
 ## Notes
 
-- Applies to both `ADD value` and `OVERWRITE all values with` — for these scalar types, `ADD` behaves like `OVERWRITE` (you can't have a checkbox holding `[true, false]`).
+- Applies to both **Add value** and **Overwrite all values with** — for these scalar types, **Add value** behaves like **Overwrite all values with** (you can't have a checkbox holding `[true, false]`).
 - Properties without a registered type (or registered as `text`, `number`, `multitext`, `tags`, etc.) keep the original string-based behavior — nothing changes for those.
 - The same type-aware coercion happens on the IF side, not just when writing THEN actions.

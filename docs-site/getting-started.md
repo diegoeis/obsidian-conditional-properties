@@ -15,7 +15,7 @@ nav_order: 2
 
 ### Manual installation
 
-1. Copy the plugin folder to `.obsidian/plugins/obsidian-conditional-properties`
+1. Copy the plugin folder to `.obsidian/plugins/conditional-properties`
 2. Settings → Community Plugins → Enable "Conditional Properties"
 
 ## Your first rule
@@ -23,13 +23,13 @@ nav_order: 2
 Every rule has the same shape: an **IF** block (one or more conditions) and a **THEN** block (one or more actions). Let's build one that tags meeting notes.
 
 1. Open Settings → Conditional Properties → **Add rule**.
-2. Under **If**, leave the condition type as **Property**, set the property name to `type`, the operator to `exactly`, and the value to `meeting`.
-3. Under **Then**, leave the action as **Property → Add value**, set the property name to `tags`, and the value to `work, important`.
+2. Under **If**, leave the condition type as **Property**, set the property name field to `type`, the operator dropdown to **exactly match**, and the value field to `meeting`.
+3. Under **Then**, leave the action type as **Property**, set the property name field to `tags`, the action dropdown to **Add value**, and the value field to `work, important`.
 4. Click **Run this rule** to test it against your configured scan scope, or **Run now** to run every rule in the vault.
 
 ```yaml
-IF property: type exactly "meeting"
-THEN ADD tags: work, important
+IF    Property: type → exactly match → "meeting"
+THEN  Property: tags → Add value → work, important
 ```
 
 That's it — any note with `type: meeting` in its frontmatter now gets `tags: [work, important]` added, without duplicating values on repeated runs.

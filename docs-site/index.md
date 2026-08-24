@@ -31,20 +31,20 @@ Stop manually updating properties across hundreds of notes. Define rules once, r
 
 **Auto-tag meetings:**
 ```yaml
-IF property: type exactly "meeting"
-THEN ADD tags: work, important
+IF    Property: type → exactly match → "meeting"
+THEN  Property: tags → Add value → work, important
 ```
 
 **Sort transcripts into a dated folder:**
 ```yaml
-IF Note file: Filename contains "transcript"
-THEN Note file: Move file to "transcripts/{{date}}"
+IF    Note file: Filename contains → "transcript"
+THEN  Note file: Move file to → "transcripts/{{date}}"
 ```
 
 **Date-stamp completed tasks:**
 ```yaml
-IF property: status exactly "done"
-THEN First level title: Add suffix " - {{date:DD/MM/YYYY}}"
+IF    Property: status → exactly match → "done"
+THEN  First level title: Add suffix → " - {{date:DD/MM/YYYY}}"
 ```
 
 ## Where to go next

@@ -11,13 +11,17 @@ Placeholders work inside **any THEN action value** — [Property actions](/actio
 
 | Placeholder | Result |
 |---|---|
-| `{{date}}` | Today's date, default format `YYYY-MM-DD`. |
-| `{{time}}` | Current time, default format `HH:mm`. |
+| `{{today}}` / `{{date}}` | Today's date (both names mean the same thing). Default format is `YYYY-MM-DD`, unless your vault has a custom Date format under Files & Links — then that format is used instead. |
+| `{{time}}` | Current time. Default format is `HH:mm`, unless your vault has a custom Time format — then that format is used instead. |
 | `{{title}}` | The note's filename, without `.md`. Example: `meeting-notes`. |
 | `{{created_date}}` | The file's creation date. |
 | `{{updated_date}}` | The file's last-modified date. |
+| `{{filename}}` | The note's filename, without `.md` (same value as `{{title}}`). |
 | `{{propertyName}}` | The live value of that frontmatter property on the current note. |
 | `{{match}}` / `{{match:N}}` / `{{match:name}}` | Beta — reuses whatever an IF regex condition matched. See [`{{match}}` in THEN](/actions/note-file-actions#match-in-then-beta). |
+
+{: .note }
+In [Note file actions](/actions/note-file-actions) (Rename file / Add name prefix / Add name suffix / Move file to), a bare date placeholder is always forced to `YYYY-MM-DD` regardless of the vault's date format — see [Dates are always date-only in Note file actions](#dates-are-always-date-only-in-note-file-actions) below.
 
 ## Custom formats
 
@@ -32,12 +36,12 @@ Append `:FORMAT` for a custom [moment.js](https://momentjs.com/docs/#/displaying
 
 ## Property placeholders
 
-Any token that isn't one of the reserved names above and doesn't contain `:` or whitespace is treated as a frontmatter property lookup: `{{g_excerpt}}`, `{{summary}}`, `{{kebab-case-prop}}` all work.
+Any token that isn't one of the reserved names above, and whose first character isn't `:` or whitespace, is treated as a frontmatter property lookup: `{{g_excerpt}}`, `{{summary}}`, `{{kebab-case-prop}}` all work.
 
 **Copy a value from one property to another:**
 ```yaml
-IF property: g_excerpt exists
-THEN ADD property excerpt: "{{g_excerpt}}"
+IF    Property: g_excerpt → exists
+THEN  Property: excerpt → Add value → "{{g_excerpt}}"
 ```
 
 Behavior:
