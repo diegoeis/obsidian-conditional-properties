@@ -2283,7 +2283,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					}));
 			} else if (action.action !== "delete") {
 				actionSetting.addText(t => t
-					.setPlaceholder("value (use commas; supports {propertyName}, {{date}}, {{time}}, {{title}}, {date}, {created_date}, {updated_date}, {today}, {filename})")
+					.setPlaceholder("value (use commas; supports {{propertyName}}, {{date}}, {{time}}, {{title}}, {{created_date}}, {{updated_date}}, {{today}}, {{filename}})")
 					.setValue(action.value || "")
 					.onChange(async (v) => {
 						action.value = v;
@@ -2309,7 +2309,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			if (action.action !== "delete") {
 				const FILE_ACTION_PLACEHOLDERS = {
-					rename: "new file name, without extension (supports {{date}}, {{time}}, {{title}}, {date}, {filename}, {propertyName}...)",
+					rename: "new file name, without extension (supports {{date}}, {{time}}, {{title}}, {{filename}}, {{propertyName}}...)",
 					addPrefix: "prefix text (supports placeholders)",
 					addSuffix: "suffix text (supports placeholders)",
 					move: "destination folder inside the vault, created if missing — e.g. Archive/{{date}}",
@@ -2336,7 +2336,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			actionSetting.addText(t => t
-				.setPlaceholder("Text (use {{date}}, {{time}}, {{title}}, {date}, {created_date}, {updated_date}, {today}, {filename}, or {propertyName})")
+				.setPlaceholder("Text (use {{date}}, {{time}}, {{title}}, {{created_date}}, {{updated_date}}, {{today}}, {{filename}}, or {{propertyName}})")
 				.setValue(action.text || "")
 				.onChange(async (v) => {
 					action.text = v;
