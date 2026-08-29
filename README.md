@@ -113,7 +113,7 @@ THEN  First level title: Overwrite to → "{{date:YYYY-MM-DD}} - {{filename}}"
 ```
 Result: `2026-01-08 - team-sync`.
 
-**Note file actions** — the action row is **Note file** type → action dropdown (`Rename file` / `Add name prefix` / `Add name suffix` / `Move file to` / `Delete file`) → text field (omitted for Delete file). See [Note file actions](#note-file-actions).
+**Note file actions** — the action row is **Note file** type → action dropdown (`Rename file` / `Add name prefix` / `Add name suffix` / `Move file to` / `Bookmark file` / `Remove bookmark` / `Delete file`) → text field (a bookmark-group dropdown for Bookmark file; omitted for Remove bookmark and Delete file). See [Note file actions](#note-file-actions).
 ```yaml
 THEN  Note file: Move file to → "Archive/{today:YYYY}"
 ```
@@ -283,9 +283,15 @@ Select **Note file** as the THEN action type to change the file itself instead o
 | **Add name prefix** | Prepends text to the current filename. Empty text is a no-op. |
 | **Add name suffix** | Appends text to the current filename. Empty text is a no-op. |
 | **Move file to** | Moves the file to a folder path inside the vault (e.g. `Archive/2026`). **The folder is created automatically if it doesn't exist** — you never need to pre-create the destination. Left empty → skipped. Moving outside the vault isn't possible — Obsidian's plugin API has no access beyond the vault sandbox. |
+| **Bookmark file** *(new in v0.25.0)* | Bookmarks the file using Obsidian's core **Bookmarks** plugin. A second dropdown lets you pick an existing bookmark group to file it under, or leave it at "No group (top level)". Requires the core Bookmarks plugin to be enabled — see below. |
+| **Remove bookmark** *(new in v0.25.0)* | Removes the file's bookmark wherever it is in the Bookmarks tree (any group, or top level). No-op if the file isn't bookmarked. |
 | **Delete file** | Sends the file to trash using your vault's configured deletion behavior (system trash, `.trash` folder, or permanent — whatever you set in Obsidian's Files & Links settings). |
 
-All file actions run through the official Obsidian API: `fileManager.renameFile` for rename/prefix/suffix/move (so links elsewhere in the vault stay intact), and `fileManager.trashFile` for delete.
+All file actions run through the official Obsidian API: `fileManager.renameFile` for rename/prefix/suffix/move (so links elsewhere in the vault stay intact), `fileManager.trashFile` for delete, and the core **Bookmarks** plugin's internal API for bookmark/remove bookmark.
+
+### Bookmark file: requires the core Bookmarks plugin
+
+**Bookmark file** and **Remove bookmark** read and write Obsidian's core **Bookmarks** plugin. Enable it under Settings → Core plugins → Bookmarks. The group dropdown lists every group that already exists in your Bookmarks pane (including nested groups, shown as `Parent/Child`) — create the group in the Bookmarks pane first if you want to file notes into it. If Bookmarks is disabled, the group dropdown is empty and the action silently does nothing (logged to the developer console) rather than failing the whole scan.
 
 ### Move file to: auto-creates the destination folder
 

@@ -74,7 +74,7 @@ Single ~2200-line file: class `ConditionalPropertiesPlugin extends Plugin` (rule
   - `thenActions` dispatch by `action.type`:
     - `"property"` — `action.action`: `add` | `remove` | `overwrite` | `delete` | `rename`. Typed-property coercion (checkbox/date/datetime) happens here via `app.metadataTypeManager`.
     - `"title"` — `action.modificationType`: `prefix` | `suffix` | `overwrite`, text run through `_formatText()`.
-    - `"file"` — dispatched to `_applyFileAction(file, fileActionType, rawText, newFm)`; `fileActionType`: `rename` | `addPrefix` | `addSuffix` | `move` | `delete`. `delete` short-circuits the rest of that file's actions (the file no longer exists) — see `_sanitizeFilenameComponent()`/`_sanitizeVaultFolderPath()` for the path-traversal guards these go through before `fileManager.renameFile`/`trashFile`.
+    - `"file"` — dispatched to `_applyFileAction(file, fileActionType, rawText, newFm, matchGroups, bookmarkGroup)`; `fileActionType`: `rename` | `addPrefix` | `addSuffix` | `move` | `bookmark` | `removeBookmark` | `delete`. `delete` short-circuits the rest of that file's actions (the file no longer exists) — see `_sanitizeFilenameComponent()`/`_sanitizeVaultFolderPath()` for the path-traversal guards these go through before `fileManager.renameFile`/`trashFile`. `bookmark`/`removeBookmark` go through `_applyBookmarkAction()` against Obsidian's core Bookmarks plugin (`app.internalPlugins.plugins.bookmarks.instance` — undocumented internal API, same category as `metadataTypeManager` below); `bookmark` targets the group named by `bookmarkGroup` (a `"/"`-joined title chain from `_listBookmarkGroups()`, or top level when empty), `removeBookmark` removes every matching file-bookmark entry anywhere in the tree.
   - `_formatText(text, file, fm, dateOnly?)` expands placeholders: `{date}` / `{created_date}` (alias), `{date:FORMAT}`, `{updated_date}`, `{today}`, `{filename}`, `{title}`, `{time}`, and `{propertyName}` (reads `fm`, the in-progress frontmatter). Both single-brace `{x}` and double-brace `{{x}}` forms are supported. `dateOnly: true` (used for Note file actions, since filenames can't hold a full timestamp) forces date-only formatting even for `{today}`/`{updated_date}`.
 - Persistence:
   - Title changes via `_updateNoteTitle(file, newTitle)`.
@@ -103,7 +103,7 @@ conditions: Array<{
 thenActions: Array<
   { type: "property", prop, value, action: "add"|"remove"|"overwrite"|"delete"|"rename" }
 | { type: "title", modificationType: "prefix"|"suffix"|"overwrite", text }
-| { type: "file", fileActionType: "rename"|"addPrefix"|"addSuffix"|"move"|"delete", text? }
+| { type: "file", fileActionType: "rename"|"addPrefix"|"addSuffix"|"move"|"bookmark"|"removeBookmark"|"delete", text?, bookmarkGroup? }
 >
 ```
 

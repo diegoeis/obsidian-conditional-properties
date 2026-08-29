@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.25.0 - 2026-08-29
+### Added
+- **"Bookmark file" and "Remove bookmark" Note file THEN actions.** "Bookmark file" adds the file to Obsidian's core Bookmarks plugin, with a group dropdown populated from your existing bookmark groups (including nested ones, shown as `Parent/Child`) or "No group (top level)". "Remove bookmark" removes the file's bookmark wherever it exists in the tree. Both are no-ops when the desired state already holds (already bookmarked in that exact group, or not bookmarked at all), so a rule can run repeatedly without piling up duplicates. Requires the core Bookmarks plugin to be enabled — if it's disabled, the group dropdown is empty and the action is silently skipped (logged to the console) rather than failing the scan, since Bookmarks has no public API (undocumented internal state, same category as the existing `metadataTypeManager` usage in this file).
+
 ## 0.24.2 - 2026-08-24
 ### Changed
 - **Settings tab UI rebuilt on native Obsidian patterns.** The DOM is now batched off-document and attached once instead of inserting each row live (fixes lag when opening the tab with many rules), wrapped in Obsidian's own setting-group/setting-items shell, and every `conditional-*` CSS class renamed to `cp-*` under one shared row shape. No behavior change — same rules, same fields, same commands.

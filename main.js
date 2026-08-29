@@ -446,15 +446,16 @@ class ConditionalPropertiesPlugin extends Plugin {
 
 			// Process THEN actions
 			for (const action of thenActions) {
-				const { type = 'property', prop, value, action: actionType, modificationType, text } = action || {};
+				const { type = 'property', prop, value, action: actionType, modificationType, text, bookmarkGroup } = action || {};
 
-				// Handle note file actions (rename / prefix / suffix / move / delete).
-				// Unlike property/title actions, these execute immediately (not
-				// batched at the end) so multiple file actions in the same rule
-				// compose in sequence — e.g. "Add name prefix" then "Move file to"
-				// sees the already-prefixed name.
+				// Handle note file actions (rename / prefix / suffix / move /
+				// delete / bookmark / removeBookmark). Unlike property/title
+				// actions, these execute immediately (not batched at the end)
+				// so multiple file actions in the same rule compose in
+				// sequence — e.g. "Add name prefix" then "Move file to" sees
+				// the already-prefixed name.
 				if (type === 'file') {
-					const applied = await this._applyFileAction(file, actionType, text, newFm, capturedMatch);
+					const applied = await this._applyFileAction(file, actionType, text, newFm, capturedMatch, bookmarkGroup);
 					if (applied === 'deleted') {
 						fileDeleted = true;
 						fileActionApplied = true;
@@ -631,19 +632,23 @@ class ConditionalPropertiesPlugin extends Plugin {
 
 	/**
 	 * Executes a single "Note file" THEN action (rename / add prefix / add
-	 * suffix / move / delete) immediately against the vault, using the
-	 * official Obsidian API — `fileManager.renameFile` (keeps links updated
-	 * across the vault) and `fileManager.trashFile` (respects the user's
-	 * configured deletion behavior: system trash, `.trash` folder, or
-	 * permanent delete). Moving a file outside the vault is not supported —
-	 * the plugin API has no access outside the vault sandbox, so "Move file
-	 * to" only accepts vault-relative destination folders.
+	 * suffix / move / delete / bookmark / remove bookmark) immediately
+	 * against the vault, using the official Obsidian API —
+	 * `fileManager.renameFile` (keeps links updated across the vault) and
+	 * `fileManager.trashFile` (respects the user's configured deletion
+	 * behavior: system trash, `.trash` folder, or permanent delete). Moving
+	 * a file outside the vault is not supported — the plugin API has no
+	 * access outside the vault sandbox, so "Move file to" only accepts
+	 * vault-relative destination folders. Bookmark/remove-bookmark go
+	 * through `_applyBookmarkAction()` — see its doc comment for the
+	 * Bookmarks core plugin caveats.
 	 *
-	 * Returns `'deleted'` when the file was trashed, `true` when a rename/
-	 * move actually changed something, or `false` when the action was a
-	 * no-op (empty text, or the computed path is unchanged).
+	 * Returns `'deleted'` when the file was trashed, `true` when a
+	 * rename/move/bookmark change actually happened, or `false` when the
+	 * action was a no-op (empty text, computed path unchanged, already
+	 * bookmarked in the target location, or nothing to unbookmark).
 	 */
-	async _applyFileAction(file, fileActionType, rawText, newFm, matchGroups) {
+	async _applyFileAction(file, fileActionType, rawText, newFm, matchGroups, bookmarkGroup) {
 		if (fileActionType === 'delete') {
 			try {
 				await this.app.fileManager.trashFile(file);
@@ -652,6 +657,10 @@ class ConditionalPropertiesPlugin extends Plugin {
 				console.error(`ConditionalProperties: failed to delete ${file.path}`, e);
 				return false;
 			}
+		}
+
+		if (fileActionType === 'bookmark' || fileActionType === 'removeBookmark') {
+			return this._applyBookmarkAction(file, fileActionType, bookmarkGroup);
 		}
 
 		// dateOnly: file/folder names can never contain a time component, so a
@@ -701,6 +710,156 @@ class ConditionalPropertiesPlugin extends Plugin {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Executes a "Bookmark file" / "Remove bookmark" THEN action against
+	 * Obsidian's core Bookmarks plugin.
+	 *
+	 * KNOWN TECH DEBT: the Bookmarks core plugin has no public API — it is
+	 * not in obsidian.d.ts. `app.internalPlugins.plugins.bookmarks.instance`
+	 * (the `items` tree, `addItem`/`removeItem`/`onItemsChanged`) is
+	 * undocumented internal state, same category as `app.metadataTypeManager`
+	 * elsewhere in this file. Guarded end-to-end with try/catch and
+	 * `typeof fn === "function"` checks, so a breaking Obsidian update
+	 * degrades to "no bookmark change" (skipped, logged via console.error)
+	 * rather than crashing the scan. Re-check this against obsidian.d.ts /
+	 * community internals when bumping minAppVersion.
+	 *
+	 * `bookmarkGroupPath` is a "/"-joined chain of group titles (see
+	 * `_listBookmarkGroups()`), or empty/undefined for the root level.
+	 * "Remove bookmark" ignores it and removes every matching file-bookmark
+	 * entry anywhere in the tree, mirroring the core plugin's own toggle
+	 * behavior (star icon) rather than a per-group removal.
+	 *
+	 * Returns `true` when a bookmark was actually added/removed, `false`
+	 * otherwise (Bookmarks disabled, already in the desired state, or an
+	 * internal-API error).
+	 */
+	_applyBookmarkAction(file, fileActionType, bookmarkGroupPath) {
+		try {
+			const internal = this.app && this.app.internalPlugins;
+			const entry = internal && internal.plugins && internal.plugins.bookmarks;
+			if (!entry || !entry.enabled || !entry.instance || !Array.isArray(entry.instance.items)) {
+				console.error("ConditionalProperties: Bookmarks core plugin is not enabled");
+				return false;
+			}
+			const instance = entry.instance;
+
+			const findFileItems = (items, path, into) => {
+				for (const item of items) {
+					if (!item) continue;
+					if (item.type === "file" && item.path === path) into.push(item);
+					if (item.type === "group" && Array.isArray(item.items)) findFileItems(item.items, path, into);
+				}
+			};
+
+			if (fileActionType === "removeBookmark") {
+				const matches = [];
+				findFileItems(instance.items, file.path, matches);
+				if (matches.length === 0) return false;
+				for (const item of matches) {
+					if (typeof instance.removeItem === "function") {
+						instance.removeItem(item);
+					} else {
+						this._removeBookmarkItemDeep(instance.items, item);
+					}
+				}
+				this._persistBookmarkChange(instance);
+				return true;
+			}
+
+			if (fileActionType === "bookmark") {
+				const targetGroup = bookmarkGroupPath
+					? this._findBookmarkGroup(instance.items, bookmarkGroupPath)
+					: undefined;
+				const targetList = (targetGroup && Array.isArray(targetGroup.items)) ? targetGroup.items : instance.items;
+
+				const alreadyInTarget = targetList.some(item => item && item.type === "file" && item.path === file.path);
+				if (alreadyInTarget) return false; // already bookmarked in this exact group/root — no-op
+
+				const newItem = { type: "file", path: file.path, title: undefined, ctime: Date.now() };
+				if (typeof instance.addItem === "function") {
+					instance.addItem(newItem, targetGroup);
+				} else {
+					targetList.push(newItem);
+				}
+				this._persistBookmarkChange(instance);
+				return true;
+			}
+
+			return false;
+		} catch (e) {
+			console.error(`ConditionalProperties: bookmark action error for ${file.path}`, e);
+			return false;
+		}
+	}
+
+	/** Recursively removes `target` from a Bookmarks `items` tree in place. Fallback for when `instance.removeItem` isn't available. */
+	_removeBookmarkItemDeep(items, target) {
+		for (let i = items.length - 1; i >= 0; i--) {
+			const item = items[i];
+			if (item === target) { items.splice(i, 1); return true; }
+			if (item && item.type === "group" && Array.isArray(item.items)) {
+				if (this._removeBookmarkItemDeep(item.items, target)) return true;
+			}
+		}
+		return false;
+	}
+
+	/** Finds a bookmark group by its "/"-joined title chain (see `_listBookmarkGroups()`). Returns `undefined` if any segment doesn't resolve to an existing group. */
+	_findBookmarkGroup(items, groupPath) {
+		const parts = String(groupPath || "").split("/").filter(Boolean);
+		let current = items;
+		let found;
+		for (const part of parts) {
+			found = Array.isArray(current) ? current.find(i => i && i.type === "group" && i.title === part) : undefined;
+			if (!found) return undefined;
+			current = Array.isArray(found.items) ? found.items : [];
+		}
+		return found;
+	}
+
+	/** Notifies the Bookmarks core plugin that its `items` tree was mutated in place, so the change is persisted and the Bookmarks pane refreshes. */
+	_persistBookmarkChange(instance) {
+		if (typeof instance.onItemsChanged === "function") {
+			instance.onItemsChanged(true);
+		} else if (typeof instance.requestSave === "function") {
+			instance.requestSave();
+		} else if (typeof instance.saveData === "function") {
+			instance.saveData();
+		}
+	}
+
+	/**
+	 * Lists every bookmark group currently defined in the Bookmarks core
+	 * plugin, as "/"-joined title chains (nested groups included) — used to
+	 * populate the "Bookmark file" group picker in settings. Returns `[]`
+	 * when Bookmarks is disabled or the internal API is unavailable. See the
+	 * tech-debt note on `_applyBookmarkAction()`.
+	 */
+	_listBookmarkGroups() {
+		try {
+			const internal = this.app && this.app.internalPlugins;
+			const entry = internal && internal.plugins && internal.plugins.bookmarks;
+			if (!entry || !entry.enabled || !entry.instance || !Array.isArray(entry.instance.items)) return [];
+
+			const groups = [];
+			const walk = (items, prefix) => {
+				for (const item of items) {
+					if (item && item.type === "group" && item.title) {
+						const path = prefix ? `${prefix}/${item.title}` : item.title;
+						groups.push(path);
+						if (Array.isArray(item.items)) walk(item.items, path);
+					}
+				}
+			};
+			walk(entry.instance.items, "");
+			return groups;
+		} catch (e) {
+			console.error("ConditionalProperties: failed to list bookmark groups", e);
+			return [];
+		}
 	}
 
 	/**
@@ -2291,7 +2450,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					}));
 			}
 		} else if (action.type === "file") {
-			const FILE_ACTIONS = ["rename", "addPrefix", "addSuffix", "move", "delete"];
+			const FILE_ACTIONS = ["rename", "addPrefix", "addSuffix", "move", "bookmark", "removeBookmark", "delete"];
 			if (!FILE_ACTIONS.includes(action.action)) action.action = "rename";
 
 			actionSetting.addDropdown(d => {
@@ -2299,6 +2458,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				d.addOption("addPrefix", "Add name prefix");
 				d.addOption("addSuffix", "Add name suffix");
 				d.addOption("move", "Move file to");
+				d.addOption("bookmark", "Bookmark file");
+				d.addOption("removeBookmark", "Remove bookmark");
 				d.addOption("delete", "Delete file");
 				d.setValue(action.action);
 				d.onChange(async (v) => {
@@ -2307,7 +2468,27 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				});
 			});
 
-			if (action.action !== "delete") {
+			if (action.action === "bookmark") {
+				// Bookmark groups come from Obsidian's core Bookmarks plugin
+				// (see `_listBookmarkGroups()` — undocumented internal API,
+				// guarded to return `[]` when Bookmarks is disabled).
+				const groups = this.plugin._listBookmarkGroups();
+				actionSetting.addDropdown(d => {
+					d.addOption("", "No group (top level)");
+					groups.forEach(g => d.addOption(g, g));
+					d.setValue(groups.includes(action.bookmarkGroup) ? action.bookmarkGroup : "");
+					d.onChange(async (v) => {
+						action.bookmarkGroup = v;
+						await this.plugin.saveData(this.plugin.settings);
+					});
+					if (groups.length === 0) {
+						d.setDisabled(true);
+					}
+				});
+				if (groups.length === 0) {
+					actionSetting.setDesc("No bookmark groups found — enable the core bookmarks plugin and create a group, or leave this at top level.");
+				}
+			} else if (action.action !== "delete" && action.action !== "removeBookmark") {
 				const FILE_ACTION_PLACEHOLDERS = {
 					rename: "new file name, without extension (supports {{date}}, {{time}}, {{title}}, {{filename}}, {{propertyName}}...)",
 					addPrefix: "prefix text (supports placeholders)",
