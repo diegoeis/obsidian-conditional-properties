@@ -180,3 +180,28 @@
   margin-top: 10px;
   color: var(--text-muted);
 }
+
+/* Rule search row (condition-type dropdown + live-filter search field),
+   right under the "Rules" heading. There's no name/description on this
+   row — it's just the two controls — so it drops Obsidian's default
+   name/value split and lets the controls span the full row instead,
+   matching the placement/width of a search bar rather than a labeled
+   setting. The search field grows to fill the remaining space next to
+   the fixed-width dropdown. */
+#eis-cp-plugin .cp-rule-search {
+  padding: 12px 20px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+#eis-cp-plugin .cp-rule-search .setting-item-info {
+  display: none;
+}
+
+#eis-cp-plugin .cp-rule-search .setting-item-control {
+  width: 100%;
+  gap: 8px;
+}
+
+#eis-cp-plugin .cp-rule-search .setting-item-control > .search-input-container {
+  flex: 1;
+}

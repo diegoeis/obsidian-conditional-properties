@@ -156,6 +156,12 @@ Scope: Latest modified, count: 15
 
 ### Settings management
 
+**Rule search** *(new in v0.25.3)* — right under the "Rules" heading: a dropdown (Property / First level title / Note file) plus a search field that filters the rule list live as you type, once you've typed at least 2 characters. It searches whichever field that condition type stores its text in — the property name for Property, the typed text for First level title and Note file — matching case-insensitively, as a literal substring (a `/regex/`-mode value is matched as that literal text). A rule shows up if *any* of its IF conditions of the selected type matches, regardless of the rule's own Match (any/all) setting. The search resets every time you reopen the settings tab.
+```yaml
+Search: Property → "people"
+```
+Shows only rules with a Property condition whose property name contains "people" (e.g. `people`, `peoples_list`).
+
 **Backup and restore settings** — export your rules and scan settings to a JSON file in the vault, and re-import them later or on another vault.
 - Settings → Conditional Properties → Backup and restore → Export settings / Import settings
 

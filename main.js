@@ -1761,6 +1761,15 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			this.plugin._rescheduleScanner();
 			new Notice(`Conditional properties: scan interval updated to ${this.plugin.settings.scanIntervalMinutes} minute(s).`);
 		}, 500, true);
+
+		// Rule search (see _renderRuleSearch()): current filter type + term.
+		// Deliberately session state, not persisted to settings/data.json —
+		// reset in hide() so every fresh open of the settings tab starts
+		// blank, but left alone across an in-tab display() rebuild (e.g.
+		// clicking "Add rule") so an active search isn't lost by an
+		// unrelated action elsewhere on the page.
+		this._ruleSearchType = "PROPERTY";
+		this._ruleSearchTerm = "";
 	}
 
 	async exportSettings() {
@@ -1880,6 +1889,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		this._debouncedSaveSettings.run();
 		this._debouncedApplyIntervalChange.run();
 		this._teardownScanSubscriptions();
+		// Rule search starts blank every time the tab is reopened.
+		this._ruleSearchType = "PROPERTY";
+		this._ruleSearchTerm = "";
 	}
 
 	_teardownScanSubscriptions() {
@@ -2128,15 +2140,21 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 						if (newRuleEl && previousFirst) {
 							rulesItemsEl.insertBefore(newRuleEl, previousFirst);
 						}
+						this._ruleSearchEntries.push({ el: newRuleEl, rule: newRule });
+						this._applyRuleSearchFilter();
 					}));
+
+			this._renderRuleSearch(rulesGroupEl);
 
 			rulesItemsEl = rulesGroupEl.createEl("div", { cls: "setting-items" });
 
 			// Render Rules
 			this.plugin.settings.rules.slice().reverse().forEach((rule, idxReversed) => {
 				const originalIndex = this.plugin.settings.rules.length - 1 - idxReversed;
-				this._renderRule(rulesItemsEl, rule, originalIndex);
+				const ruleEl = this._renderRule(rulesItemsEl, rule, originalIndex);
+				this._ruleSearchEntries.push({ el: ruleEl, rule });
 			});
+			this._applyRuleSearchFilter();
 
 			// Attach the fully-built tree in one shot — see the comment above
 			// `rootEl`'s creation for why this is deferred to here.
@@ -2146,6 +2164,99 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			console.error("Error in display():", error);
 			new Notice("An error occurred while loading the settings. Check the console for details.", 5000);
 		}
+	}
+
+	/**
+	 * Search row rendered right under the "Rules" heading, above the rule
+	 * list: a condition-type dropdown (Property / First level title / Note
+	 * file) plus a live-filter search field. `Setting.addSearch()` is
+	 * Obsidian's native search input — it comes with its own clear ("x")
+	 * button built in, shown automatically once there's text.
+	 *
+	 * Filter state (`_ruleSearchType` / `_ruleSearchTerm`) is session-only:
+	 * initialized in the constructor, reset in `hide()` so every fresh open
+	 * of the settings tab starts blank, but left alone across an in-tab
+	 * `display()` rebuild (e.g. clicking "Add rule") so an active search
+	 * isn't wiped by an unrelated action elsewhere on the page.
+	 */
+	_renderRuleSearch(containerEl) {
+		this._ruleSearchEntries = [];
+
+		const PLACEHOLDERS = {
+			PROPERTY: "Search by property name…",
+			FIRST_LEVEL_HEADING: "Search by first level title text…",
+			NOTE_FILE: "Search by note file text…",
+		};
+
+		const searchSetting = new Setting(containerEl).setClass("cp-rule-search");
+
+		let searchComponent;
+		searchSetting.addDropdown(d => {
+			d.addOption("PROPERTY", "Property");
+			d.addOption("FIRST_LEVEL_HEADING", "First level title");
+			d.addOption("NOTE_FILE", "Note file");
+			d.setValue(this._ruleSearchType);
+			d.onChange(v => {
+				this._ruleSearchType = v;
+				if (searchComponent) searchComponent.setPlaceholder(PLACEHOLDERS[v]);
+				this._applyRuleSearchFilter();
+			});
+		});
+
+		searchSetting.addSearch(search => {
+			searchComponent = search;
+			search.setPlaceholder(PLACEHOLDERS[this._ruleSearchType])
+				.setValue(this._ruleSearchTerm)
+				.onChange(v => {
+					this._ruleSearchTerm = v;
+					this._applyRuleSearchFilter();
+				});
+		});
+	}
+
+	/**
+	 * Applies the current rule-search filter by toggling `is-hidden` on
+	 * each already-rendered rule card — no re-render, just class toggles,
+	 * so this stays cheap even with dozens of rules. Filtering only kicks
+	 * in once the term is at least 2 characters; shorter shows every rule,
+	 * matching the "search box" convention of not filtering too eagerly on
+	 * a single keystroke.
+	 */
+	_applyRuleSearchFilter() {
+		const entries = this._ruleSearchEntries || [];
+		const term = (this._ruleSearchTerm || "").trim().toLowerCase();
+
+		if (term.length < 2) {
+			entries.forEach(({ el }) => el.removeClass("is-hidden"));
+			return;
+		}
+
+		const type = this._ruleSearchType;
+		entries.forEach(({ el, rule }) => {
+			el.toggleClass("is-hidden", !this._ruleMatchesSearch(rule, type, term));
+		});
+	}
+
+	/**
+	 * True when `rule` has at least one condition of `type` whose literal
+	 * text contains `lowerTerm` (already lowercased) — a case-insensitive
+	 * substring match, never interpreted as a regex even when the stored
+	 * value looks like one (e.g. `/report/i` is matched as that literal
+	 * text, slashes included).
+	 *
+	 * `type === "PROPERTY"` matches against the property name (`ifProp`) —
+	 * the field name typed in the IF condition, not the value being
+	 * compared against. `FIRST_LEVEL_HEADING` and `NOTE_FILE` both match
+	 * against the condition's typed value (`ifValue`), since that's where
+	 * each stores the text the user types for that condition.
+	 */
+	_ruleMatchesSearch(rule, type, lowerTerm) {
+		const conditions = Array.isArray(rule.conditions) ? rule.conditions : [];
+		return conditions.some(cond => {
+			if (!cond || cond.ifType !== type) return false;
+			const haystack = type === "PROPERTY" ? cond.ifProp : cond.ifValue;
+			return String(haystack || "").toLowerCase().includes(lowerTerm);
+		});
 	}
 
 	_renderRule(containerEl, rule, idx) {
