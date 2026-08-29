@@ -25,7 +25,7 @@
   padding: 20px;
   border-radius: 5px;
   margin-bottom: 20px;
-  background: #fff;
+  background: var(--background-primary);
   transition: all .15s linear;
 }
 
@@ -115,7 +115,7 @@
 
 #eis-cp-plugin .cp-rule-line .extra-setting-button {
   background: var(--text-error);
-  color: #fff;
+  color: var(--text-on-accent);
   max-width: 40px;
 }
 
@@ -134,7 +134,7 @@
   float: right;
   margin: 0;
   background: var(--text-error);
-  color: #fff;
+  color: var(--text-on-accent);
   cursor: pointer;
 }
 

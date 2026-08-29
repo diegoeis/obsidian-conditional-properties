@@ -128,19 +128,19 @@ If a rule flags something that's structurally unavoidable given this repo's no-b
 
 ### Live-test loop via Obsidian CLI
 
-The user keeps the plugin installed in their active vault at `/Users/diegoeis/obs-notes`. To make a code change land in Obsidian without manual clicking, **run the sync script**:
+The user keeps the plugin installed in their active vault at `/Users/diegoeis/Documents/obs-notes`. To make a code change land in Obsidian without manual clicking, **run the sync script**:
 
 ```sh
 ./scripts/sync.sh
 ```
 
-This is the project's "F5" — copies `main.js`, `styles.css`, and `manifest.json` into `/Users/diegoeis/obs-notes/.obsidian/plugins/conditional-properties/` and triggers `obsidian plugin:reload id=conditional-properties`. The script lives at [`scripts/sync.sh`](scripts/sync.sh) and is the canonical way to refresh the plugin during development. Override the target with `OBSIDIAN_PLUGIN_DIR=/path/to/other/vault/.obsidian/plugins/conditional-properties ./scripts/sync.sh` when testing in a different vault.
+This is the project's "F5" — copies `main.js`, `styles.css`, and `manifest.json` into `/Users/diegoeis/Documents/obs-notes/.obsidian/plugins/conditional-properties/` and triggers `obsidian plugin:reload id=conditional-properties`. The script lives at [`scripts/sync.sh`](scripts/sync.sh) and is the canonical way to refresh the plugin during development. Override the target with `OBSIDIAN_PLUGIN_DIR=/path/to/other/vault/.obsidian/plugins/conditional-properties ./scripts/sync.sh` when testing in a different vault.
 
 **Run it every time `main.js`, `styles.css`, or `manifest.json` changes during a feature branch.** Without the copy step, the running Obsidian still loads the previous version from the vault. Without `plugin:reload`, the copied files don't take effect until Obsidian restarts.
 
 If you need to do it by hand (e.g. the CLI is unavailable):
 ```sh
-cp main.js styles.css manifest.json /Users/diegoeis/obs-notes/.obsidian/plugins/conditional-properties/
+cp main.js styles.css manifest.json /Users/diegoeis/Documents/obs-notes/.obsidian/plugins/conditional-properties/
 obsidian plugin:reload id=conditional-properties
 ```
 (`obsidian` resolves to `/Applications/Obsidian.app/Contents/MacOS/obsidian`. Confirm the CLI subcommand exists with `obsidian help | grep plugin:`.)

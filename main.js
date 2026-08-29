@@ -7,7 +7,7 @@
 // legacy `Plugin` DOM interface (navigator.plugins), never actually used by
 // this file.
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-redeclare -- hand-written CommonJS main.js by design, see comment above
-const { Plugin, Notice, Setting, PluginSettingTab, ButtonComponent, DropdownComponent, moment } = require("obsidian");
+const { Plugin, Notice, Setting, PluginSettingTab, ButtonComponent, DropdownComponent, moment, debounce, normalizePath } = require("obsidian");
 
 class ConditionalPropertiesPlugin extends Plugin {
 	async onload() {
@@ -24,8 +24,12 @@ class ConditionalPropertiesPlugin extends Plugin {
 		// so a broken /pattern/ in a rule doesn't spam one Notice per file
 		// during a full-vault scan — see _compileRegexOrNotify().
 		this._notifiedInvalidRegex = new Set();
+		// Caches compiled RegExp instances by raw pattern text, so a
+		// full-vault scan with N regex-mode conditions compiles each
+		// pattern once instead of once per file — see _compileRegexOrNotify().
+		this._regexCache = new Map();
 		await this._migrateRules();
-		this.registerInterval(this._setupScheduler());
+		this._rescheduleScanner();
 		this.addCommand({
 			id: "run-now",
 			name: "Run conditional rules on vault",
@@ -63,7 +67,12 @@ class ConditionalPropertiesPlugin extends Plugin {
 		this.addSettingTab(new ConditionalPropertiesSettingTab(this.app, this));
 	}
 
-	onunload() {}
+	onunload() {
+		// Requests cancellation of any in-flight scan so a disable/reload
+		// mid-scan doesn't keep writing to files after the plugin is gone.
+		// `requestStopScan()` is a no-op when nothing is running.
+		this.requestStopScan();
+	}
 
 	_setupScheduler() {
 		const minutes = Math.max(5, Number(this.settings.scanIntervalMinutes || 5));
@@ -74,6 +83,21 @@ class ConditionalPropertiesPlugin extends Plugin {
 				console.error("ConditionalProperties scheduler error", e);
 			}
 		}, minutes * 60 * 1000);
+	}
+
+	/**
+	 * (Re)starts the scheduled-scan interval using the current
+	 * `scanIntervalMinutes`. Safe to call any number of times — clears the
+	 * previous interval (if any) before starting a new one, so a change to
+	 * the setting takes effect immediately instead of requiring the user to
+	 * restart Obsidian. `registerInterval()` still tracks the new id for
+	 * automatic cleanup on unload.
+	 */
+	_rescheduleScanner() {
+		if (this._schedulerIntervalId !== undefined) {
+			window.clearInterval(this._schedulerIntervalId);
+		}
+		this._schedulerIntervalId = this.registerInterval(this._setupScheduler());
 	}
 
 	async _writeMigrationBackup() {
@@ -99,75 +123,83 @@ class ConditionalPropertiesPlugin extends Plugin {
 		if (migrationVersion >= 3) return;
 
 		let hasChanges = false;
-		const ensureRuleArray = Array.isArray(this.settings.rules) ? this.settings.rules : [];
-		const convertLegacyOperator = (op) => {
-			if (!op || op === "contains") {
-				if (op !== "exactly") hasChanges = true;
-				return "exactly";
-			}
-			if (op === "notContains") {
-				hasChanges = true;
-				return "notContains";
-			}
-			return op;
-		};
-		const removeNotExactly = (op) => {
-			if (op === "notExactly") {
-				hasChanges = true;
-				return "notContains";
-			}
-			return op;
-		};
+		this.settings.rules = Array.isArray(this.settings.rules) ? this.settings.rules : [];
 
-		this.settings.rules = ensureRuleArray.map(rule => {
-			let migratedRule = rule;
-			if (rule.thenProp !== undefined || rule.thenValue !== undefined) {
-				migratedRule = {
-					ifType: "PROPERTY",
-					ifProp: rule.ifProp || "",
-					ifValue: rule.ifValue || "",
-					op: removeNotExactly(convertLegacyOperator(rule.op)),
-					thenActions: []
-				};
-				if (rule.thenProp) {
-					migratedRule.thenActions.push({
-						prop: rule.thenProp,
-						value: rule.thenValue || "",
-						action: "add"
-					});
+		// v0/v1 → v2 (introduced in 0.12.1): renames the legacy operator
+		// values and flattens single-action rules (`thenProp`/`thenValue`,
+		// predating `thenActions[]`).
+		//
+		// MUST stay gated to `migrationVersion < 2` — never let this re-run
+		// against rules already on the v2 schema. `contains` has been a
+		// valid, current operator (substring match) since 0.12.1; running
+		// `convertLegacyOperator` against it again would silently rewrite a
+		// genuine "contains" rule into "exactly", corrupting it with no way
+		// to recover the original operator. This previously ran
+		// unconditionally whenever `migrationVersion < 3`, which meant any
+		// user still sitting at `operatorMigrationVersion: 2` who upgraded
+		// straight to a version bumping to 3 had every "contains" condition
+		// silently reinterpreted as "exactly" on next load — see the
+		// CHANGELOG entry for this fix for the full history.
+		if (migrationVersion < 2) {
+			const convertLegacyOperator = (op) => {
+				if (!op || op === "contains") {
+					if (op !== "exactly") hasChanges = true;
+					return "exactly";
 				}
-				hasChanges = true;
-			} else {
-				if (rule.ifType === "TITLE" || rule.ifType === "HEADING_FIRST_LEVEL") {
-					migratedRule = { ...migratedRule, ifType: "FIRST_LEVEL_HEADING" };
+				if (op === "notContains") {
 					hasChanges = true;
-				} else if (rule.ifType === undefined) {
-					migratedRule = { ...migratedRule, ifType: "PROPERTY" };
+					return "notContains";
+				}
+				return op;
+			};
+			const removeNotExactly = (op) => {
+				if (op === "notExactly") {
 					hasChanges = true;
+					return "notContains";
 				}
-				const updatedOp = removeNotExactly(convertLegacyOperator(migratedRule.op));
-				if (updatedOp !== migratedRule.op) {
-					migratedRule = { ...migratedRule, op: updatedOp };
-				}
-				if (Array.isArray(migratedRule.ifConditions)) {
-					const convertedConditions = migratedRule.ifConditions.map(condition => {
-						if (!condition) return condition;
-						const nextOp = removeNotExactly(convertLegacyOperator(condition.op));
-						if (nextOp !== condition.op) {
-							hasChanges = true;
-							return { ...condition, op: nextOp };
-						}
-						return condition;
-					});
-					if (convertedConditions !== migratedRule.ifConditions) {
-						migratedRule = { ...migratedRule, ifConditions: convertedConditions };
+				return op;
+			};
+
+			this.settings.rules = this.settings.rules.map(rule => {
+				let migratedRule = rule;
+				if (rule.thenProp !== undefined || rule.thenValue !== undefined) {
+					migratedRule = {
+						ifType: "PROPERTY",
+						ifProp: rule.ifProp || "",
+						ifValue: rule.ifValue || "",
+						op: removeNotExactly(convertLegacyOperator(rule.op)),
+						thenActions: []
+					};
+					if (rule.thenProp) {
+						migratedRule.thenActions.push({
+							prop: rule.thenProp,
+							value: rule.thenValue || "",
+							action: "add"
+						});
+					}
+					hasChanges = true;
+				} else {
+					if (rule.ifType === "TITLE" || rule.ifType === "HEADING_FIRST_LEVEL") {
+						migratedRule = { ...migratedRule, ifType: "FIRST_LEVEL_HEADING" };
+						hasChanges = true;
+					} else if (rule.ifType === undefined) {
+						migratedRule = { ...migratedRule, ifType: "PROPERTY" };
+						hasChanges = true;
+					}
+					const updatedOp = removeNotExactly(convertLegacyOperator(migratedRule.op));
+					if (updatedOp !== migratedRule.op) {
+						migratedRule = { ...migratedRule, op: updatedOp };
 					}
 				}
-			}
-			return migratedRule;
-		});
+				return migratedRule;
+			});
+		}
 
-		// v3 migration — flatten single-condition legacy rules into conditions[] + match
+		// v2 → v3 (introduced in 0.17.0): flatten single-condition legacy
+		// rules into conditions[] + match. Independent of the step above —
+		// safe to run whether or not this settings file just went through
+		// the v0/v1→v2 step, and a no-op on any rule that already has
+		// `conditions[]`.
 		const needsV3Migration = this.settings.rules.some(rule =>
 			rule && !Array.isArray(rule.conditions) && (
 				rule.ifType !== undefined ||
@@ -212,7 +244,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 
 		this.settings.operatorMigrationVersion = 3;
 		if (hasChanges || migrationVersion !== 3) {
-			this.saveData(this.settings);
+			await this.saveData(this.settings);
 		}
 	}
 
@@ -364,13 +396,32 @@ class ConditionalPropertiesPlugin extends Plugin {
 		// references that live inside Obsidian's metadataCache. A shallow `{...}`
 		// copy still shares array references (e.g. tags), which caused mutations
 		// to leak into the cache and made subsequent runs see stale "already
-		// applied" state.
-		const newFm = JSON.parse(JSON.stringify(currentFrontmatter || {}));
+		// applied" state. structuredClone() (native, no JSON round-trip) — the
+		// frontmatter is always JSON-safe plain data (strings/numbers/booleans/
+		// arrays/objects), so there's no structuredClone-only type it needs to
+		// preserve; this is purely the faster equivalent of the old JSON dance.
+		const newFm = structuredClone(currentFrontmatter || {});
 		let changed = false;
 		let titleChanged = false;
 		let newTitle = null;
 		let fileActionApplied = false;
 		let fileDeleted = false;
+
+		// Memoizes `_getNoteTitle(file)` for the lifetime of this call. Its
+		// result can't change mid-call — title actions compute `newTitle` in
+		// memory and only write it via `_updateNoteTitle()` after this whole
+		// loop finishes, so every read in between still reflects the same
+		// on-disk/cached title. Without this, N title conditions + M title
+		// actions in the same rule set means N+M redundant lookups per file.
+		let cachedTitle;
+		let titleCached = false;
+		const getCachedNoteTitle = async () => {
+			if (!titleCached) {
+				cachedTitle = await this._getNoteTitle(file);
+				titleCached = true;
+			}
+			return cachedTitle;
+		};
 
 		for (let ruleIdx = 0; ruleIdx < rules.length; ruleIdx++) {
 			if (fileDeleted) break;
@@ -404,7 +455,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 					}
 					let sourceValue;
 					if (cType === "FIRST_LEVEL_HEADING") {
-						sourceValue = await this._getNoteTitle(file);
+						sourceValue = await getCachedNoteTitle();
 						const allowsNull = cOp === "notExists" || cOp === "isEmpty";
 						if (sourceValue === null && !allowsNull) return false;
 					} else {
@@ -468,7 +519,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 				// Handle title modification
 				if (type === 'title' && text) {
 					try {
-						const currentTitle = await this._getNoteTitle(file);
+						const currentTitle = await getCachedNoteTitle();
 
 						// Format the text with any placeholders
 						const formattedText = this._formatText(text, file, newFm, false, capturedMatch);
@@ -1246,19 +1297,36 @@ class ConditionalPropertiesPlugin extends Plugin {
 	 * match" by the caller.
 	 */
 	_compileRegexOrNotify(rawPattern) {
+		if (this._regexCache.has(rawPattern)) {
+			return this._regexCache.get(rawPattern);
+		}
+
 		const match = /^\/(.+)\/([a-z]*)$/.exec(rawPattern);
 		const pattern = match ? match[1] : rawPattern.slice(1, -1);
-		const flags = match ? match[2] : "";
+		// Strip "g"/"y" (global/sticky). Every call site here runs a single
+		// test()/exec() per compiled instance — before caching, that was
+		// already true "for free" since a fresh RegExp always starts with
+		// `lastIndex: 0`. Now that instances are cached and reused across
+		// many files, keeping "g"/"y" would let `lastIndex` carry over
+		// between unrelated inputs (e.g. every other file silently failing
+		// to match). Stripping them keeps the exact same match semantics
+		// this plugin already relied on, just safe to reuse.
+		const rawFlags = match ? match[2] : "";
+		const flags = rawFlags.replace(/[gy]/g, "");
+
+		let compiled;
 		try {
-			return new RegExp(pattern, flags);
+			compiled = new RegExp(pattern, flags);
 		} catch (e) {
 			console.error(`Conditional properties: invalid regular expression "${rawPattern}"`, e);
 			if (!this._notifiedInvalidRegex.has(rawPattern)) {
 				this._notifiedInvalidRegex.add(rawPattern);
 				new Notice(`Conditional properties: invalid regular expression ${rawPattern} — ${e.message}`, 8000);
 			}
-			return null;
+			compiled = null;
 		}
+		this._regexCache.set(rawPattern, compiled);
+		return compiled;
 	}
 
 	/**
@@ -1379,10 +1447,58 @@ class ConditionalPropertiesPlugin extends Plugin {
 		return this._valueMatches(a, b);
 	}
 
+	/**
+	 * Fast path for `_getNoteTitle()`: derives the title from Obsidian's
+	 * already-indexed `metadataCache` (`sections` + `headings`) — zero disk
+	 * I/O. Mirrors the exact same rule as the file-read fallback below: the
+	 * H1 counts as the title only when it's the very first block in the
+	 * document body (immediately after frontmatter, if any — blank lines
+	 * before it are fine, any other content before it is not).
+	 *
+	 * Returns the heading text, `null` when the cache conclusively shows no
+	 * qualifying H1, or `undefined` when the cache can't answer yet (file
+	 * just created/renamed and not re-indexed, or genuinely no sections
+	 * indexed) — the caller falls back to reading the file directly in
+	 * that case, so this never trades correctness for speed.
+	 */
+	_getNoteTitleFromCache(file) {
+		const cache = this.app.metadataCache.getFileCache(file);
+		if (!cache) return undefined;
+		const sections = Array.isArray(cache.sections) ? cache.sections : [];
+		if (sections.length === 0) return undefined;
+
+		const hasFrontmatter = sections[0] && sections[0].type === "yaml";
+		const firstBodySection = hasFrontmatter ? sections[1] : sections[0];
+		if (!firstBodySection) return null; // nothing after frontmatter, or a genuinely empty note
+		if (firstBodySection.type !== "heading") return null; // some other block comes first
+
+		const startLine = firstBodySection.position && firstBodySection.position.start && firstBodySection.position.start.line;
+		const heading = (cache.headings || []).find(h =>
+			h.position && h.position.start && h.position.start.line === startLine
+		);
+		if (!heading || heading.level !== 1) return null;
+		return heading.heading;
+	}
+
 	async _getNoteTitle(file) {
 		// Only check for H1 heading immediately after YAML frontmatter
 		// H1 headings elsewhere in the document are not considered the "title"
+		const cachedTitle = this._getNoteTitleFromCache(file);
+		if (cachedTitle !== undefined) return cachedTitle;
+
 		try {
+			// read(), not cachedRead() — this only runs when the
+			// metadataCache fast path above couldn't answer, i.e. exactly
+			// when the cache might be stale or not yet resolved (e.g. a
+			// file just created/changed from outside the editor). Obsidian's
+			// own docs are explicit that cachedRead() "may not be up to
+			// date" and is meant for display purposes, while read() reads
+			// "directly from disk" — this fallback exists specifically to
+			// get a correct answer, so it can't reach for the same
+			// staleness risk it's trying to route around. Verified live:
+			// using cachedRead() here reproducibly made a rule's condition
+			// see a stale/empty title microseconds after the file was
+			// created, wrongly treating an existing H1 as absent.
 			const content = await this.app.vault.read(file);
 
 			// Check if file has YAML frontmatter
@@ -1623,20 +1739,55 @@ class ConditionalPropertiesPlugin extends Plugin {
 }
 
 class ConditionalPropertiesSettingTab extends PluginSettingTab {
-	constructor(app, plugin) { super(app, plugin); this.plugin = plugin; }
+	constructor(app, plugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+		// Every free-text field's onChange fires per keystroke; saving to
+		// disk on each one is wasted I/O for no benefit (the in-memory
+		// `rule`/`action` object is already updated synchronously, so
+		// nothing reads a stale value in between). One shared debouncer
+		// (created once here, not per `display()` call) coalesces bursts of
+		// typing — across any field, since it always persists the whole
+		// settings object — into a single write ~400ms after typing stops.
+		// `resetTimer: true` (Obsidian's debounce signature) restarts the
+		// wait on every keystroke rather than firing at a fixed cadence.
+		this._debouncedSaveSettings = debounce(() => this.plugin.saveData(this.plugin.settings), 400, true);
+		// Separate debouncer for the scan-interval field: besides saving, a
+		// changed interval also needs the scheduler restarted and a
+		// confirmation Notice — neither of which the generic save debouncer
+		// above should trigger for every other field's edits.
+		this._debouncedApplyIntervalChange = debounce(() => {
+			this.plugin._rescheduleScanner();
+			new Notice(`Conditional properties: scan interval updated to ${this.plugin.settings.scanIntervalMinutes} minute(s).`);
+		}, 500, true);
+	}
 
 	async exportSettings() {
-		// Writes into the vault itself via vault.adapter.write instead of
-		// triggering a browser "Save As" through a synthetic <a download>
-		// click on a Blob URL. That pattern is unreliable in mobile WebViews
-		// (iOS in particular may not surface a save dialog at all) — the
-		// manifest declares isDesktopOnly: false, so this needs to work on
-		// mobile too. Writing to the vault root also means the exported file
-		// shows up in Obsidian's file explorer on every platform.
+		// Writes into the vault itself instead of triggering a browser
+		// "Save As" through a synthetic <a download> click on a Blob URL.
+		// That pattern is unreliable in mobile WebViews (iOS in particular
+		// may not surface a save dialog at all) — the manifest declares
+		// isDesktopOnly: false, so this needs to work on mobile too. Writing
+		// to the vault root also means the exported file shows up in
+		// Obsidian's file explorer on every platform.
+		//
+		// Uses the Vault API (vault.create / vault.process), not
+		// vault.adapter.write — the Adapter API bypasses Obsidian's own
+		// index/events, and normalizePath() is the standard first line of
+		// defense for any path built from user/placeholder-derived text
+		// (here, today's date). vault.create() throws if the file already
+		// exists (running export twice on the same day) — vault.process()
+		// on the existing file preserves the original "just overwrite it"
+		// behavior, now through the Vault API instead of the Adapter API.
 		try {
 			const settings = JSON.stringify(this.plugin.settings, null, 2);
-			const fileName = `conditional-properties-settings-${new Date().toISOString().split('T')[0]}.json`;
-			await this.app.vault.adapter.write(fileName, settings);
+			const fileName = normalizePath(`conditional-properties-settings-${new Date().toISOString().split('T')[0]}.json`);
+			const existing = this.app.vault.getFileByPath(fileName);
+			if (existing) {
+				await this.app.vault.process(existing, () => settings);
+			} else {
+				await this.app.vault.create(fileName, settings);
+			}
 			new Notice(`Settings exported to "${fileName}" in your vault's root folder.`, 6000);
 		} catch (error) {
 			console.error('Error exporting settings:', error);
@@ -1654,18 +1805,37 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					if (!settings || typeof settings !== 'object') {
 						throw new Error('Invalid settings format');
 					}
+					// `rules` must be an array — a corrupted or hand-edited
+					// backup with e.g. `rules: "banana"` would otherwise
+					// reach `display()` and every rule-iterating code path
+					// and break them. Fall back to an empty rule list rather
+					// than accepting garbage.
+					if (settings.rules !== undefined && !Array.isArray(settings.rules)) {
+						console.error('ConditionalProperties: imported settings had a non-array "rules" — resetting to empty', settings.rules);
+						settings.rules = [];
+					}
 
-					// Merge with default settings to ensure all required fields are present
+					// Merge with default settings to ensure all required fields are present.
+					// operatorMigrationVersion defaults to 0 here — same as a
+					// fresh onload() — not to the current version, so a
+					// genuinely old backup (or one missing the field
+					// entirely) still goes through every migration step
+					// below instead of skipping straight past them.
 					this.plugin.settings = {
 						rules: [],
 						scanIntervalMinutes: 5,
 						lastRun: null,
 						scanScope: "latestCreated",
 						scanCount: 15,
-						operatorMigrationVersion: 2,
+						operatorMigrationVersion: 0,
 						...settings
 					};
 
+					// An imported backup can be from any older schema
+					// version — run the same migration pipeline a normal
+					// onload() would, instead of leaving it in a legacy
+					// shape until the next Obsidian restart.
+					await this.plugin._migrateRules();
 					await this.plugin.saveData(this.plugin.settings);
 					new Notice('Settings imported successfully! The plugin will now reload.');
 					this.display();
@@ -1685,6 +1855,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	}
 
 	hide() {
+		// Flush any debounced text-field save immediately so closing the tab
+		// right after typing never drops the last edit.
+		this._debouncedSaveSettings.run();
+		this._debouncedApplyIntervalChange.run();
 		this._teardownScanSubscriptions();
 	}
 
@@ -1728,10 +1902,14 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				.addText(text => {
 					text.setPlaceholder("5")
 					.setValue(String(this.plugin.settings.scanIntervalMinutes || 5))
-					.onChange(async (value) => {
+					.onChange((value) => {
 						this.plugin.settings.scanIntervalMinutes = Math.max(5, Number(value) || 5);
-						await this.plugin.saveData(this.plugin.settings);
-						new Notice("Interval updated. Restart Obsidian to apply immediately.");
+						this._debouncedSaveSettings();
+						// Debounced: restarts the scheduler and shows one
+						// confirmation Notice after typing settles, instead
+						// of once per keystroke — and takes effect right
+						// away, no Obsidian restart needed.
+						this._debouncedApplyIntervalChange();
 					});
 				});
 
@@ -1758,10 +1936,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				.addText(text => {
 					text.setPlaceholder("15")
 					.setValue(String(this.plugin.settings.scanCount || 15))
-					.onChange(async (value) => {
+					.onChange((value) => {
 						const num = Math.max(1, Math.min(1000, Number(value) || 15));
 						this.plugin.settings.scanCount = num;
-						await this.plugin.saveData(this.plugin.settings);
+						this._debouncedSaveSettings();
 					});
 				});
 
@@ -1849,7 +2027,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					runNowBtnRef.buttonEl.classList.toggle("is-loading", thisIsRunning);
 				}
 				if (stopBtnRef) {
-					stopBtnRef.buttonEl.style.display = thisIsRunning ? "" : "none";
+					stopBtnRef.buttonEl.toggleClass("is-hidden", !thisIsRunning);
 				}
 			};
 			syncRunNowState();
@@ -2080,7 +2258,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			const thisIsRunning = this.plugin.isRuleRunning(rule);
 			runBtn.setDisabled(anyRunning);
 			runBtn.buttonEl.classList.toggle("is-loading", thisIsRunning);
-			ruleStopBtn.buttonEl.style.display = thisIsRunning ? "" : "none";
+			ruleStopBtn.buttonEl.toggleClass("is-hidden", !thisIsRunning);
 		};
 		syncRuleRunState();
 		const unsubRule = this.plugin.onScanStateChange(syncRuleRunState);
@@ -2158,10 +2336,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			line.addText(t => t
 				.setPlaceholder(isFolderOp ? "folder name or path, e.g. meetings/transcripts/company" : "text, or /regex/")
 				.setValue(cond.ifValue || "")
-				.onChange(async (v) => {
+				.onChange((v) => {
 					cond.ifValue = v;
 					if (updateNoteFileRegexHint) updateNoteFileRegexHint(v);
-					await this.plugin.saveData(this.plugin.settings);
+					this._debouncedSaveSettings();
 				}));
 			if (!isFolderOp) {
 				updateNoteFileRegexHint = this.plugin._addRegexHint(line, cond.ifValue || "");
@@ -2182,10 +2360,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				line.addText(t => t
 					.setPlaceholder("First level title text, or /regex/")
 					.setValue(cond.ifValue || "")
-					.onChange(async (v) => {
+					.onChange((v) => {
 						cond.ifValue = v;
 						updateHeadingRegexHint(v);
-						await this.plugin.saveData(this.plugin.settings);
+						this._debouncedSaveSettings();
 					}));
 				updateHeadingRegexHint = this.plugin._addRegexHint(line, cond.ifValue || "");
 			}
@@ -2193,9 +2371,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			line.addText(t => t
 				.setPlaceholder("Property")
 				.setValue(cond.ifProp || "")
-				.onChange(async (v) => {
+				.onChange((v) => {
 					cond.ifProp = v;
-					await this.plugin.saveData(this.plugin.settings);
+					this._debouncedSaveSettings();
 				}));
 
 			line.addDropdown(d => {
@@ -2213,10 +2391,10 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				line.addText(t => t
 					.setPlaceholder("Value, or /regex/")
 					.setValue(cond.ifValue || "")
-					.onChange(async (v) => {
+					.onChange((v) => {
 						cond.ifValue = v;
 						updateValueRegexHint(v);
-						await this.plugin.saveData(this.plugin.settings);
+						this._debouncedSaveSettings();
 					}));
 				updateValueRegexHint = this.plugin._addRegexHint(line, cond.ifValue || "");
 			}
@@ -2337,17 +2515,23 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	 * Obsidian's Setting always builds a .setting-item-info wrapper holding
 	 * .setting-item-name + .setting-item-description. Our condition/action
 	 * rows only need a compact label, never a description, so this swaps
-	 * that whole wrapper out for a single <h6 class="cp-rule-label">, and
+	 * that whole wrapper out for a single <div class="cp-rule-label">, and
 	 * stashes it on the Setting instance (`setting.labelEl`) so later
 	 * renumbering (after a row is added/removed) can update the text
 	 * directly instead of calling Setting.setName() — which would just
 	 * write into the now-detached info wrapper we removed. Safe to call
 	 * repeatedly: the swap only happens once per Setting.
+	 *
+	 * A plain <div>, not a heading element (`<h6>` previously): "Condition
+	 * 1" / "Action 1" is a compact field label for one row, not a document
+	 * section — a rule with several conditions/actions would otherwise
+	 * produce dozens of heading-level elements, which a screen reader's
+	 * heading-navigation feature lists as if they were real page structure.
 	 */
 	_setRuleLineLabel(setting, text) {
 		if (!setting.labelEl) {
 			const infoEl = setting.settingEl.querySelector(".setting-item-info");
-			const labelEl = document.createElement("h6");
+			const labelEl = document.createElement("div");
 			labelEl.className = "cp-rule-label";
 			setting.settingEl.insertBefore(labelEl, infoEl);
 			if (infoEl) infoEl.remove();
@@ -2414,9 +2598,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			actionSetting.addText(t => t
 				.setPlaceholder("Property name")
 				.setValue(action.prop || "")
-				.onChange(async (v) => {
+				.onChange((v) => {
 					action.prop = v;
-					await this.plugin.saveData(this.plugin.settings);
+					this._debouncedSaveSettings();
 				}));
 
 			actionSetting.addDropdown(d => {
@@ -2436,17 +2620,17 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				actionSetting.addText(t => t
 					.setPlaceholder("New property name")
 					.setValue(action.newPropName || "")
-					.onChange(async (v) => {
+					.onChange((v) => {
 						action.newPropName = v;
-						await this.plugin.saveData(this.plugin.settings);
+						this._debouncedSaveSettings();
 					}));
 			} else if (action.action !== "delete") {
 				actionSetting.addText(t => t
 					.setPlaceholder("value (use commas; supports {{propertyName}}, {{date}}, {{time}}, {{title}}, {{created_date}}, {{updated_date}}, {{today}}, {{filename}})")
 					.setValue(action.value || "")
-					.onChange(async (v) => {
+					.onChange((v) => {
 						action.value = v;
-						await this.plugin.saveData(this.plugin.settings);
+						this._debouncedSaveSettings();
 					}));
 			}
 		} else if (action.type === "file") {
@@ -2498,9 +2682,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				actionSetting.addText(t => t
 					.setPlaceholder(FILE_ACTION_PLACEHOLDERS[action.action] || "value")
 					.setValue(action.text || "")
-					.onChange(async (v) => {
+					.onChange((v) => {
 						action.text = v;
-						await this.plugin.saveData(this.plugin.settings);
+						this._debouncedSaveSettings();
 					}));
 			}
 		} else {
@@ -2519,9 +2703,9 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			actionSetting.addText(t => t
 				.setPlaceholder("Text (use {{date}}, {{time}}, {{title}}, {{created_date}}, {{updated_date}}, {{today}}, {{filename}}, or {{propertyName}})")
 				.setValue(action.text || "")
-				.onChange(async (v) => {
+				.onChange((v) => {
 					action.text = v;
-					await this.plugin.saveData(this.plugin.settings);
+					this._debouncedSaveSettings();
 				}));
 		}
 
