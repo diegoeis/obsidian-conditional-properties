@@ -171,6 +171,8 @@ Full mechanics are in root `CLAUDE.md` → **Release**. Summary:
 - [ ] "Run now", "Run current file", and "Stop" commands behave correctly, including mid-scan cancellation
 - [ ] Note file actions (rename/prefix/suffix/move/delete) never write outside the vault, even with adversarial placeholder input (`../`, absolute paths)
 
+**🚨 Live-testing via `obsidian eval` against the dev vault can destroy real user data if you're not careful** — it already has once (a live test overwrote the user's real rules by swapping `plugin.settings` and then closing the settings tab, which flushes a real save unconditionally). See [`CLAUDE.md`](../CLAUDE.md) → "The dev vault is real user data" for the mandatory rules: test logic against an isolated fake instance (never the real `plugin.settings`), never close the settings tab while fake data is loaded into it, and if a real settings swap is unavoidable, back up → verify the backup parses → test → restore → save for real → re-read `data.json` from disk to confirm, all in one uninterrupted sequence.
+
 ## 📚 Reference Links
 
 **Obsidian:**

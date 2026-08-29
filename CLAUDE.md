@@ -155,6 +155,24 @@ Recent fixes worth remembering when touching title logic:
 - First-level heading detection: detect H1 **only when it appears immediately after YAML frontmatter** (see commit `29ea0bd`). Don't reintroduce broader scanning — it caused false positives.
 - Inline title setting must be ignored when checking for H1 existence (commit `2af8ba5`).
 
+### 🚨 The dev vault is real user data — never mutate `plugin.settings` live to test it
+
+`/Users/diegoeis/Documents/obs-notes` is the user's actual working vault, not a throwaway fixture. `obsidian eval` gives full JS access to the running app, including `app.plugins.plugins["conditional-properties"].settings` — the user's real rules, scan config, everything in `data.json`. This has already caused real data loss once: a live test swapped `settings.rules` in memory for fake test data, then called `app.setting.close()` to check "does the search filter reset on tab close" — `hide()` unconditionally calls `_debouncedSaveSettings.run()`, which calls the real `saveData()` with whatever was in memory at that moment. The fake test rules got written straight over the user's real ones, silently, with no error. Recovery only worked because a backup happened to have been taken minutes earlier for an unrelated reason — treat that as luck, not as a safety net that will be there next time.
+
+Rules for any live test that touches the real running plugin instance, no exceptions:
+
+1. **Test business logic against an isolated fake instance, never the real `plugin.settings`.** The safe pattern (used for the migration-logic tests): `Object.assign(Object.create(Object.getPrototypeOf(plugin)), { settings: {...fakeData}, saveData: async () => {}, ...anyOtherMethodWithSideEffects: async () => {} })`, then call the method under test on that fake object (`method.call(fakeCtx, ...)`). This inherits every real method for free but can never write to the real `data.json`, no matter what the code under test does.
+2. **Never call `app.setting.close()` (or anything that triggers the settings tab's `hide()`) while the real `plugin.settings` holds anything other than the user's genuine data.** `hide()` flushes a real save unconditionally. If you need to verify "does X reset when the tab closes/reopens," test it on an isolated fake tab instance instead, or accept verifying the state-reset logic by reading the code/calling `hide()` directly on a throwaway object.
+3. **DOM/UI inspection against the real settings tab must stay read-only** — `querySelector`, `getComputedStyle`, `classList.contains`, dispatching a synthetic `input`/`change` event to verify a handler wires up correctly. Never follow it with a real tab close while fake data is loaded (see #2).
+4. **If a test genuinely requires swapping the real `plugin.settings` temporarily** (true end-to-end verification), do the whole cycle as one uninterrupted sequence, never split across turns or left half-done:
+   - Capture a full backup: `JSON.stringify(plugin.settings)` to a scratch file.
+   - **Read that file back and confirm it parses as valid JSON** before touching anything.
+   - Run the test.
+   - Restore the in-memory object.
+   - **Call the real `saveData()` immediately** to persist the restoration — don't leave it "restored" only in memory.
+   - **Read `data.json` off disk directly** (not the in-memory object) and confirm it matches the backup before considering the test done or moving on to anything else.
+5. When in doubt, don't reach for step 4 — steps 1–3 cover the overwhelming majority of what actually needs testing.
+
 ## Documentation site (mirrors `.github/workflows/pages.yml`)
 
 The public docs site (linked from the README) is built from `docs-site/` and published via GitHub Pages, using GitHub's "Actions" deployment source (not a `gh-pages` branch, not a `/docs` folder on `main`).
