@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.25.4 - 2026-08-29
+### Changed
+- **Condition/action rows restyled.** Each rule's card lost its border, keeping only a background fill (`var(--setting-items-background)`) and padding; every condition/action row now reads as one line — label, fields, and remove button inline instead of stacked. Row labels changed from "Condition 1" / "Condition 2" / "Action 1" to a sentence-like "Where" (first condition), "Or" / "And" (every following condition, matching the rule's Any/All setting), and "Do this" (every action) — a fixed-width, right-aligned column to the left of each row's fields. Every field inside a row (text inputs, selects, dropdowns) gets a contrast fill via `var(--background-modifier-form-field)` — Obsidian's own input/select background token — since the row itself no longer carries one.
+
+## 0.25.3 - 2026-08-29
+### Added
+- **Rule search, right under the "Rules" heading.** A condition-type dropdown (Property / First level title / Note file) plus a live-filter search field — typing hides every rule that doesn't have a matching IF condition of that type. For Property, it searches the property name; for First level title and Note file, it searches the condition's typed text. Match is a case-insensitive, literal substring (a `/regex/`-mode condition value is matched as its literal text, slashes included — never interpreted as a pattern), and only kicks in once the term is at least 2 characters. The search field is Obsidian's native search input, with its own built-in clear ("x") button. The filter is session-only — it starts blank every time the settings tab is (re)opened, but stays put across in-tab actions like "Add rule".
+
 ## 0.25.2 - 2026-08-29
 ### Added
 - **"Latest export" path shown under Backup and restore.** After clicking "Export settings", the full path of the exported file now appears right below the section description (persisted in settings, so it's still shown after reopening the settings tab or restarting Obsidian). On desktop this is the full OS filesystem path (e.g. `/Users/name/Vault/conditional-properties-settings-2026-08-29.json`), via `FileSystemAdapter.getFullPath()`; on mobile, where there's no real filesystem path to show, it falls back to the vault-relative path.
