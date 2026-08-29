@@ -10,7 +10,7 @@ nav_order: 1
 Automate your frontmatter with smart IF/THEN rules. Set properties, modify titles, and keep your vault organized — automatically.
 {: .fs-6 .fw-300 }
 
-[Install Obsidian](https://community.obsidian.md/plugins/conditional-properties){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
+[Install Obsidian](obsidian://show-plugin?id=conditional-properties){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
 [View on GitHub](https://github.com/diegoeis/obsidian-conditional-properties){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
