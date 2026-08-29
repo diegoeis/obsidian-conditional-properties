@@ -2,7 +2,7 @@
 
 ## 0.25.2 - 2026-08-29
 ### Added
-- **"Latest export" path shown under Backup and restore.** After clicking "Export settings", the vault-relative path of the exported file now appears right below the section description (persisted in settings, so it's still shown after reopening the settings tab or restarting Obsidian).
+- **"Latest export" path shown under Backup and restore.** After clicking "Export settings", the full path of the exported file now appears right below the section description (persisted in settings, so it's still shown after reopening the settings tab or restarting Obsidian). On desktop this is the full OS filesystem path (e.g. `/Users/name/Vault/conditional-properties-settings-2026-08-29.json`), via `FileSystemAdapter.getFullPath()`; on mobile, where there's no real filesystem path to show, it falls back to the vault-relative path.
 
 ## 0.25.1 - 2026-08-29
 ### Fixed

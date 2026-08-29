@@ -7,7 +7,7 @@
 // legacy `Plugin` DOM interface (navigator.plugins), never actually used by
 // this file.
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-redeclare -- hand-written CommonJS main.js by design, see comment above
-const { Plugin, Notice, Setting, PluginSettingTab, ButtonComponent, DropdownComponent, moment, debounce, normalizePath } = require("obsidian");
+const { Plugin, Notice, Setting, PluginSettingTab, ButtonComponent, DropdownComponent, moment, debounce, normalizePath, FileSystemAdapter } = require("obsidian");
 
 class ConditionalPropertiesPlugin extends Plugin {
 	async onload() {
@@ -1789,12 +1789,22 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			} else {
 				await this.app.vault.create(fileName, settings);
 			}
-			new Notice(`Settings exported to "${fileName}" in your vault's root folder.`, 6000);
+			// Resolves to a full OS filesystem path on desktop, e.g.
+			// "/Users/name/Vault/conditional-properties-settings-....json" —
+			// `FileSystemAdapter.getFullPath()` is desktop-only (there is no
+			// real filesystem path on mobile's Capacitor-backed adapter), so
+			// this falls back to the vault-relative path there instead.
+			const adapter = this.app.vault.adapter;
+			const displayPath = adapter instanceof FileSystemAdapter
+				? adapter.getFullPath(fileName)
+				: fileName;
+
+			new Notice(`Settings exported to "${displayPath}".`, 6000);
 
 			// Persists the path so "Latest export" under the Backup and
 			// restore description (see display()) survives reopening the
 			// settings tab or restarting Obsidian, not just this session.
-			this.plugin.settings.lastExportPath = fileName;
+			this.plugin.settings.lastExportPath = displayPath;
 			await this.plugin.saveData(this.plugin.settings);
 			if (typeof this._updateLastExportDisplay === "function") {
 				this._updateLastExportDisplay();
