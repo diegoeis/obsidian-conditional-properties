@@ -171,3 +171,12 @@
   color: var(--text-warning);
   margin-top: 4px;
 }
+
+/* "Latest export" line under the Backup and restore description. Block +
+   margin-top gives it its own line, separated from the description above,
+   without needing literal <br> elements in the DOM. */
+#eis-cp-plugin .cp-last-export {
+  display: block;
+  margin-top: 10px;
+  color: var(--text-muted);
+}

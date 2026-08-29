@@ -18,7 +18,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 			lastRun: null,
 			scanScope: "latestCreated",
 			scanCount: 15,
-			operatorMigrationVersion: 0
+			operatorMigrationVersion: 0,
+			lastExportPath: null
 		}, loaded);
 		// Dedupes the "invalid regular expression" Notice per raw pattern text
 		// so a broken /pattern/ in a rule doesn't spam one Notice per file
@@ -1789,6 +1790,15 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				await this.app.vault.create(fileName, settings);
 			}
 			new Notice(`Settings exported to "${fileName}" in your vault's root folder.`, 6000);
+
+			// Persists the path so "Latest export" under the Backup and
+			// restore description (see display()) survives reopening the
+			// settings tab or restarting Obsidian, not just this session.
+			this.plugin.settings.lastExportPath = fileName;
+			await this.plugin.saveData(this.plugin.settings);
+			if (typeof this._updateLastExportDisplay === "function") {
+				this._updateLastExportDisplay();
+			}
 		} catch (error) {
 			console.error('Error exporting settings:', error);
 			new Notice('Failed to export settings: ' + error.message, 5000);
@@ -1953,6 +1963,27 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			const exportImportSetting = new Setting(configItemsEl)
 				.setName("Backup and restore")
 				.setDesc("Export or import your plugin settings");
+
+			// Shows the vault-relative path of the most recent export right
+			// under the description, once one exists — persisted in
+			// settings.lastExportPath, so it survives reopening the tab or
+			// restarting Obsidian. `_updateLastExportDisplay` is stashed on
+			// the tab instance so exportSettings() can refresh it after a
+			// successful export, the same pattern _debouncedSaveSettings etc.
+			// use to reach back into a live render from outside display().
+			const lastExportEl = exportImportSetting.descEl.createEl("small", { cls: "cp-last-export" });
+			this._updateLastExportDisplay = () => {
+				lastExportEl.empty();
+				const path = this.plugin.settings.lastExportPath;
+				if (!path) {
+					lastExportEl.addClass("is-hidden");
+					return;
+				}
+				lastExportEl.removeClass("is-hidden");
+				lastExportEl.createEl("b", { text: "Latest export: " });
+				lastExportEl.createSpan({ text: `"${path}"` });
+			};
+			this._updateLastExportDisplay();
 
 			exportImportSetting.addButton(btn => {
 				btn.setButtonText("Export settings")

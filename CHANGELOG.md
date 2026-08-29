@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.25.2 - 2026-08-29
+### Added
+- **"Latest export" path shown under Backup and restore.** After clicking "Export settings", the vault-relative path of the exported file now appears right below the section description (persisted in settings, so it's still shown after reopening the settings tab or restarting Obsidian).
+
 ## 0.25.1 - 2026-08-29
 ### Fixed
 - **Critical: a settings migration bug could silently rewrite `contains` conditions to `exactly`.** `_migrateRules()`'s v0/v1→v2 operator-rename step ran unconditionally whenever `operatorMigrationVersion < 3`, instead of being gated to `< 2` on its own. `contains` has been a valid, current operator (substring match) since 0.12.1 — anyone whose `data.json` was still sitting at `operatorMigrationVersion: 2` (never re-opened Obsidian between 0.12.1 and 0.17.0) would have every genuine `contains` condition silently reinterpreted as `exactly` the next time this ran. Each migration step is now gated to its own version range independently, so a step can never re-run against data from a schema it doesn't apply to. There's no reliable way to detect or repair data already affected by a past run of the old code — this only prevents it from happening going forward. Also fixed in the same function: a missing `await` on the final `saveData()` call, and removed a dead `ifConditions` branch that referenced a field name that never existed in any shipped schema.

@@ -444,7 +444,7 @@ The plugin runs automatically based on your selected scope.
 
 Settings → Backup and restore.
 
-- **Export settings** writes `conditional-properties-settings-YYYY-MM-DD.json` to your **vault's root folder** (not your OS's Downloads folder) and shows a `Notice` confirming the path. This works the same way on desktop and mobile — earlier versions triggered a browser download dialog, which isn't reliable in Obsidian Mobile's WebView.
+- **Export settings** writes `conditional-properties-settings-YYYY-MM-DD.json` to your **vault's root folder** (not your OS's Downloads folder) and shows a `Notice` confirming the path. This works the same way on desktop and mobile — earlier versions triggered a browser download dialog, which isn't reliable in Obsidian Mobile's WebView. The path of the most recent export is also shown as "Latest export" right under this section's description *(new in v0.25.2)* — it stays there after reopening the settings tab or restarting Obsidian.
 - **Import settings** opens a file picker; pick any exported JSON file to restore your rules and scan settings.
 
 ## Roadmap
