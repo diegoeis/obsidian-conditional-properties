@@ -205,3 +205,15 @@
 #eis-cp-plugin .cp-rule-search .setting-item-control > .search-input-container {
   flex: 1;
 }
+
+/* Obsidian's native search input (used for the global search, quick
+   switcher, etc.) is pill-shaped by default — rounder than every other
+   field in this plugin's own settings. Force it back to the same
+   `--input-radius` every other text input/dropdown here already uses
+   (via Obsidian's own default styling), so this field reads as "one of
+   ours" instead of a different, borrowed-looking control. `!important`
+   is needed to win over Obsidian's own core styles on this element. */
+#eis-cp-plugin .cp-rule-search .search-input-container,
+#eis-cp-plugin .cp-rule-search .search-input-container input[type="search"] {
+  border-radius: var(--input-radius) !important;
+}
