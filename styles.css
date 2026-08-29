@@ -16,29 +16,26 @@
   }
 }
 
-#eis-cp-plugin .cp-rules-group .setting-items {
-  padding: 20px;
-}
-
 #eis-cp-plugin .cp-rule {
-  border: 1px solid var(--background-modifier-border);
-  padding: 20px;
-  border-radius: 5px;
   margin-bottom: 20px;
-  background: var(--background-primary);
-  transition: all .15s linear;
-}
-
-#eis-cp-plugin .cp-rule:hover {
-  border-color: var(--background-modifier-border-hover);
+  background: var(--setting-items-background);
+  padding: 20px;
 }
 
 /* Shared row shape for both an IF condition and a THEN action — they're
-   the same element, same styling, just different content inside. */
+   the same element, same styling, just different content inside. Label
+   ("Where"/"Or"/"Do this") and its fields sit on one line, not stacked. */
+#eis-cp-plugin .cp-rule-line,
+#eis-cp-plugin .cp-rule-line .setting-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  padding: 0;
+}
+
 #eis-cp-plugin .cp-rule-line {
-  display: block;
-  padding-top: 12px;
-  margin-bottom: 7px;
+  margin-bottom: 8px;
 }
 
 #eis-cp-plugin .cp-rule .setting-item-control {
@@ -103,14 +100,45 @@
   font-size: 0.8rem;
 }
 
-/* Condition / Action row label tweaks */
+/* Same contrast fill as the condition/action row fields — background-color
+   only, not the `background` shorthand, so the native select arrow
+   (drawn via background-image) stays intact. */
+#eis-cp-plugin .cp-match select,
+#eis-cp-plugin .cp-match .dropdown {
+  background-color: var(--background-modifier-form-field);
+}
+
+/* Condition / Action row label ("Where" / "Or" / "Do this") — a fixed-width
+   column to the left of the row's fields, same line, right-aligned so the
+   fields line up under one another across rows. */
 #eis-cp-plugin .cp-rule .cp-rule-label {
-  padding: 0 0 5px;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 46px;
+  padding: 0;
   margin: 0;
+  text-align: right;
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
 #eis-cp-plugin .cp-rule .cp-rule-line:hover .cp-rule-label {
   font-weight: bold;
+  color: var(--text-normal);
+}
+
+/* Contrast fill for every field inside a condition/action row — the row
+   itself carries no background anymore, so the fields need their own to
+   stand out. var(--background-modifier-form-field) is Obsidian's own
+   input/select fill token: reads as white in light themes (the effect
+   asked for) without hardcoding a color that would break dark themes.
+   background-color only (not the `background` shorthand): a native
+   .dropdown/<select> draws its arrow via background-image, and the
+   shorthand would reset that to none, leaving a select with no arrow. */
+#eis-cp-plugin .cp-rule-line input[type="text"],
+#eis-cp-plugin .cp-rule-line select,
+#eis-cp-plugin .cp-rule-line .dropdown {
+  background-color: var(--background-modifier-form-field);
 }
 
 #eis-cp-plugin .cp-rule-line .extra-setting-button {

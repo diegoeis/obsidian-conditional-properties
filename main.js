@@ -2082,7 +2082,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			// child of .setting-group (a sibling of .setting-items, not
 			// nested inside it) — same shape Obsidian's own settings use for
 			// a group heading with an action attached.
-			const rulesGroupEl = rootEl.createEl("div", { cls: "setting-group cp-rules-group" });
+			const rulesGroupEl = rootEl.createEl("div", { cls: "setting-group" });
 
 			this.plugin.settings.rules = this.plugin.settings.rules || [];
 
@@ -2130,7 +2130,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 						}
 					}));
 
-			rulesItemsEl = rulesGroupEl.createEl("div", { cls: "setting-items" });
+			rulesItemsEl = rulesGroupEl.createEl("div", { cls: "cp-rules-group" });
 
 			// Render Rules
 			this.plugin.settings.rules.slice().reverse().forEach((rule, idxReversed) => {
@@ -2337,7 +2337,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const line = new Setting(containerEl);
 		line.settingEl.addClass("cp-rule-line");
 		line.settingEl.removeClass("setting-item");
-		this._setRuleLineLabel(line, `Condition ${condIdx + 1}`);
+		this._setRuleLineLabel(line, this._conditionLineLabelText(condIdx, rule.match));
 
 		const rebuild = async () => {
 			await this.plugin.saveData(this.plugin.settings);
@@ -2489,7 +2489,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 	_ensureMatchDropdown(ruleCtx) {
 		if (ruleCtx.matchWrapEl) return;
-		const { ifHeader, rule } = ruleCtx;
+		const { ifHeader, rule, conditionSettings } = ruleCtx;
 		const matchWrap = ifHeader.createEl("div", { cls: "cp-match" });
 		matchWrap.createEl("span", { text: "Match", cls: "cp-match-label" });
 		new DropdownComponent(matchWrap)
@@ -2499,6 +2499,12 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			.onChange(async (v) => {
 				rule.match = v === "all" ? "all" : "any";
 				await this.plugin.saveData(this.plugin.settings);
+				// "Any" reads as OR, "All" reads as AND — every condition
+				// line's connector word (all but the first, which is
+				// always "Where") has to follow the mode just chosen.
+				conditionSettings.forEach((line, i) => {
+					this._setRuleLineLabel(line, this._conditionLineLabelText(i, rule.match));
+				});
 			});
 		ruleCtx.matchWrapEl = matchWrap;
 	}
@@ -2531,7 +2537,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					await this.plugin.saveData(this.plugin.settings);
 
 					conditionSettings.forEach((line, i) => {
-						this._setRuleLineLabel(line, `Condition ${i + 1}`);
+						this._setRuleLineLabel(line, this._conditionLineLabelText(i, rule.match));
 					});
 
 					if (rule.conditions.length === 1) {
@@ -2553,18 +2559,30 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	}
 
 	/**
+	 * Condition rows read as a sentence with the match dropdown ("Any/All
+	 * of the following are true"): the first condition is introduced with
+	 * "Where", every following one with "Or" (match: "any") or "And"
+	 * (match: "all") — so the connector word always matches the boolean
+	 * the rule is actually evaluating.
+	 */
+	_conditionLineLabelText(condIdx, match) {
+		if (condIdx === 0) return "Where";
+		return match === "all" ? "And" : "Or";
+	}
+
+	/**
 	 * Obsidian's Setting always builds a .setting-item-info wrapper holding
 	 * .setting-item-name + .setting-item-description. Our condition/action
 	 * rows only need a compact label, never a description, so this swaps
 	 * that whole wrapper out for a single <div class="cp-rule-label">, and
 	 * stashes it on the Setting instance (`setting.labelEl`) so later
-	 * renumbering (after a row is added/removed) can update the text
+	 * relabeling (after a row is added/removed) can update the text
 	 * directly instead of calling Setting.setName() — which would just
 	 * write into the now-detached info wrapper we removed. Safe to call
 	 * repeatedly: the swap only happens once per Setting.
 	 *
-	 * A plain <div>, not a heading element (`<h6>` previously): "Condition
-	 * 1" / "Action 1" is a compact field label for one row, not a document
+	 * A plain <div>, not a heading element (`<h6>` previously): "Where" /
+	 * "Or" / "Do this" is a compact field label for one row, not a document
 	 * section — a rule with several conditions/actions would otherwise
 	 * produce dozens of heading-level elements, which a screen reader's
 	 * heading-navigation feature lists as if they were real page structure.
@@ -2604,7 +2622,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		const rule = ruleCtx.rule;
 		const actionWrap = containerEl.createEl("div", { cls: "cp-rule-line" });
 		const actionSetting = new Setting(actionWrap);
-		this._setRuleLineLabel(actionSetting, `Action ${actionIdx + 1}`);
+		this._setRuleLineLabel(actionSetting, "Do this");
 		
 		// Initialize action type if not set
 		if (!action.type) {
@@ -2772,8 +2790,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 					await this.plugin.saveData(this.plugin.settings);
 
-					entries.forEach((e, i) => {
-						this._setRuleLineLabel(e.setting, `Action ${i + 1}`);
+					entries.forEach((e) => {
+						this._setRuleLineLabel(e.setting, "Do this");
 					});
 				});
 		});
