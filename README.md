@@ -241,7 +241,7 @@ Match: Any of the following
 THEN  Property: tags → Remove value → active
 ```
 
-Click **+ add condition** below the IF block to add more conditions, and use the **Match** dropdown to switch between **Any of the following** and **All of the following**. Existing rules from previous plugin versions are auto-migrated and keep their behavior unchanged.
+Click **+ add condition** below the IF block to add more conditions, and use the **Match** dropdown to switch between **Any of the following** and **All of the following**. Each condition row is labeled to read like a sentence *(new in v0.25.4)* — the first is always **Where**, every one after it is **Or** (Match: Any) or **And** (Match: All), automatically following whichever mode you have selected. THEN actions are all labeled **Do this**. Existing rules from previous plugin versions are auto-migrated and keep their behavior unchanged.
 
 ## Note file conditions
 

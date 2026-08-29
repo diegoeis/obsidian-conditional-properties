@@ -7,6 +7,22 @@ nav_order: 11
 
 The full, unabridged history lives in [CHANGELOG.md on GitHub](https://github.com/diegoeis/obsidian-conditional-properties/blob/main/CHANGELOG.md). Highlights of recent releases:
 
+## 0.25.4
+
+- Condition/action rows restyled: no border on the rule card, one-line layout, and labels changed from "Condition 1"/"Action 1" to a sentence-like **Where** (first condition), **Or**/**And** (every following condition, matching Any/All), and **Do this** (every action).
+
+## 0.25.3
+
+- **Rule search** — a condition-type dropdown (Property / First level title / Note file) plus a live-filter search field, right under the Rules heading. See [Backup & Restore](/backup-restore#rule-search).
+
+## 0.25.0 – 0.25.2
+
+- **"Bookmark file" and "Remove bookmark"** Note file actions, backed by Obsidian's core Bookmarks plugin, with a group picker. See [Note File Actions](/actions/note-file-actions).
+- **"Latest export" path** shown under Backup and restore after exporting — the full OS filesystem path on desktop.
+- **Critical fix**: a settings-migration bug that could silently rewrite `contains` conditions to `exactly` for anyone still on an old schema version — fixed, each migration step now gated to its own version range.
+- Scan-interval changes apply immediately, no Obsidian restart needed; every settings field debounces its save instead of writing on every keystroke.
+- Performance: title lookups read Obsidian's metadata cache first instead of the file from disk; compiled regex conditions are cached; dark-mode color fixes; accessibility fix for condition/action row labels.
+
 ## 0.24.2
 
 - Settings tab UI rebuilt on native Obsidian patterns (setting-group/setting-items shell, batched DOM build, `cp-*` class naming). No behavior change.

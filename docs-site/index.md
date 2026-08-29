@@ -54,11 +54,11 @@ THEN  First level title: Add suffix → " - {{date:DD/MM/YYYY}}"
 | [Getting Started](/getting-started) | Install the plugin and build your first rule |
 | [Examples](/examples) | A cookbook of rules, from simple to complex |
 | [Conditions (IF)](/conditions/) | Property, First level title, Note file, regex matching, multiple conditions |
-| [Actions (THEN)](/actions/) | Property, First level title, Note file actions, multiple actions per rule |
+| [Actions (THEN)](/actions/) | Property, First level title, Note file actions (including Bookmark file), multiple actions per rule |
 | [Placeholders](/placeholders) | `{{date}}`, `{{time}}`, `{{title}}`, `{{propertyName}}`, `{{match}}` |
 | [Typed Properties](/typed-properties) | Checkbox / date / datetime auto-coercion |
 | [Execution & Scheduling](/execution-scheduling) | Run manually, scheduled scans, scan scopes |
-| [Backup & Restore](/backup-restore) | Export/import your rules |
+| [Backup & Restore](/backup-restore) | Export/import your rules, rule search |
 | [Help](/help) | Bug reports, feature requests |
 | [Changelog](/changelog) | Version history |
 

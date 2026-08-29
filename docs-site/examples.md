@@ -114,8 +114,8 @@ THEN:
 
 ```yaml
 Match: All of the following
-  Condition 1  Property: status → exactly match → "done"
-  Condition 2  Note file: Parent folder is not → "Archive"
+  Where  Property: status → exactly match → "done"
+  And    Note file: Parent folder is not → "Archive"
 THEN  Note file: Add name prefix → "[DONE] "
 ```
 Combines a [Property condition](/conditions/property) with a [Note file condition](/conditions/note-file) in one `Match all` rule — only prefixes notes that are done *and* not already archived. See [Multiple Conditions](/conditions/multiple-conditions).
@@ -153,8 +153,8 @@ Rule 2 fires in the **same scan** Rule 1 added the `completed` tag — no second
 
 ```yaml
 Match: All of the following
-  Condition 1  First level title: contains → /\d{4}-\d{2}-\d{2}/
-  Condition 2  Note file: Parent folder is → "meetings"
+  Where  First level title: contains → /\d{4}-\d{2}-\d{2}/
+  And    Note file: Parent folder is → "meetings"
 THEN:
   - Property: type → Overwrite all values with → "meeting"
   - Property: reviewed → Overwrite all values with → "false"
@@ -170,14 +170,14 @@ Nested condition groups like `(A OR B) AND C` aren't supported in a single rule 
 ```yaml
 Rule 1:
   Match: All of the following
-    Condition 1  Property: type → exactly match → "meeting"
-    Condition 2  Note file: Parent folder is not → "Archive"
+    Where  Property: type → exactly match → "meeting"
+    And    Note file: Parent folder is not → "Archive"
   THEN  Property: tags → Add value → meeting, needs-review
 
 Rule 2:
   Match: All of the following
-    Condition 1  First level title: contains → "Meeting"
-    Condition 2  Note file: Parent folder is not → "Archive"
+    Where  First level title: contains → "Meeting"
+    And    Note file: Parent folder is not → "Archive"
   THEN  Property: tags → Add value → meeting, needs-review
 ```
 Either rule fires the same THEN action, so a note matching by `type` *or* by title — as long as it's outside `Archive` — ends up with the same tags. `ADD` never duplicates a value, so a note that satisfies both rules doesn't end up with `meeting` listed twice.
