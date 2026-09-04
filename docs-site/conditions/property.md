@@ -39,6 +39,25 @@ IF  Property: title → contains → /\d{4}-\d{2}-\d{2}/
 
 Regex on a **list** property (like `tags`) still matches against each item, but there's no single scalar to pull a capture from for [`{{match}}` in THEN](/actions/note-file-actions#match-in-then-beta) — capture groups are only exposed for a Property condition holding a single (non-list) value.
 
+## Placeholders in the value
+
+The value field accepts [placeholders](/placeholders) too, resolved against the file being checked before the comparison runs:
+
+```yaml
+IF  Property: dateDue → exactly match → "{{today}}"
+```
+Matches when `dateDue` holds today's date.
+
+You can also compare one property against another — anything that isn't a reserved placeholder name is looked up as a frontmatter property:
+
+```yaml
+IF  Property: type → exactly match → "{{company}}"
+```
+Matches when the note's `type` property has the exact same value as its `company` property.
+
+{: .note }
+A `/regex/` value (see [Regex matching](#regex-matching) above) is never expanded for placeholders — `/{{today}}/` is treated as a literal regex pattern, not "today's date wrapped in a regex".
+
 ## Typed property awareness
 
 When a property is registered as `checkbox`, `date`, or `datetime` in Obsidian's property types, your typed value is normalized before comparing — so you can write the IF condition however feels natural, and the plugin adapts to the stored format.

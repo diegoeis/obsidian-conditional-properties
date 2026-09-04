@@ -1109,6 +1109,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 			if (type === 'time') return formatTime(format);
 			if (type === 'updated_date') return formatDate(format, getUpdatedMomentDate());
 			if (type === 'today') return formatDate(format, moment());
+			if (type === 'yesterday') return formatDate(format, moment().subtract(1, 'day'));
+			if (type === 'tomorrow') return formatDate(format, moment().add(1, 'day'));
 			if (type === 'date' && isDoubleBrace) return formatDate(format, moment()); // {{date}} = today, matches Obsidian's Templates plugin
 			return formatDate(format); // {date} / {created_date} / {{created_date}} = file creation date
 		};
@@ -1121,18 +1123,19 @@ class ConditionalPropertiesPlugin extends Plugin {
 		// Pass 1 — Obsidian Templates-style double braces, reserved names:
 		// {{date}}, {{date:FORMAT}}, {{time}}, {{time:FORMAT}}, {{title}},
 		// plus this plugin's own reserved names for consistency:
-		// {{created_date}}, {{updated_date}}, {{today}}, {{filename}} — all
-		// with the same meaning as their {name} counterpart (see
-		// `resolveReserved` above for the one exception, {{date}} vs {date}).
-		let out = text.replace(/\{\{(date|created_date|updated_date|today|time|title|filename)(?::([^}]+))?\}\}/g,
+		// {{created_date}}, {{updated_date}}, {{today}}, {{yesterday}},
+		// {{tomorrow}}, {{filename}} — all with the same meaning as their
+		// {name} counterpart (see `resolveReserved` above for the one
+		// exception, {{date}} vs {date}).
+		let out = text.replace(/\{\{(date|created_date|updated_date|today|yesterday|tomorrow|time|title|filename)(?::([^}]+))?\}\}/g,
 			(match, type, format) => resolveReserved(type, format, true));
 
 		// Pass 2 — legacy single braces, reserved names: {date}, {date:FORMAT},
-		// {filename}, {created_date}, {updated_date}, {today}, {time}, {title}.
-		// {date} and {created_date} are aliases for the file's creation date
-		// (kept both for backward compatibility — {date} shipped first, before
-		// {{}} support existed).
-		out = out.replace(/\{(date|created_date|updated_date|today|time|title|filename)(?::([^}]+))?\}/g,
+		// {filename}, {created_date}, {updated_date}, {today}, {yesterday},
+		// {tomorrow}, {time}, {title}. {date} and {created_date} are aliases
+		// for the file's creation date (kept both for backward compatibility
+		// — {date} shipped first, before {{}} support existed).
+		out = out.replace(/\{(date|created_date|updated_date|today|yesterday|tomorrow|time|title|filename)(?::([^}]+))?\}/g,
 			(match, type, format) => resolveReserved(type, format, false));
 
 		// Pass 2.5 — {{match}} / {{match:N}} / {{match:name}} — BETA. Refers to
@@ -1174,10 +1177,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 	/**
 	 * Resolves {{placeholder}}s inside an IF condition's value (`cond.ifValue`)
 	 * before it's compared — reuses `_formatText`, the same engine THEN
-	 * actions already run their text through, so `{{today}}`, `{{filename}}`,
-	 * `{{title}}`, `{{created_date}}`, `{{updated_date}}`, `{{time}}` and
-	 * `{{propertyName}}` (any other frontmatter property, read from `fm`, the
-	 * in-progress frontmatter) all work the same way on both sides of a rule.
+	 * actions already run their text through, so `{{today}}`, `{{yesterday}}`,
+	 * `{{tomorrow}}`, `{{filename}}`, `{{title}}`, `{{created_date}}`,
+	 * `{{updated_date}}`, `{{time}}` and `{{propertyName}}` (any other
+	 * frontmatter property, read from `fm`, the in-progress frontmatter) all
+	 * work the same way on both sides of a rule.
 	 * Two deliberate no-ops:
 	 *   - Non-string `ifValue` is returned as-is (nothing to resolve).
 	 *   - A regex-mode value (`/pattern/flags` — see `_isRegexPattern`) is
@@ -2837,7 +2841,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					}));
 			} else if (action.action !== "delete") {
 				actionSetting.addText(t => t
-					.setPlaceholder("value (use commas; supports {{propertyName}}, {{date}}, {{time}}, {{title}}, {{created_date}}, {{updated_date}}, {{today}}, {{filename}})")
+					.setPlaceholder("value (use commas; supports {{propertyName}}, {{date}}, {{time}}, {{title}}, {{created_date}}, {{updated_date}}, {{yesterday}}, {{tomorrow}}, {{filename}})")
 					.setValue(action.value || "")
 					.onChange((v) => {
 						action.value = v;
@@ -2912,7 +2916,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			actionSetting.addText(t => t
-				.setPlaceholder("Text (use {{date}}, {{time}}, {{title}}, {{created_date}}, {{updated_date}}, {{today}}, {{filename}}, or {{propertyName}})")
+				.setPlaceholder("Text (use {{date}}, {{time}}, {{title}}, {{created_date}}, {{updated_date}}, {{yesterday}}, {{tomorrow}}, {{filename}}, or {{propertyName}})")
 				.setValue(action.text || "")
 				.onChange((v) => {
 					action.text = v;

@@ -36,4 +36,16 @@ IF  First level title: contains → /\d{4}-\d{2}-\d{2}/
 ```
 Matches a title like "Nota da reunião 2026-08-22 com John Doe" — the plugin finds the date `2026-08-22` inside the text. Capture groups from a match here are available in THEN actions via [`{{match}}`](/actions/note-file-actions#match-in-then-beta).
 
+## Placeholders in the value
+
+The value field accepts [placeholders](/placeholders) too, resolved against the file being checked before the comparison runs:
+
+```yaml
+IF  First level title: contains → "{{created_date}}"
+```
+Matches when the title contains the file's creation date. Also works against a property value, e.g. `contains → "{{status}}"` matches when the title contains whatever `status` currently holds.
+
+{: .note }
+A `/regex/` value (see [Regex matching](#regex-matching) above) is never expanded for placeholders — it's compiled as a literal pattern as-is.
+
 {% endraw %}
