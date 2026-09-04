@@ -2,6 +2,7 @@
 title: Examples
 nav_order: 3
 ---
+{% raw %}
 
 # Examples
 
@@ -181,3 +182,5 @@ Rule 2:
   THEN  Property: tags → Add value → meeting, needs-review
 ```
 Either rule fires the same THEN action, so a note matching by `type` *or* by title — as long as it's outside `Archive` — ends up with the same tags. `ADD` never duplicates a value, so a note that satisfies both rules doesn't end up with `meeting` listed twice.
+
+{% endraw %}

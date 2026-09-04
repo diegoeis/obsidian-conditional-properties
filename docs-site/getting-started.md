@@ -2,6 +2,7 @@
 title: Getting Started
 nav_order: 2
 ---
+{% raw %}
 
 # Getting Started
 
@@ -48,3 +49,5 @@ See [Execution & Scheduling](/execution-scheduling) for scan scopes and the Stop
 - [Conditions (IF)](/conditions/) — everything a rule can check
 - [Actions (THEN)](/actions/) — everything a rule can do
 - [Placeholders](/placeholders) — dynamic values like `{{date}}` and `{{propertyName}}`
+
+{% endraw %}

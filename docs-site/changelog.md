@@ -2,6 +2,7 @@
 title: Changelog
 nav_order: 11
 ---
+{% raw %}
 
 # Changelog
 
@@ -59,3 +60,5 @@ Not built yet, tracked in [README.md's Roadmap section](https://github.com/diego
 - Comparison operators (greater than / less than)
 - Nested condition groups (e.g. `(A AND B) OR C`)
 - Folder/tag-based scoping
+
+{% endraw %}

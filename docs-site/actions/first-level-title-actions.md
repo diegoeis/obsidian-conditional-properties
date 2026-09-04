@@ -3,6 +3,7 @@ title: First Level Title Actions
 parent: Actions (THEN)
 nav_order: 2
 ---
+{% raw %}
 
 # First level title actions
 
@@ -39,3 +40,5 @@ Unlike Add prefix/Add suffix, Overwrite to works even when the note has no H1 ye
 ## Placeholders
 
 All three accept the full [Placeholders](/placeholders) set — dates, time, filename, frontmatter properties, and regex captures via `{{match}}`.
+
+{% endraw %}

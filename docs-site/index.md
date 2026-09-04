@@ -3,6 +3,7 @@ title: Home
 layout: home
 nav_order: 1
 ---
+{% raw %}
 
 # Conditional Properties for Obsidian
 {: .fs-9 }
@@ -67,3 +68,5 @@ THEN  First level title: Add suffix → " - {{date:DD/MM/YYYY}}"
 - Only modifies frontmatter — body content is preserved
 - All processing happens locally
 - No data leaves your device
+
+{% endraw %}

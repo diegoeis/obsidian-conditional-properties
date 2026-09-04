@@ -3,6 +3,7 @@ title: Property
 parent: Conditions (IF)
 nav_order: 1
 ---
+{% raw %}
 
 # Property condition
 
@@ -48,3 +49,5 @@ IF  Property: created_at → exactly match → "08-08-2025"
 Matches a note whose YAML stores `created_at: 2025-08-08` — the plugin parses `08-08-2025` using your vault's Daily Notes / Templates date format (or a few common fallbacks) before comparing.
 
 For checkbox properties, `Property: done → exactly match → "true"` matches a note with `done: true` (boolean) regardless of how you typed `true` (case-insensitive). See [Typed Properties](/typed-properties) for the full parsing rules.
+
+{% endraw %}

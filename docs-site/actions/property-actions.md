@@ -3,6 +3,7 @@ title: Property Actions
 parent: Actions (THEN)
 nav_order: 1
 ---
+{% raw %}
 
 # Property actions
 
@@ -72,3 +73,5 @@ Any property action's value can reference dates, times, the filename, another pr
 ```yaml
 THEN  Property: excerpt → Add value → "{{g_excerpt}}"
 ```
+
+{% endraw %}
