@@ -448,7 +448,13 @@ class ConditionalPropertiesPlugin extends Plugin {
 					const cType = cond.ifType || "PROPERTY";
 					const cOp = cond.op || "exactly";
 					if (cType === "NOTE_FILE") {
-						const isMatch = this._matchesNoteFileCondition(file, cond);
+						// Resolve {{placeholder}}s in the condition's value before
+						// matching (see `_resolveConditionValue`) — e.g. `{{today}}`
+						// against a filename. `_captureRegexGroups` below still reads
+						// `cond.ifValue` (the raw, unresolved value) — resolution is a
+						// no-op for regex-mode values, so this is safe.
+						const resolvedCond = { ...cond, ifValue: this._resolveConditionValue(cond, file, newFm) };
+						const isMatch = this._matchesNoteFileCondition(file, resolvedCond);
 						if (isMatch && !capturedMatch) {
 							capturedMatch = this._captureRegexGroups(file.basename || "", cond);
 						}
@@ -470,7 +476,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 						// rules 1..N-1 from this same run, never rules after it.
 						sourceValue = newFm?.[cond.ifProp];
 					}
-					const isMatch = this._matchesCondition(sourceValue, cond.ifValue, cOp, cType, cond.ifProp);
+					// Resolve {{placeholder}}s (e.g. `{{today}}`, `{{someProperty}}`)
+					// in the condition's value before matching — see
+					// `_resolveConditionValue`.
+					const resolvedValue = this._resolveConditionValue(cond, file, newFm);
+					const isMatch = this._matchesCondition(sourceValue, resolvedValue, cOp, cType, cond.ifProp);
 					if (isMatch && !capturedMatch) {
 						capturedMatch = this._captureRegexGroups(sourceValue, cond);
 					}
@@ -1159,6 +1169,37 @@ class ConditionalPropertiesPlugin extends Plugin {
 		out = out.replace(/\{([^}:\s][^}:]*)\}/g, (match, name) => getProperty(name));
 
 		return out;
+	}
+
+	/**
+	 * Resolves {{placeholder}}s inside an IF condition's value (`cond.ifValue`)
+	 * before it's compared — reuses `_formatText`, the same engine THEN
+	 * actions already run their text through, so `{{today}}`, `{{filename}}`,
+	 * `{{title}}`, `{{created_date}}`, `{{updated_date}}`, `{{time}}` and
+	 * `{{propertyName}}` (any other frontmatter property, read from `fm`, the
+	 * in-progress frontmatter) all work the same way on both sides of a rule.
+	 * Two deliberate no-ops:
+	 *   - Non-string `ifValue` is returned as-is (nothing to resolve).
+	 *   - A regex-mode value (`/pattern/flags` — see `_isRegexPattern`) is
+	 *     returned untouched. Placeholder resolution inside a regex pattern is
+	 *     out of scope for now — expanding a placeholder there could inject
+	 *     regex metacharacters into what's supposed to be a fixed pattern.
+	 * `{{match}}` (the regex-capture placeholder) always resolves to "" here
+	 * (no `matchGroups` passed) — it refers to a capture from this rule's
+	 * winning condition, which isn't decided yet while conditions are still
+	 * being evaluated.
+	 * `dateOnly` mirrors the same rule `_applyFileAction` already uses for
+	 * file-related THEN actions: `true` for `NOTE_FILE` conditions (a
+	 * filename can't hold a full timestamp — e.g. `:` isn't valid on
+	 * Windows), `false` for `PROPERTY` / `FIRST_LEVEL_HEADING` (full
+	 * configured date/time format, since a property or heading can hold one).
+	 */
+	_resolveConditionValue(cond, file, fm) {
+		const raw = cond?.ifValue;
+		if (typeof raw !== "string" || raw === "") return raw;
+		if (this._isRegexPattern(raw)) return raw;
+		const dateOnly = cond?.ifType === "NOTE_FILE";
+		return this._formatText(raw, file, fm, dateOnly, null);
 	}
 
 	_matchesCondition(source, expected, op, ifType, propName) {
@@ -2486,7 +2527,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			let updateNoteFileRegexHint = null;
 			line.addText(t => t
-				.setPlaceholder(isFolderOp ? "folder name or path, e.g. meetings/transcripts/company" : "text, or /regex/")
+				.setPlaceholder(isFolderOp ? "folder name or path, e.g. meetings/transcripts/company" : "text, {{placeholder}}, or /regex/")
 				.setValue(cond.ifValue || "")
 				.onChange((v) => {
 					cond.ifValue = v;
@@ -2510,7 +2551,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			if (cond.op !== 'exists' && cond.op !== 'notExists' && cond.op !== 'isEmpty') {
 				let updateHeadingRegexHint;
 				line.addText(t => t
-					.setPlaceholder("First level title text, or /regex/")
+					.setPlaceholder("First level title text, {{placeholder}}, or /regex/")
 					.setValue(cond.ifValue || "")
 					.onChange((v) => {
 						cond.ifValue = v;
@@ -2541,7 +2582,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			if (cond.op !== 'exists' && cond.op !== 'notExists' && cond.op !== 'isEmpty') {
 				let updateValueRegexHint;
 				line.addText(t => t
-					.setPlaceholder("Value, or /regex/")
+					.setPlaceholder("Value, {{placeholder}}, or /regex/")
 					.setValue(cond.ifValue || "")
 					.onChange((v) => {
 						cond.ifValue = v;
