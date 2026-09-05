@@ -3,6 +3,7 @@ title: Home
 layout: home
 nav_order: 1
 ---
+{% raw %}
 
 # Conditional Properties for Obsidian
 {: .fs-9 }
@@ -15,7 +16,7 @@ Automate your frontmatter with smart IF/THEN rules. Set properties, modify title
 
 ---
 
-![Plugin Interface](https://i.imgur.com/d13fhzH.jpeg)
+![Plugin Interface](https://i.imgur.com/VE2HQ67.png)
 
 ## Why use this plugin?
 
@@ -51,19 +52,21 @@ THEN  First level title: Add suffix → " - {{date:DD/MM/YYYY}}"
 
 | Section | What's there |
 |---|---|
-| [Getting Started](/getting-started) | Install the plugin and build your first rule |
-| [Examples](/examples) | A cookbook of rules, from simple to complex |
-| [Conditions (IF)](/conditions/) | Property, First level title, Note file, regex matching, multiple conditions |
-| [Actions (THEN)](/actions/) | Property, First level title, Note file actions (including Bookmark file), multiple actions per rule |
-| [Placeholders](/placeholders) | `{{date}}`, `{{time}}`, `{{title}}`, `{{propertyName}}`, `{{match}}` |
-| [Typed Properties](/typed-properties) | Checkbox / date / datetime auto-coercion |
-| [Execution & Scheduling](/execution-scheduling) | Run manually, scheduled scans, scan scopes |
-| [Backup & Restore](/backup-restore) | Export/import your rules, rule search |
-| [Help](/help) | Bug reports, feature requests |
-| [Changelog](/changelog) | Version history |
+| [Getting Started](/obsidian-conditional-properties/getting-started) | Install the plugin and build your first rule |
+| [Examples](/obsidian-conditional-properties/examples) | A cookbook of rules, from simple to complex |
+| [Conditions (IF)](/obsidian-conditional-properties/conditions/) | Property, First level title, Note file, placeholders in the value, regex matching, multiple conditions |
+| [Actions (THEN)](/obsidian-conditional-properties/actions/) | Property, First level title, Note file actions (including Bookmark file), multiple actions per rule |
+| [Placeholders](/obsidian-conditional-properties/placeholders) | `{{date}}`, `{{yesterday}}`, `{{tomorrow}}`, `{{time}}`, `{{title}}`, `{{propertyName}}`, `{{match}}` — work in IF conditions too |
+| [Typed Properties](/obsidian-conditional-properties/typed-properties) | Checkbox / date / datetime auto-coercion |
+| [Execution & Scheduling](/obsidian-conditional-properties/execution-scheduling) | Run manually, scheduled scans, scan scopes |
+| [Backup & Restore](/obsidian-conditional-properties/backup-restore) | Export/import your rules, search rules by name or value |
+| [Help](/obsidian-conditional-properties/help) | Bug reports, feature requests |
+| [Changelog](/obsidian-conditional-properties/changelog) | Version history |
 
 ## Safe & private
 
 - Only modifies frontmatter — body content is preserved
 - All processing happens locally
 - No data leaves your device
+
+{% endraw %}

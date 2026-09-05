@@ -3,6 +3,7 @@ title: Note File Actions
 parent: Actions (THEN)
 nav_order: 3
 ---
+{% raw %}
 
 # Note file actions
 
@@ -83,3 +84,5 @@ THEN  Note file: Move file to → "transcripts/{{match:year}}/{{match:month}}"
 - Not supported yet for a Property condition whose value is a **list** (e.g. `tags`) — regex still matches against list items, but there's no single scalar to pull a capture from. Property (single value), First level title, and Note file (filename) conditions are supported.
 - Double-brace only (`{{match}}`) — this placeholder has no single-brace form.
 - If the rule had no matching regex condition, or you reference a group/name that doesn't exist in the pattern, `{{match...}}` resolves to an empty string rather than erroring.
+
+{% endraw %}

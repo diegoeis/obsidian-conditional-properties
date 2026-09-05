@@ -3,6 +3,7 @@ title: Note file
 parent: Conditions (IF)
 nav_order: 3
 ---
+{% raw %}
 
 # Note file condition
 
@@ -25,6 +26,18 @@ The condition row is: **Note file** type → operator dropdown → value field (
 | `Parent folder is not` | the folder path the file lives in (inverted) | see below |
 
 The three filename operators also accept a `/regex/`-wrapped value — see [Regex Matching](/conditions/regex-matching). `Parent folder is` / `Parent folder is not` always stay literal path matching; they don't accept regex.
+
+## Placeholders in the value
+
+The value field accepts [placeholders](/placeholders) too, resolved against the file being checked before the comparison runs — this works for every operator above, including `Parent folder is`/`Parent folder is not`:
+
+```yaml
+IF  Note file: Filename contains → "{{today}}"
+```
+Matches a filename that contains today's date, e.g. `2026-09-04 - Meeting.md`.
+
+{: .note }
+Here `{{today}}` (and any other date placeholder) is always forced to `YYYY-MM-DD`, never a time component — see [Dates are always date-only in Note file actions](/placeholders#dates-are-always-date-only-in-note-file-actions). A `/regex/` value is never expanded for placeholders — it's compiled as a literal pattern as-is.
 
 ## Parent folder is
 
@@ -52,3 +65,5 @@ Runs on every note **except** those under an `Archive` folder anywhere in their 
 
 {: .note }
 Leaving the value empty makes `Parent folder is` never match, and `Parent folder is not` always match — same "nothing to compare against" convention as the `does not contain` operator elsewhere in the plugin.
+
+{% endraw %}

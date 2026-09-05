@@ -3,6 +3,7 @@ title: Property
 parent: Conditions (IF)
 nav_order: 1
 ---
+{% raw %}
 
 # Property condition
 
@@ -12,7 +13,18 @@ Checks any frontmatter property's value.
 IF  Property: status → exactly match → "done"
 ```
 
-The condition row is: **Property** type → property name field → operator dropdown → value field. All [six operators](/conditions/#six-comparison-operators) work on a Property condition:
+The condition row is: **Property** type → property name field → operator dropdown → value field. All six operators work on a Property condition:
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `exactly match` | Exact match | `Property: type → exactly match → "meeting"` |
+| `contains` | Substring match | `Property: name → contains → "Diego"` |
+| `does not contain` | Does not contain | `Property: tags → does not contain → "draft"` |
+| `exists` | Property present | `Property: status → exists` |
+| `does not exist` | Property absent | `Property: reviewed → does not exist` |
+| `is empty` | Empty value | `Property: tags → is empty` |
+
+`exists`, `does not exist`, and `is empty` skip the value field entirely — there's nothing to compare against:
 
 ```yaml
 IF  Property: tags → does not contain → "draft"
@@ -38,6 +50,25 @@ IF  Property: title → contains → /\d{4}-\d{2}-\d{2}/
 
 Regex on a **list** property (like `tags`) still matches against each item, but there's no single scalar to pull a capture from for [`{{match}}` in THEN](/actions/note-file-actions#match-in-then-beta) — capture groups are only exposed for a Property condition holding a single (non-list) value.
 
+## Placeholders in the value
+
+The value field accepts [placeholders](/placeholders) too, resolved against the file being checked before the comparison runs:
+
+```yaml
+IF  Property: dateDue → exactly match → "{{today}}"
+```
+Matches when `dateDue` holds today's date.
+
+You can also compare one property against another — anything that isn't a reserved placeholder name is looked up as a frontmatter property:
+
+```yaml
+IF  Property: type → exactly match → "{{company}}"
+```
+Matches when the note's `type` property has the exact same value as its `company` property.
+
+{: .note }
+A `/regex/` value (see [Regex matching](#regex-matching) above) is never expanded for placeholders — `/{{today}}/` is treated as a literal regex pattern, not "today's date wrapped in a regex".
+
 ## Typed property awareness
 
 When a property is registered as `checkbox`, `date`, or `datetime` in Obsidian's property types, your typed value is normalized before comparing — so you can write the IF condition however feels natural, and the plugin adapts to the stored format.
@@ -48,3 +79,5 @@ IF  Property: created_at → exactly match → "08-08-2025"
 Matches a note whose YAML stores `created_at: 2025-08-08` — the plugin parses `08-08-2025` using your vault's Daily Notes / Templates date format (or a few common fallbacks) before comparing.
 
 For checkbox properties, `Property: done → exactly match → "true"` matches a note with `done: true` (boolean) regardless of how you typed `true` (case-insensitive). See [Typed Properties](/typed-properties) for the full parsing rules.
+
+{% endraw %}

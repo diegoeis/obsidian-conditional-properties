@@ -5,3 +5,5 @@ data.json
 .cursor
 WARP.md
 node_modules/
+docs-site/_config.local.yml
+docs-site/_site/

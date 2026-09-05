@@ -1109,6 +1109,8 @@ class ConditionalPropertiesPlugin extends Plugin {
 			if (type === 'time') return formatTime(format);
 			if (type === 'updated_date') return formatDate(format, getUpdatedMomentDate());
 			if (type === 'today') return formatDate(format, moment());
+			if (type === 'yesterday') return formatDate(format, moment().subtract(1, 'day'));
+			if (type === 'tomorrow') return formatDate(format, moment().add(1, 'day'));
 			if (type === 'date' && isDoubleBrace) return formatDate(format, moment()); // {{date}} = today, matches Obsidian's Templates plugin
 			return formatDate(format); // {date} / {created_date} / {{created_date}} = file creation date
 		};
@@ -1121,18 +1123,19 @@ class ConditionalPropertiesPlugin extends Plugin {
 		// Pass 1 — Obsidian Templates-style double braces, reserved names:
 		// {{date}}, {{date:FORMAT}}, {{time}}, {{time:FORMAT}}, {{title}},
 		// plus this plugin's own reserved names for consistency:
-		// {{created_date}}, {{updated_date}}, {{today}}, {{filename}} — all
-		// with the same meaning as their {name} counterpart (see
-		// `resolveReserved` above for the one exception, {{date}} vs {date}).
-		let out = text.replace(/\{\{(date|created_date|updated_date|today|time|title|filename)(?::([^}]+))?\}\}/g,
+		// {{created_date}}, {{updated_date}}, {{today}}, {{yesterday}},
+		// {{tomorrow}}, {{filename}} — all with the same meaning as their
+		// {name} counterpart (see `resolveReserved` above for the one
+		// exception, {{date}} vs {date}).
+		let out = text.replace(/\{\{(date|created_date|updated_date|today|yesterday|tomorrow|time|title|filename)(?::([^}]+))?\}\}/g,
 			(match, type, format) => resolveReserved(type, format, true));
 
 		// Pass 2 — legacy single braces, reserved names: {date}, {date:FORMAT},
-		// {filename}, {created_date}, {updated_date}, {today}, {time}, {title}.
-		// {date} and {created_date} are aliases for the file's creation date
-		// (kept both for backward compatibility — {date} shipped first, before
-		// {{}} support existed).
-		out = out.replace(/\{(date|created_date|updated_date|today|time|title|filename)(?::([^}]+))?\}/g,
+		// {filename}, {created_date}, {updated_date}, {today}, {yesterday},
+		// {tomorrow}, {time}, {title}. {date} and {created_date} are aliases
+		// for the file's creation date (kept both for backward compatibility
+		// — {date} shipped first, before {{}} support existed).
+		out = out.replace(/\{(date|created_date|updated_date|today|yesterday|tomorrow|time|title|filename)(?::([^}]+))?\}/g,
 			(match, type, format) => resolveReserved(type, format, false));
 
 		// Pass 2.5 — {{match}} / {{match:N}} / {{match:name}} — BETA. Refers to
@@ -1174,10 +1177,11 @@ class ConditionalPropertiesPlugin extends Plugin {
 	/**
 	 * Resolves {{placeholder}}s inside an IF condition's value (`cond.ifValue`)
 	 * before it's compared — reuses `_formatText`, the same engine THEN
-	 * actions already run their text through, so `{{today}}`, `{{filename}}`,
-	 * `{{title}}`, `{{created_date}}`, `{{updated_date}}`, `{{time}}` and
-	 * `{{propertyName}}` (any other frontmatter property, read from `fm`, the
-	 * in-progress frontmatter) all work the same way on both sides of a rule.
+	 * actions already run their text through, so `{{today}}`, `{{yesterday}}`,
+	 * `{{tomorrow}}`, `{{filename}}`, `{{title}}`, `{{created_date}}`,
+	 * `{{updated_date}}`, `{{time}}` and `{{propertyName}}` (any other
+	 * frontmatter property, read from `fm`, the in-progress frontmatter) all
+	 * work the same way on both sides of a rule.
 	 * Two deliberate no-ops:
 	 *   - Non-string `ifValue` is returned as-is (nothing to resolve).
 	 *   - A regex-mode value (`/pattern/flags` — see `_isRegexPattern`) is
@@ -2139,13 +2143,58 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 			this.plugin.settings.rules = this.plugin.settings.rules || [];
 
-			// rulesItemsEl is declared here (before the heading Setting below)
-			// only so the "Add rule" button's onClick closure can reference
-			// it — the element itself is created further down, in the actual
-			// desired DOM order. The closure won't run until well after this
-			// whole function finishes setting up, so the binding is populated
-			// by the time anyone clicks the button.
+			// emptyStateEl / searchWrapEl / rulesItemsEl are declared here
+			// (before anything that references them below) only so the
+			// closures created further down — the heading's "Add rule"
+			// button, the empty state's own button, and `addNewRule` itself
+			// — can all refer to them. The elements are created further
+			// down, in the actual desired DOM order; none of these closures
+			// run until well after this whole function finishes setting up,
+			// so every binding is populated by the time anyone clicks
+			// anything.
+			let emptyStateEl;
+			let searchWrapEl;
 			let rulesItemsEl;
+
+			// Shared by both "Add rule" entry points — the heading button
+			// (always visible) and the empty state's own button (only
+			// visible with zero rules, see below) — so creating the first
+			// rule behaves identically no matter which one the user clicks:
+			// the new rule is added, and the empty state (if showing) gives
+			// way to the normal search + rule list.
+			const addNewRule = async () => {
+				const newRule = {
+					match: "any",
+					conditions: [{
+						ifType: "PROPERTY",
+						ifProp: "",
+						ifValue: "",
+						op: "exactly"
+					}],
+					thenActions: [{
+						prop: "",
+						value: "",
+						action: "add"
+					}]
+				};
+				this.plugin.settings.rules.push(newRule);
+				await this.plugin.saveData(this.plugin.settings);
+
+				// New rules go to the top of the list, right under the
+				// heading — capture the current first card before
+				// rendering (which appends the new one at the end),
+				// then move it back to the front.
+				const previousFirst = rulesItemsEl.firstChild;
+				const newRuleEl = this._renderRule(rulesItemsEl, newRule, this.plugin.settings.rules.length - 1);
+				if (newRuleEl && previousFirst) {
+					rulesItemsEl.insertBefore(newRuleEl, previousFirst);
+				}
+				this._ruleSearchEntries.push({ el: newRuleEl, rule: newRule });
+				this._applyRuleSearchFilter();
+
+				emptyStateEl.addClass("is-hidden");
+				this._syncEmptyState();
+			};
 
 			new Setting(rulesGroupEl)
 				.setName("Rules")
@@ -2154,40 +2203,24 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				.addButton(btn => btn
 					.setButtonText("Add rule")
 					.setCta()
-					.onClick(async () => {
-						const newRule = {
-							match: "any",
-							conditions: [{
-								ifType: "PROPERTY",
-								ifProp: "",
-								ifValue: "",
-								op: "exactly"
-							}],
-							thenActions: [{
-								prop: "",
-								value: "",
-								action: "add"
-							}]
-						};
-						this.plugin.settings.rules.push(newRule);
-						await this.plugin.saveData(this.plugin.settings);
+					.onClick(() => addNewRule()));
 
-						// New rules go to the top of the list, right under the
-						// heading — capture the current first card before
-						// rendering (which appends the new one at the end),
-						// then move it back to the front.
-						const previousFirst = rulesItemsEl.firstChild;
-						const newRuleEl = this._renderRule(rulesItemsEl, newRule, this.plugin.settings.rules.length - 1);
-						if (newRuleEl && previousFirst) {
-							rulesItemsEl.insertBefore(newRuleEl, previousFirst);
-						}
-						this._ruleSearchEntries.push({ el: newRuleEl, rule: newRule });
-						this._applyRuleSearchFilter();
-					}));
+			// Onboarding empty state — shown only with zero rules, in place
+			// of the (otherwise pointless) search bar and empty rule list.
+			// Its own "Add rule" button runs the exact same `addNewRule()`
+			// as the heading button above.
+			emptyStateEl = this._emptyStateEl = rulesGroupEl.createEl("div", { cls: "cp-rules-empty-state" });
+			emptyStateEl.createEl("div", { cls: "cp-rules-empty-state-title", text: "Welcome! Lets automate your notes!" });
+			emptyStateEl.createEl("div", { cls: "cp-rules-empty-state-text", text: "Create your first rule. Set an if condition to trigger actions." });
+			new ButtonComponent(emptyStateEl)
+				.setButtonText("Add rule")
+				.setCta()
+				.onClick(() => addNewRule());
 
-			this._renderRuleSearch(rulesGroupEl);
+			searchWrapEl = this._searchWrapEl = rulesGroupEl.createEl("div", { cls: "cp-rules-search-wrap" });
+			this._renderRuleSearch(searchWrapEl);
 
-			rulesItemsEl = rulesGroupEl.createEl("div", { cls: "cp-rules-group" });
+			rulesItemsEl = this._rulesItemsEl = rulesGroupEl.createEl("div", { cls: "cp-rules-group" });
 
 			// Render Rules
 			this.plugin.settings.rules.slice().reverse().forEach((rule, idxReversed) => {
@@ -2196,6 +2229,8 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				this._ruleSearchEntries.push({ el: ruleEl, rule });
 			});
 			this._applyRuleSearchFilter();
+
+			this._syncEmptyState();
 
 			// Attach the fully-built tree in one shot — see the comment above
 			// `rootEl`'s creation for why this is deferred to here.
@@ -2224,7 +2259,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		this._ruleSearchEntries = [];
 
 		const PLACEHOLDERS = {
-			PROPERTY: "Search by property name…",
+			PROPERTY: "Search by property name or value…",
 			FIRST_LEVEL_HEADING: "Search by first level title text…",
 			NOTE_FILE: "Search by note file text…",
 		};
@@ -2279,24 +2314,45 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * True when `rule` has at least one condition of `type` whose literal
-	 * text contains `lowerTerm` (already lowercased) — a case-insensitive
-	 * substring match, never interpreted as a regex even when the stored
-	 * value looks like one (e.g. `/report/i` is matched as that literal
-	 * text, slashes included).
+	 * True when `rule` has at least one matching condition (IF) or action
+	 * (THEN) of `type` whose text contains `lowerTerm` (already lowercased)
+	 * — a case-insensitive substring match, never interpreted as a regex
+	 * even when the stored value looks like one (e.g. `/report/i` is
+	 * matched as that literal text, slashes included).
 	 *
-	 * `type === "PROPERTY"` matches against the property name (`ifProp`) —
-	 * the field name typed in the IF condition, not the value being
-	 * compared against. `FIRST_LEVEL_HEADING` and `NOTE_FILE` both match
-	 * against the condition's typed value (`ifValue`), since that's where
-	 * each stores the text the user types for that condition.
+	 * `type` is the search dropdown's IF condition type (`PROPERTY` /
+	 * `FIRST_LEVEL_HEADING` / `NOTE_FILE`); `THEN_TYPE_BY_IF_TYPE` maps each
+	 * to the corresponding THEN action `type` so one dropdown selection
+	 * searches both sides of the rule.
+	 *
+	 * Fields checked per type:
+	 *   - `PROPERTY`: IF `ifProp` (the field name) + `ifValue` (the
+	 *     compared-against value); THEN `prop` (target property name) +
+	 *     `value` (what gets written) + `newPropName` (rename target, only
+	 *     set when `action.action === "rename"`).
+	 *   - `FIRST_LEVEL_HEADING`: IF `ifValue`; THEN `text` (title action).
+	 *   - `NOTE_FILE`: IF `ifValue`; THEN `text` + `bookmarkGroup` (file
+	 *     action).
 	 */
 	_ruleMatchesSearch(rule, type, lowerTerm) {
+		const includesTerm = (value) => String(value || "").toLowerCase().includes(lowerTerm);
+
 		const conditions = Array.isArray(rule.conditions) ? rule.conditions : [];
-		return conditions.some(cond => {
+		const conditionMatch = conditions.some(cond => {
 			if (!cond || cond.ifType !== type) return false;
-			const haystack = type === "PROPERTY" ? cond.ifProp : cond.ifValue;
-			return String(haystack || "").toLowerCase().includes(lowerTerm);
+			if (type === "PROPERTY") return includesTerm(cond.ifProp) || includesTerm(cond.ifValue);
+			return includesTerm(cond.ifValue);
+		});
+		if (conditionMatch) return true;
+
+		const THEN_TYPE_BY_IF_TYPE = { PROPERTY: "property", FIRST_LEVEL_HEADING: "title", NOTE_FILE: "file" };
+		const thenType = THEN_TYPE_BY_IF_TYPE[type];
+		const thenActions = Array.isArray(rule.thenActions) ? rule.thenActions : [];
+		return thenActions.some(action => {
+			if (!action || action.type !== thenType) return false;
+			if (thenType === "property") return includesTerm(action.prop) || includesTerm(action.value) || includesTerm(action.newPropName);
+			if (thenType === "title") return includesTerm(action.text);
+			return includesTerm(action.text) || includesTerm(action.bookmarkGroup);
 		});
 	}
 
@@ -2337,6 +2393,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			conditionSettings,
 			matchWrapEl: null,
 			removeBtnByCondition: new WeakMap(),
+			removeBtnByAction: new WeakMap(),
 		};
 
 		if (rule.conditions.length > 1) {
@@ -2405,12 +2462,20 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					value: "",
 					action: "add"
 				};
+				const wasSingle = rule.thenActions.length === 1;
 				rule.thenActions.push(newAction);
 				await this.plugin.saveData(this.plugin.settings);
 
 				const newActionIdx = rule.thenActions.length - 1;
 				const newEntry = this._renderThenAction(thenRuleBlockEl, ruleCtx, newAction, newActionIdx);
 				actionEntries.push(newEntry);
+
+				if (wasSingle) {
+					const firstEntry = actionEntries[0];
+					if (firstEntry && !ruleCtx.removeBtnByAction.has(firstEntry.setting)) {
+						this._addActionRemoveButton(firstEntry.setting, ruleCtx, rule.thenActions[0], firstEntry);
+					}
+				}
 			});
 
 		const actions = wrap.createEl("div", { cls: "cp-rule-actions" });
@@ -2476,9 +2541,27 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				}
 
 				wrap.remove();
+				this._syncEmptyState();
 			});
 
 		return wrap;
+	}
+
+	/**
+	 * Shows the onboarding empty state (and hides the search bar + rule
+	 * list) when `settings.rules` is empty, and vice versa — called after
+	 * every action that can change the rule count from/to zero: the
+	 * initial `display()` render, adding the first rule (from either "Add
+	 * rule" button), and removing a rule (which might leave zero behind).
+	 * No-op if `display()` hasn't run yet this session (elements not
+	 * cached).
+	 */
+	_syncEmptyState() {
+		if (!this._emptyStateEl || !this._searchWrapEl || !this._rulesItemsEl) return;
+		const isEmpty = (this.plugin.settings.rules || []).length === 0;
+		this._emptyStateEl.toggleClass("is-hidden", !isEmpty);
+		this._searchWrapEl.toggleClass("is-hidden", isEmpty);
+		this._rulesItemsEl.toggleClass("is-hidden", isEmpty);
 	}
 
 	_renderCondition(containerEl, ruleCtx, cond, condIdx) {
@@ -2837,7 +2920,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 					}));
 			} else if (action.action !== "delete") {
 				actionSetting.addText(t => t
-					.setPlaceholder("value (use commas; supports {{propertyName}}, {{date}}, {{time}}, {{title}}, {{created_date}}, {{updated_date}}, {{today}}, {{filename}})")
+					.setPlaceholder("value (use commas; supports {{propertyName}}, {{date}}, {{time}}, {{title}}, {{created_date}}, {{updated_date}}, {{yesterday}}, {{tomorrow}}, {{filename}})")
 					.setValue(action.value || "")
 					.onChange((v) => {
 						action.value = v;
@@ -2912,7 +2995,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 			});
 
 			actionSetting.addText(t => t
-				.setPlaceholder("Text (use {{date}}, {{time}}, {{title}}, {{created_date}}, {{updated_date}}, {{today}}, {{filename}}, or {{propertyName}})")
+				.setPlaceholder("Text (use {{date}}, {{time}}, {{title}}, {{created_date}}, {{updated_date}}, {{yesterday}}, {{tomorrow}}, {{filename}}, or {{propertyName}})")
 				.setValue(action.text || "")
 				.onChange((v) => {
 					action.text = v;
@@ -2922,31 +3005,12 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 
 		const entry = { el: actionWrap, setting: actionSetting };
 
-		actionSetting.addExtraButton(b => {
-			// See the matching comment in _addConditionRemoveButton() — same
-			// "mod-warning on extraSettingsEl" workaround Obsidian's own core
-			// UI uses, since ExtraButtonComponent has no setWarning().
-			b.extraSettingsEl.addClass("mod-warning");
-			return b
-				.setIcon("cross")
-				.setTooltip("Remove this action")
-				.onClick(async () => {
-					const currentIdx = rule.thenActions.indexOf(action);
-					if (currentIdx === -1) return;
-
-					rule.thenActions.splice(currentIdx, 1);
-					const entries = ruleCtx.actionEntries || [];
-					const entryIdx = entries.indexOf(entry);
-					if (entryIdx !== -1) entries.splice(entryIdx, 1);
-					actionWrap.remove();
-
-					await this.plugin.saveData(this.plugin.settings);
-
-					entries.forEach((e) => {
-						this._setRuleLineLabel(e.setting, "Do this");
-					});
-				});
-		});
+		// Same convention as IF conditions (see `_addConditionRemoveButton`):
+		// a rule always needs at least one THEN action, so the remove button
+		// only shows once there's more than one to choose from.
+		if (rule.thenActions.length > 1) {
+			this._addActionRemoveButton(actionSetting, ruleCtx, action, entry);
+		}
 
 		// Setting always builds its own nested .setting-item div inside the
 		// container it's given. We want .cp-rule-line to be that row
@@ -2963,6 +3027,55 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 		nestedSettingEl.remove();
 
 		return entry;
+	}
+
+	/**
+	 * Mirrors `_addConditionRemoveButton()` for THEN actions: a rule always
+	 * needs at least one action, so the "remove this row" button is only
+	 * ever attached once there's more than one action to choose from — both
+	 * here and at the two call sites that add/remove it as the count
+	 * crosses the 1 ↔ 2 boundary (the "+ add action" handler above, and the
+	 * removal handler below).
+	 */
+	_addActionRemoveButton(actionSetting, ruleCtx, action, entry) {
+		let btnEl = null;
+		actionSetting.addExtraButton(b => {
+			// See the matching comment in _addConditionRemoveButton() — same
+			// "mod-warning on extraSettingsEl" workaround Obsidian's own core
+			// UI uses, since ExtraButtonComponent has no setWarning().
+			b.extraSettingsEl.addClass("mod-warning");
+			b.setIcon("cross")
+				.setTooltip("Remove this action")
+				.onClick(async () => {
+					const { rule, actionEntries, removeBtnByAction } = ruleCtx;
+					const entries = actionEntries || [];
+					const currentIdx = rule.thenActions.indexOf(action);
+					if (currentIdx === -1) return;
+
+					rule.thenActions.splice(currentIdx, 1);
+					const entryIdx = entries.indexOf(entry);
+					if (entryIdx !== -1) entries.splice(entryIdx, 1);
+					removeBtnByAction.delete(entry.setting);
+					entry.el.remove();
+
+					await this.plugin.saveData(this.plugin.settings);
+
+					entries.forEach((e) => {
+						this._setRuleLineLabel(e.setting, "Do this");
+					});
+
+					if (rule.thenActions.length === 1) {
+						const lastEntry = entries[0];
+						if (lastEntry) {
+							const lastBtn = removeBtnByAction.get(lastEntry.setting);
+							if (lastBtn) lastBtn.remove();
+							removeBtnByAction.delete(lastEntry.setting);
+						}
+					}
+				});
+			btnEl = b.extraSettingsEl;
+		});
+		ruleCtx.removeBtnByAction.set(actionSetting, btnEl);
 	}
 }
 

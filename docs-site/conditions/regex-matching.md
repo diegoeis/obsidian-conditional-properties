@@ -3,6 +3,7 @@ title: Regex Matching
 parent: Conditions (IF)
 nav_order: 4
 ---
+{% raw %}
 
 # Regular expression matching
 
@@ -48,3 +49,5 @@ A malformed pattern (or unknown flag) never crashes a scan: it's treated as "doe
 ## Reusing the match in THEN
 
 Whatever your IF regex matched — the full text, a numbered group, or a named group — is available in THEN actions via `{{match}}`. See [`{{match}}` in THEN (Beta)](/actions/note-file-actions#match-in-then-beta).
+
+{% endraw %}

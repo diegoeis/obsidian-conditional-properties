@@ -3,6 +3,7 @@ title: First level title
 parent: Conditions (IF)
 nav_order: 2
 ---
+{% raw %}
 
 # First level title condition
 
@@ -15,7 +16,18 @@ This is **not** the same as Obsidian's separate "inline title" feature (the edit
 IF  First level title: contains → "Meeting"
 ```
 
-The condition row is: **First level title** type → operator dropdown → value field (no separate property-name field). All [six operators](/conditions/#six-comparison-operators) work here:
+The condition row is: **First level title** type → operator dropdown → value field (no separate property-name field). All six operators work here:
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `exactly match` | Exact match | `First level title: exactly match → "Meeting Notes"` |
+| `contains` | Substring match | `First level title: contains → "Meeting"` |
+| `does not contain` | Does not contain | `First level title: does not contain → "Draft"` |
+| `exists` | H1 present | `First level title: exists` |
+| `does not exist` | H1 absent | `First level title: does not exist` |
+| `is empty` | Empty H1 | `First level title: is empty` |
+
+`exists`, `does not exist`, and `is empty` skip the value field entirely:
 
 ```yaml
 IF  First level title: exists
@@ -34,3 +46,17 @@ IF  First level title: is empty
 IF  First level title: contains → /\d{4}-\d{2}-\d{2}/
 ```
 Matches a title like "Nota da reunião 2026-08-22 com John Doe" — the plugin finds the date `2026-08-22` inside the text. Capture groups from a match here are available in THEN actions via [`{{match}}`](/actions/note-file-actions#match-in-then-beta).
+
+## Placeholders in the value
+
+The value field accepts [placeholders](/placeholders) too, resolved against the file being checked before the comparison runs:
+
+```yaml
+IF  First level title: contains → "{{created_date}}"
+```
+Matches when the title contains the file's creation date. Also works against a property value, e.g. `contains → "{{status}}"` matches when the title contains whatever `status` currently holds.
+
+{: .note }
+A `/regex/` value (see [Regex matching](#regex-matching) above) is never expanded for placeholders — it's compiled as a literal pattern as-is.
+
+{% endraw %}

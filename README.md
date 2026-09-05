@@ -65,6 +65,15 @@ IF  Property: created_at → exactly match → "08-08-2025"
 ```
 matches a note whose YAML stores `created_at: 2025-08-08`.
 
+**Placeholders in condition values** *(new in v0.26.0)* — a condition's value field accepts the same [placeholders](#placeholders) as a THEN action's, resolved against the file before the comparison runs. Skipped for a `/regex/`-mode value.
+```yaml
+IF  Property: dateDue → exactly match → "{{today}}"
+```
+You can also compare one property against another this way:
+```yaml
+IF  Property: type → exactly match → "{{company}}"
+```
+
 **Rule chaining within a scan** — a later rule's condition sees property (or filename/folder) changes an earlier rule already made in the same run, not just the state from before the scan started.
 ```yaml
 Rule 1: IF  Property: status → exactly match → "done"    THEN  Property: tags → Add value → completed
@@ -118,7 +127,7 @@ Result: `2026-01-08 - team-sync`.
 THEN  Note file: Move file to → "Archive/{today:YYYY}"
 ```
 
-**Multiple actions per rule** — chain several actions in one rule; note file actions execute immediately and compose in sequence.
+**Multiple actions per rule** — chain several actions in one rule; note file actions execute immediately and compose in sequence. The remove ("×") button on an action row only shows once there's more than one action *(new in v0.26.0)* — same rule the IF side's condition rows already followed, since a rule always needs at least one.
 ```yaml
 THEN:
   - Property: status → Overwrite all values with → "done"
@@ -156,11 +165,13 @@ Scope: Latest modified, count: 15
 
 ### Settings management
 
-**Rule search** *(new in v0.25.3)* — right under the "Rules" heading: a dropdown (Property / First level title / Note file) plus a search field that filters the rule list live as you type, once you've typed at least 2 characters. It searches whichever field that condition type stores its text in — the property name for Property, the typed text for First level title and Note file — matching case-insensitively, as a literal substring (a `/regex/`-mode value is matched as that literal text). A rule shows up if *any* of its IF conditions of the selected type matches, regardless of the rule's own Match (any/all) setting. The search resets every time you reopen the settings tab.
+**Rule search** *(new in v0.25.3, extended in v0.26.0)* — right under the "Rules" heading: a dropdown (Property / First level title / Note file) plus a search field that filters the rule list live as you type, once you've typed at least 2 characters. It searches both sides of the rule for that type: for Property, the IF condition's property name *and* value, plus the matching THEN property action's property name, value, and rename target; for First level title and Note file, the IF condition's typed text plus the matching THEN action's text (and bookmark group, for Note file). Matching is case-insensitive, as a literal substring (a `/regex/`-mode value is matched as that literal text). A rule shows up if *any* matching field is found, regardless of the rule's own Match (any/all) setting. The search resets every time you reopen the settings tab.
 ```yaml
 Search: Property → "people"
 ```
-Shows only rules with a Property condition whose property name contains "people" (e.g. `people`, `peoples_list`).
+Shows every rule with a Property condition or action whose property name *or* value contains "people" (e.g. property named `people`/`peoples_list`, or a value like `Add value → "people, teams"`).
+
+**Onboarding empty state** *(new in v0.26.0)* — with zero rules (a fresh install, or every rule removed), the search bar and rule list are replaced by a short welcome message and its own "Add rule" button, so a first-time user isn't looking at a bare search field with nothing to search. Disappears the moment a rule exists, and reappears if you delete your way back down to zero.
 
 **Backup and restore settings** — export your rules and scan settings to a JSON file in the vault, and re-import them later or on another vault.
 - Settings → Conditional Properties → Backup and restore → Export settings / Import settings
@@ -382,11 +393,12 @@ Useful for running rules only on active notes instead of your entire vault.
 
 ## Placeholders
 
-Placeholders work inside **any THEN action value** — property `Add value` / `Overwrite all values with`, title `Prefix` / `Suffix` / `Overwrite`, and Note file `Rename` / `Add name prefix` / `Add name suffix` / `Move file to`. They're expanded at the moment the rule runs, against the file being processed.
+Placeholders work inside **any THEN action value** — property `Add value` / `Overwrite all values with`, title `Prefix` / `Suffix` / `Overwrite`, and Note file `Rename` / `Add name prefix` / `Add name suffix` / `Move file to` — and, *(new in v0.26.0)*, inside **any IF condition value** too (Property, First level title, Note file — skipped for a `/regex/`-mode value). They're expanded at the moment the rule runs, against the file being processed.
 
 | Placeholder | Result |
 |---|---|
-| `{{date}}` / `{{today}}` | Today's date (both names mean the same thing). Default format is `YYYY-MM-DD`, unless your vault has a custom Date format set under Files & Links — then that format is used instead. Example: `2026-01-08`. |
+| `{{date}}` | Today's date — same meaning as Obsidian's own `{{date}}` Templates placeholder. Default format is `YYYY-MM-DD`, unless your vault has a custom Date format set under Files & Links — then that format is used instead. Example: `2026-01-08`. `{{today}}` still works as an alias, kept for backward compatibility. |
+| `{{yesterday}}` / `{{tomorrow}}` *(new in v0.26.0)* | Yesterday's / tomorrow's date. Same formatting rules as `{{date}}`. |
 | `{{created_date}}` | The file's creation date. |
 | `{{updated_date}}` | The file's last-modified date. |
 | `{{time}}` | Current time. Default format is `HH:mm`, unless your vault has a custom Time format set — then that format is used instead. Matches Obsidian's Templates `{{time}}`. |
@@ -409,11 +421,11 @@ Behavior:
 - **Missing property → empty string.** No errors, no literal `{{name}}` left behind in your YAML.
 - **Arrays are joined with `, `.** A source like `tags: [a, b, c]` becomes `a, b, c` in the expanded string.
 - **Earlier actions in the same rule are visible to later ones.** The expansion reads from the in-progress frontmatter, so if action #1 sets `excerpt`, action #2 can reference `{{excerpt}}`.
-- **Reserved names win.** `date`, `created_date`, `updated_date`, `today`, `time`, `title`, and `filename` are resolved as reserved placeholders first; a property with one of those names won't shadow them.
+- **Reserved names win.** `date`, `created_date`, `updated_date`, `today`, `yesterday`, `tomorrow`, `time`, `title`, and `filename` are resolved as reserved placeholders first; a property with one of those names won't shadow them.
 
-### Note file actions: dates are always date-only
+### Note file actions and conditions: dates are always date-only
 
-Inside `Rename` / `Add name prefix` / `Add name suffix` / `Move file to`, a **bare** date placeholder (`{{date}}`, `{{created_date}}`, `{{updated_date}}`, `{{today}}` — no explicit `:FORMAT`) always resolves to `YYYY-MM-DD`, never a time component, regardless of your vault's configured default date format. File and folder names elsewhere in the OS can't contain certain characters depending on platform, so these fields don't inherit a format that might not have been meant for filenames. An explicit format is always honored exactly as typed, including one with `:` in it — the plugin never rewrites what you explicitly typed, it only picks a safe default when you didn't specify one.
+Inside `Rename` / `Add name prefix` / `Add name suffix` / `Move file to`, and any Note file condition's value *(new in v0.26.0)*, a **bare** date placeholder (`{{date}}`, `{{yesterday}}`, `{{tomorrow}}`, `{{created_date}}`, `{{updated_date}}`, `{{today}}` — no explicit `:FORMAT`) always resolves to `YYYY-MM-DD`, never a time component, regardless of your vault's configured default date format. File and folder names elsewhere in the OS can't contain certain characters depending on platform, so these fields don't inherit a format that might not have been meant for filenames. An explicit format is always honored exactly as typed, including one with `:` in it — the plugin never rewrites what you explicitly typed, it only picks a safe default when you didn't specify one.
 
 ### Combinations
 
