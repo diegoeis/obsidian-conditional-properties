@@ -21,7 +21,7 @@ aux_links:
   "View on GitHub":
     - "https://github.com/diegoeis/obsidian-conditional-properties"
 
-footer_content: 'Copyright &copy; 2026 Diego Eis. Distributed under an <a href="https://github.com/diegoeis/obsidian-conditional-properties/blob/main/LICENSE">MIT license</a>.'
+footer_content: 'Copyright &copy; 2026 <a href="https://diegoeis.com/?utm_source=obsidian-plugin-conditional-properties&amp;utm_medium=link&amp;utm_campaign=conditional-properties-site">Diego Eis</a>. Distributed under an <a href="https://github.com/diegoeis/obsidian-conditional-properties/blob/main/LICENSE">MIT license</a>.'
 
 callouts:
   note:

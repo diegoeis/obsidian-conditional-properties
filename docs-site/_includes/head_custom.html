@@ -1,0 +1,24 @@
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-0DXD7GN46D"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-0DXD7GN46D');
+</script>
+
+<!-- just-the-docs' own "This site uses Just the Docs" attribution can't be
+     removed via an empty _includes/nav_footer_custom.html override — the
+     theme treats a fully empty override as "none provided" and falls back
+     to its default text regardless. Hiding both places it renders (sidebar
+     footer on desktop, footer block on mobile) is the only clean way to
+     drop it entirely. `!important` is required: the desktop element also
+     carries the theme's own `.d-md-block` responsive utility class, which
+     the theme defines with `!important` and would otherwise win. -->
+<style>
+  .side-bar .site-footer,
+  footer .d-md-none.mt-4.fs-2 {
+    display: none !important;
+  }
+</style>

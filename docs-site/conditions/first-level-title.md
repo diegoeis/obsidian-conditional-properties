@@ -16,7 +16,18 @@ This is **not** the same as Obsidian's separate "inline title" feature (the edit
 IF  First level title: contains → "Meeting"
 ```
 
-The condition row is: **First level title** type → operator dropdown → value field (no separate property-name field). All [six operators](/conditions/#six-comparison-operators) work here:
+The condition row is: **First level title** type → operator dropdown → value field (no separate property-name field). All six operators work here:
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `exactly match` | Exact match | `First level title: exactly match → "Meeting Notes"` |
+| `contains` | Substring match | `First level title: contains → "Meeting"` |
+| `does not contain` | Does not contain | `First level title: does not contain → "Draft"` |
+| `exists` | H1 present | `First level title: exists` |
+| `does not exist` | H1 absent | `First level title: does not exist` |
+| `is empty` | Empty H1 | `First level title: is empty` |
+
+`exists`, `does not exist`, and `is empty` skip the value field entirely:
 
 ```yaml
 IF  First level title: exists

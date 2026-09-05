@@ -7,6 +7,16 @@ nav_order: 1
 
 # Property actions
 
+The action row is: **Property** type → property name field → action dropdown → value field (skipped for **Delete property**; a new-name field instead of a value field for **Rename property to**).
+
+| Action | Effect |
+|--------|--------|
+| **Add value** | Adds a value to a property without duplicating it. Converts a scalar to an array when needed. |
+| **Remove value** | Removes a specific value from a property or array. |
+| **Overwrite all values with** | Replaces the entire value. Does not split on commas — see below. |
+| **Delete property** | Removes the property from the note entirely. No value field. |
+| **Rename property to** | Copies a property's value to a new name and removes the old one. |
+
 ## Add value
 
 Adds a value to a property without duplicating it. Converts a scalar to an array when needed.
@@ -14,8 +24,6 @@ Adds a value to a property without duplicating it. Converts a scalar to an array
 ```yaml
 THEN  Property: tags → Add value → important
 ```
-
-The action row is: **Property** type → property name field → action dropdown → value field.
 
 ## Remove value
 

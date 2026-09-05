@@ -8,6 +8,14 @@ nav_order: 11
 
 The full, unabridged history lives in [CHANGELOG.md on GitHub](https://github.com/diegoeis/obsidian-conditional-properties/blob/main/CHANGELOG.md). Highlights of recent releases:
 
+## 0.26.0
+
+- IF condition values now accept the same [placeholders](/placeholders) as THEN actions — `{{today}}`, `{{propertyName}}`, and friends — resolved against the file before the comparison runs.
+- New `{{yesterday}}` / `{{tomorrow}}` placeholders, alongside `{{date}}`.
+- Rule search now also searches THEN action fields (property name/value, title text, note file text/bookmark group), not just the IF condition.
+- New onboarding empty state with zero rules — a welcome message and its own "Add rule" button, replacing the search bar and empty list.
+- Fixed a docs-site bug where `{{...}}` placeholder examples on the Note file condition page were silently eaten by Jekyll's Liquid engine, plus several broken internal links on the home page.
+
 ## 0.25.4
 
 - Condition/action rows restyled: no border on the rule card, one-line layout, and labels changed from "Condition 1"/"Action 1" to a sentence-like **Where** (first condition), **Or**/**And** (every following condition, matching Any/All), and **Do this** (every action).

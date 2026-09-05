@@ -245,3 +245,26 @@
 #eis-cp-plugin .cp-rule-search .search-input-container input[type="search"] {
   border-radius: var(--input-radius) !important;
 }
+
+/* Onboarding empty state — shown in place of the search bar + rule list
+   when the vault has zero rules yet (fresh install, or every rule
+   deleted). Centered column, capped at 500px so the short welcome copy
+   doesn't stretch edge-to-edge on a wide settings modal. */
+#eis-cp-plugin .cp-rules-empty-state {
+  max-width: 500px;
+  margin: 80px auto;
+  padding: 0 20px;
+  text-align: center;
+}
+
+#eis-cp-plugin .cp-rules-empty-state-title {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--text-normal);
+  margin-bottom: 8px;
+}
+
+#eis-cp-plugin .cp-rules-empty-state-text {
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}

@@ -13,7 +13,18 @@ Checks any frontmatter property's value.
 IF  Property: status → exactly match → "done"
 ```
 
-The condition row is: **Property** type → property name field → operator dropdown → value field. All [six operators](/conditions/#six-comparison-operators) work on a Property condition:
+The condition row is: **Property** type → property name field → operator dropdown → value field. All six operators work on a Property condition:
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `exactly match` | Exact match | `Property: type → exactly match → "meeting"` |
+| `contains` | Substring match | `Property: name → contains → "Diego"` |
+| `does not contain` | Does not contain | `Property: tags → does not contain → "draft"` |
+| `exists` | Property present | `Property: status → exists` |
+| `does not exist` | Property absent | `Property: reviewed → does not exist` |
+| `is empty` | Empty value | `Property: tags → is empty` |
+
+`exists`, `does not exist`, and `is empty` skip the value field entirely — there's nothing to compare against:
 
 ```yaml
 IF  Property: tags → does not contain → "draft"

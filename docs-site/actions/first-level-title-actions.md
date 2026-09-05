@@ -11,6 +11,12 @@ Prefix, suffix, or overwrite the note's title — the H1 heading immediately aft
 
 The action row is: **First level title** type → modification dropdown (`Add prefix` / `Add suffix` / `Overwrite to`) → text field.
 
+| Action | Effect |
+|--------|--------|
+| **Add prefix** | Prepends text to the title. Requires an existing H1 — silently skipped if the note has none. |
+| **Add suffix** | Appends text to the title. Requires an existing H1 — silently skipped if the note has none. |
+| **Overwrite to** | Replaces the title entirely. Works even with no H1 yet — inserts one right after the frontmatter (or at the top of the note). |
+
 ## Add prefix
 
 ```yaml
