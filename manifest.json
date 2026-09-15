@@ -3,10 +3,8 @@
   "name": "Conditional Properties",
   "version": "0.26.0",
   "minAppVersion": "1.5.0",
-  "description": "Automate your frontmatter with smart IF/THEN rules. Set properties, modify titles, and keep your vault organized—automatically.",
+  "description": "Automate actions with smart IF/THEN rules. Set properties, modify titles, move files, and keep your vault organized creating simple automations based in your frontmatter, titles and files.",
   "author": "Diego Eis",
   "authorUrl": "https://diegoeis.com",
   "isDesktopOnly": false
 }
-
-
