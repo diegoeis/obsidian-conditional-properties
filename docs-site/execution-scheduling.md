@@ -31,3 +31,31 @@ Set a scan interval (minimum 5 minutes) in the settings, and the plugin runs aut
 | **Entire vault** | Every markdown note |
 
 The note count (1–1000) is configurable for the two "latest" scopes — useful for running rules only against active notes instead of scanning your entire vault every time.
+
+## Excluded files and folders
+{: .d-inline-block }
+
+New in v0.27.0
+{: .label .label-green }
+
+A multi-line field in the settings listing notes and folders the plugin must never touch. One path per line, relative to the vault root:
+
+```
+Templates
+Archive/2024
+Inbox/scratch.md
+**/*.excalidraw.md
+# lines starting with # are ignored
+```
+
+| Entry | Matches |
+|---|---|
+| `Templates` | Every note inside that folder, at any depth — and a note literally named `Templates.md` |
+| `Inbox/scratch.md` | That exact note (the `.md` is optional) |
+| `Daily/*.md` | Notes directly inside `Daily`, but not in its subfolders |
+| `**/*.excalidraw.md` | Any note with that suffix, anywhere in the vault |
+| `note?.md` | `note1.md`, `noteA.md` — `?` is a single character |
+
+Leading and trailing slashes are ignored (`/Templates/` is the same as `Templates`) and matching is case-insensitive. Paths are matched literally — a `.` or `(` in a folder name is never interpreted as a regular expression.
+
+Exclusions apply to **every** way a rule can run: scheduled scans, **Run now**, a single rule's **Run this rule**, and the "Run conditional rules on current file" command (which tells you the file was skipped). They're applied before the scan-scope slice, so excluding a folder frees up slots in a "latest N notes" scan instead of shrinking how many notes actually get processed.

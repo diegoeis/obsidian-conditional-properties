@@ -18,6 +18,7 @@ class ConditionalPropertiesPlugin extends Plugin {
 			lastRun: null,
 			scanScope: "latestCreated",
 			scanCount: 15,
+			excludedPaths: "",
 			operatorMigrationVersion: 0,
 			lastExportPath: null
 		}, loaded);
@@ -60,6 +61,13 @@ class ConditionalPropertiesPlugin extends Plugin {
 					return file !== null;
 				}
 				if (!file) { new Notice("No active file."); return; }
+				// Honour the exclusion list here too: a manual run on a
+				// single file is still "the plugin touching that file",
+				// and the user asked for it to be left alone.
+				if (this.isPathExcluded(file.path)) {
+					new Notice("Conditional properties: this file is in the exclusion list — skipped.");
+					return;
+				}
 				this.runScanOnFile(file).then(modified => {
 					new Notice(modified ? "Conditional Properties: file modified" : "Conditional Properties: no changes");
 				});
@@ -282,9 +290,99 @@ class ConditionalPropertiesPlugin extends Plugin {
 		return { scanned: scannedCount, total: files.length, modified: modifiedCount, stopped };
 	}
 
+	/**
+	 * Parses `settings.excludedPaths` (the raw textarea text, one entry per
+	 * line) into a list of matchable patterns. Blank lines and `#` comments
+	 * are skipped; each entry is run through `normalizePath()` and stripped
+	 * of leading/trailing slashes so "/Templates/" and "Templates" mean the
+	 * same thing.
+	 *
+	 * Result is cached against the raw string it was built from, so a
+	 * full-vault scan parses the list once instead of once per file, and the
+	 * cache invalidates itself the moment the user edits the textarea (the
+	 * raw string no longer matches) — no manual invalidation needed.
+	 */
+	_getExclusionPatterns() {
+		const raw = typeof this.settings.excludedPaths === "string" ? this.settings.excludedPaths : "";
+		if (this._exclusionCache && this._exclusionCache.raw === raw) {
+			return this._exclusionCache.patterns;
+		}
+		const patterns = [];
+		for (const line of raw.split("\n")) {
+			const trimmed = line.trim();
+			if (!trimmed || trimmed.startsWith("#")) continue;
+			const entry = normalizePath(trimmed).replace(/^\/+|\/+$/g, "");
+			if (!entry || entry === "." || entry === "/") continue;
+			patterns.push({
+				value: entry.toLowerCase(),
+				// Only entries that actually contain a wildcard pay the
+				// RegExp cost; everything else uses plain string compares.
+				regex: /[*?]/.test(entry) ? this._globToRegExp(entry) : null
+			});
+		}
+		this._exclusionCache = { raw, patterns };
+		return patterns;
+	}
+
+	/**
+	 * Converts a user-typed glob into an anchored RegExp:
+	 * `*` matches anything except a slash, `**` crosses folder boundaries,
+	 * `?` matches a single non-slash character. Every other regex
+	 * metacharacter is escaped, so a pattern can never be interpreted as a
+	 * raw regular expression. Returns null on an impossible pattern rather
+	 * than throwing — a broken line is simply ignored instead of breaking
+	 * the whole scan.
+	 */
+	_globToRegExp(pattern) {
+		const DOUBLE_STAR = "\u0000";
+		const body = pattern
+			.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+			.replace(/\*\*/g, DOUBLE_STAR)
+			.replace(/\*/g, "[^/]*")
+			.replace(new RegExp(DOUBLE_STAR, "g"), ".*")
+			.replace(/\?/g, "[^/]");
+		try {
+			return new RegExp(`^${body}$`, "i");
+		} catch (e) {
+			console.error("ConditionalProperties: invalid exclusion pattern", e);
+			return null;
+		}
+	}
+
+	/**
+	 * True when `filePath` (vault-relative, e.g. "Archive/2024/note.md") is
+	 * covered by the user's exclusion list. An entry matches when it is:
+	 *   - the exact file path ("Inbox/scratch.md"), with or without the
+	 *     ".md" extension;
+	 *   - a folder containing the file at any depth ("Templates" excludes
+	 *     "Templates/daily/x.md");
+	 *   - a glob that matches the whole path ("**\/*.excalidraw.md").
+	 * Comparison is case-insensitive, matching how Obsidian treats vault
+	 * paths on macOS/Windows.
+	 */
+	isPathExcluded(filePath) {
+		if (!filePath) return false;
+		const patterns = this._getExclusionPatterns();
+		if (!patterns.length) return false;
+		const path = String(filePath).toLowerCase();
+		for (const pattern of patterns) {
+			if (pattern.regex) {
+				if (pattern.regex.test(filePath)) return true;
+				continue;
+			}
+			if (path === pattern.value) return true;
+			if (path === `${pattern.value}.md`) return true;
+			if (path.startsWith(`${pattern.value}/`)) return true;
+		}
+		return false;
+	}
+
 	_getFilesToScan() {
 		const { vault } = this.app;
-		const allFiles = vault.getMarkdownFiles();
+		// Exclusions are applied before the scope slice, so excluding a
+		// folder genuinely frees up slots in a "latest N notes" scan
+		// instead of silently shrinking how many notes get processed.
+		const allFiles = vault.getMarkdownFiles().filter(file => !this.isPathExcluded(file.path));
 		if (this.settings.scanScope === 'entireVault') {
 			return allFiles;
 		}
@@ -1901,6 +1999,7 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 						lastRun: null,
 						scanScope: "latestCreated",
 						scanCount: 15,
+						excludedPaths: "",
 						operatorMigrationVersion: 0,
 						...settings
 					};
@@ -2025,6 +2124,25 @@ class ConditionalPropertiesSettingTab extends PluginSettingTab {
 				notesToScanSetting.settingEl.toggleClass('is-hidden', hidden);
 			};
 			syncNotesToScanVisibility();
+
+			// Exclusion list — one file or folder per line. Applies to every
+			// scan path (scheduled, "Run now", a single rule's run, and the
+			// "Run conditional rules on current file" command), so an
+			// excluded note is never touched by any rule.
+			new Setting(configItemsEl)
+				.setName("Excluded files and folders")
+				.setClass("cp-excluded-paths")
+				.setDesc("One path per line, relative to the vault root. A folder excludes every note inside it, at any depth. Wildcards are supported (* within a folder, ** across folders). Lines starting with # are ignored.")
+				.addTextArea(text => {
+					text.setPlaceholder("Templates\nArchive/2024\nInbox/scratch.md\n**/*.excalidraw.md")
+						.setValue(this.plugin.settings.excludedPaths || "")
+						.onChange((value) => {
+							this.plugin.settings.excludedPaths = value;
+							this._debouncedSaveSettings();
+						});
+					text.inputEl.rows = 6;
+					text.inputEl.setAttr("aria-label", "Excluded files and folders, one path per line");
+				});
 
 			// Add Export/Import Buttons
 			const exportImportSetting = new Setting(configItemsEl)

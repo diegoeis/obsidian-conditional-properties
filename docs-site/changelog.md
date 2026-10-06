@@ -8,6 +8,10 @@ nav_order: 11
 
 The full, unabridged history lives in [CHANGELOG.md on GitHub](https://github.com/diegoeis/obsidian-conditional-properties/blob/main/CHANGELOG.md). Highlights of recent releases:
 
+## 0.27.0
+
+- **Excluded files and folders** — a multi-line settings field listing notes and folders the plugin must never touch, one path per line. Folders cover everything inside them at any depth, file entries match an exact note, and wildcards (`*`, `**`, `?`) are supported. Applies to scheduled scans, "Run now", "Run this rule", and the run-on-current-file command. See [Execution & Scheduling](/obsidian-conditional-properties/execution-scheduling#excluded-files-and-folders).
+
 ## 0.26.0
 
 - IF condition values now accept the same [placeholders](/placeholders) as THEN actions — `{{today}}`, `{{propertyName}}`, and friends — resolved against the file before the comparison runs.

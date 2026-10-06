@@ -58,7 +58,7 @@ THEN  First level title: Add suffix → " - {{date:DD/MM/YYYY}}"
 | [Actions (THEN)](/obsidian-conditional-properties/actions/) | Property, First level title, Note file actions (including Bookmark file), multiple actions per rule |
 | [Placeholders](/obsidian-conditional-properties/placeholders) | `{{date}}`, `{{yesterday}}`, `{{tomorrow}}`, `{{time}}`, `{{title}}`, `{{propertyName}}`, `{{match}}` — work in IF conditions too |
 | [Typed Properties](/obsidian-conditional-properties/typed-properties) | Checkbox / date / datetime auto-coercion |
-| [Execution & Scheduling](/obsidian-conditional-properties/execution-scheduling) | Run manually, scheduled scans, scan scopes |
+| [Execution & Scheduling](/obsidian-conditional-properties/execution-scheduling) | Run manually, scheduled scans, scan scopes, excluded files and folders |
 | [Backup & Restore](/obsidian-conditional-properties/backup-restore) | Export/import your rules, search rules by name or value |
 | [Help](/obsidian-conditional-properties/help) | Bug reports, feature requests |
 | [Changelog](/obsidian-conditional-properties/changelog) | Version history |

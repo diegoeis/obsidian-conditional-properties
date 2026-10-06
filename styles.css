@@ -268,3 +268,27 @@
   color: var(--text-muted);
   margin-bottom: 16px;
 }
+
+/* Exclusion list — the only multi-line field in the tab. Obsidian's
+   default setting row keeps the control column narrow, which makes a
+   one-path-per-line textarea unreadable, so this row stacks: full-width
+   description on top, full-width textarea below. Monospace keeps folder
+   paths aligned; vertical-only resize stops a drag from breaking the
+   settings layout horizontally. */
+#eis-cp-plugin .cp-excluded-paths {
+  display: block;
+}
+
+#eis-cp-plugin .cp-excluded-paths .setting-item-control {
+  width: 100%;
+  padding-top: 8px;
+  justify-content: flex-start;
+}
+
+#eis-cp-plugin .cp-excluded-paths textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+}

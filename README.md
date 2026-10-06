@@ -163,6 +163,13 @@ THEN  Note file: Move file to → "transcripts/{{match}}"
 Scope: Latest modified, count: 15
 ```
 
+**Excluded files and folders** *(new in v0.27.0)* — list notes and folders the plugin must never touch, one path per line. Folders cover everything inside them; wildcards (`*`, `**`, `?`) are supported.
+```yaml
+Templates
+Archive/2024
+**/*.excalidraw.md
+```
+
 ### Settings management
 
 **Rule search** *(new in v0.25.3, extended in v0.26.0)* — right under the "Rules" heading: a dropdown (Property / First level title / Note file) plus a search field that filters the rule list live as you type, once you've typed at least 2 characters. It searches both sides of the rule for that type: for Property, the IF condition's property name *and* value, plus the matching THEN property action's property name, value, and rename target; for First level title and Note file, the IF condition's typed text plus the matching THEN action's text (and bookmark group, for Note file). Matching is case-insensitive, as a literal substring (a `/regex/`-mode value is matched as that literal text). A rule shows up if *any* matching field is found, regardless of the rule's own Match (any/all) setting. The search resets every time you reopen the settings tab.
@@ -390,6 +397,32 @@ Choose what to scan:
 - **Entire vault**: process all notes
 
 Useful for running rules only on active notes instead of your entire vault.
+
+## Excluded files and folders
+
+*(new in v0.27.0)*
+
+Settings → **Excluded files and folders** — a multi-line field listing notes and folders the plugin must never touch. One path per line, relative to the vault root:
+
+```
+Templates
+Archive/2024
+Inbox/scratch.md
+**/*.excalidraw.md
+# lines starting with # are ignored
+```
+
+| Entry | Matches |
+|---|---|
+| `Templates` | Every note inside that folder, at any depth — and a note literally named `Templates.md` |
+| `Inbox/scratch.md` | That exact note (the `.md` is optional) |
+| `Daily/*.md` | Notes directly inside `Daily`, but not in its subfolders |
+| `**/*.excalidraw.md` | Any note with that suffix, anywhere in the vault |
+| `note?.md` | `note1.md`, `noteA.md` — `?` is a single character |
+
+Leading and trailing slashes are ignored (`/Templates/` is the same as `Templates`) and matching is case-insensitive. Paths are matched literally — a `.` or `(` in a folder name is never interpreted as a regular expression.
+
+Exclusions apply to **every** way a rule can run: scheduled scans, **Run now**, a single rule's **Run this rule**, and the "Run conditional rules on current file" command (which tells you the file was skipped). They're applied before the scan-scope slice, so excluding a folder frees up slots in a "latest N notes" scan instead of shrinking how many notes actually get processed.
 
 ## Placeholders
 
